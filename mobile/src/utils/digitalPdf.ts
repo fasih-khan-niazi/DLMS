@@ -1,7 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
-import { firebaseAuth } from "./firebase";
-import { API_BASE_URL } from "./api";
+import { firebaseAuth } from "../config/firebase";
+import { API_BASE_URL } from "../config/api";
 
 export async function downloadDigitalPdf(
   digitalBookId: string,

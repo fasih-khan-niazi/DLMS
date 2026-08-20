@@ -41,18 +41,23 @@ export async function registerForPushNotifications(): Promise<string | null> {
     Constants.expoConfig?.extra?.eas?.projectId ||
     Constants.easConfig?.projectId;
 
-  // Expo push token (works with Expo Go). For FCM native token later, use getDevicePushTokenAsync.
-  const tokenResponse = projectId
-    ? await Notifications.getExpoPushTokenAsync({ projectId })
-    : await Notifications.getExpoPushTokenAsync();
-
-  const token = tokenResponse.data;
-
+  // Expo Go needs a projectId when available; never crash the app if push setup fails.
   try {
-    await api.post("/api/auth/fcm-token", { token });
-  } catch (error) {
-    console.error("Failed to register push token with API:", error);
-  }
+    const tokenResponse = projectId
+      ? await Notifications.getExpoPushTokenAsync({ projectId })
+      : await Notifications.getExpoPushTokenAsync();
 
-  return token;
+    const token = tokenResponse.data;
+
+    try {
+      await api.post("/api/auth/fcm-token", { token });
+    } catch (error) {
+      console.error("Failed to register push token with API:", error);
+    }
+
+    return token;
+  } catch (error) {
+    console.error("Push token registration skipped:", error);
+    return null;
+  }
 }

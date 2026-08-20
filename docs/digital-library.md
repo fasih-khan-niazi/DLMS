@@ -43,3 +43,12 @@ Legacy uploads with `storageBackend: "local"` may still exist under
 
 API must be running (auth + proxy). PDF files themselves live in Supabase, so they
 are not lost when the PC is off - but the phone still needs the API for access control.
+
+## Who can upload (no admin web required yet)
+
+Upload PDF is already on the **mobile** app for `librarian` or `admin`.
+
+Use the seeded admin account from `scripts/seed-admin.ts` (role `admin`). On Home you
+should see **Upload PDF**. To promote a normal student without the web portal, set
+their Firestore `users/{uid}.role` to `librarian` and custom claim `role: librarian`
+(or we add a tiny promote script in Phase 7).
