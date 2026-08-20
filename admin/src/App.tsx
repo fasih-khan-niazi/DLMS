@@ -6,6 +6,7 @@ import { ConfigPage } from "./pages/Config";
 import { DashboardPage } from "./pages/Dashboard";
 import { FinesPage } from "./pages/Fines";
 import { LoginPage } from "./pages/Login";
+import { ReportsPage } from "./pages/Reports";
 import { ReservationsPage } from "./pages/Reservations";
 import { UsersPage } from "./pages/Users";
 
@@ -46,6 +47,7 @@ export default function App() {
             <Route path="config" element={<ConfigPage />} />
             <Route path="reservations" element={<ReservationsPage />} />
             <Route path="fines" element={<FinesPage />} />
+            <Route path="reports" element={<ReportsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

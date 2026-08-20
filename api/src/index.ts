@@ -7,6 +7,7 @@ import helmet from "helmet";
 import { startCronJobs } from "./cron";
 import authRoutes from "./routes/auth";
 import adminRoutes from "./routes/admin";
+import reportsRoutes from "./routes/reports";
 import catalogRoutes from "./routes/catalog";
 import loanRoutes from "./routes/loans";
 import reservationRoutes from "./routes/reservations";
@@ -33,6 +34,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/admin/reports", reportsRoutes);
 app.use("/api/catalog", catalogRoutes);
 app.use("/api/loans", loanRoutes);
 app.use("/api/reservations", reservationRoutes);

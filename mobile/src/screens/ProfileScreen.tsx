@@ -1,15 +1,21 @@
 import React, { useEffect, useState } from "react";
-import { Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import {
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+} from "react-native";
+import { signOut } from "firebase/auth";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import api, { API_BASE_URL } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
+import api, { API_BASE_URL } from "../config/api";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
 };
 
-export default function HomeScreen({ navigation }: Props) {
+export default function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<any>(null);
 
@@ -29,46 +35,56 @@ export default function HomeScreen({ navigation }: Props) {
         { paddingTop: Math.max(insets.top, 24) + 12 },
       ]}
     >
-      <Text style={styles.brand}>DLMS</Text>
-      <Text style={styles.greeting}>
-        Hello, {profile?.displayName || firebaseAuth.currentUser?.displayName || "User"}
+      <Text style={styles.title}>Profile</Text>
+      <Text style={styles.name}>
+        {profile?.displayName || firebaseAuth.currentUser?.displayName || "User"}
       </Text>
-      <Text style={styles.role}>Role: {profile?.role || "loading..."}</Text>
+      <Text style={styles.meta}>{profile?.email || firebaseAuth.currentUser?.email}</Text>
+      <Text style={styles.meta}>Role: {profile?.role || "..."}</Text>
+      <Text style={styles.meta}>
+        Active loans: {profile?.activeBorrowCount ?? 0}
+      </Text>
+      <Text style={styles.meta}>
+        Outstanding fines: Rs {profile?.totalOutstandingFines ?? 0}
+      </Text>
       <Text style={styles.apiHint}>API: {API_BASE_URL}</Text>
 
-      <Text style={styles.section}>Digital</Text>
-
       <TouchableOpacity
-        style={styles.actionButton}
+        style={styles.linkButton}
         onPress={() => navigation.navigate("DigitalLibrary")}
       >
-        <Text style={styles.actionText}>E-Library</Text>
+        <Text style={styles.linkText}>E-Library</Text>
       </TouchableOpacity>
-
       <TouchableOpacity
-        style={styles.actionButton}
+        style={styles.linkButton}
         onPress={() => navigation.navigate("Bookshelf")}
       >
-        <Text style={styles.actionText}>My Bookshelf</Text>
+        <Text style={styles.linkText}>My Bookshelf</Text>
       </TouchableOpacity>
 
       {isStaff && (
         <>
-          <Text style={styles.section}>Staff</Text>
           <TouchableOpacity
-            style={styles.actionButton}
+            style={styles.linkButton}
             onPress={() => navigation.navigate("AddBook")}
           >
-            <Text style={styles.actionText}>Add Physical Book</Text>
+            <Text style={styles.linkText}>Add Physical Book</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.actionButton}
+            style={styles.linkButton}
             onPress={() => navigation.navigate("UploadDigitalBook")}
           >
-            <Text style={styles.actionText}>Upload PDF</Text>
+            <Text style={styles.linkText}>Upload PDF</Text>
           </TouchableOpacity>
         </>
       )}
+
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={() => signOut(firebaseAuth)}
+      >
+        <Text style={styles.logoutText}>Sign Out</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -80,18 +96,18 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
     flexGrow: 1,
   },
-  brand: {
-    fontSize: 32,
+  title: {
+    fontSize: 28,
     fontWeight: "800",
     color: "#2E4A62",
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  greeting: {
-    fontSize: 22,
+  name: {
+    fontSize: 20,
     fontWeight: "700",
     color: "#2E4A62",
   },
-  role: {
+  meta: {
     fontSize: 15,
     color: "#6B7280",
     marginTop: 6,
@@ -99,29 +115,31 @@ const styles = StyleSheet.create({
   apiHint: {
     fontSize: 12,
     color: "#9CA3AF",
-    marginTop: 4,
+    marginTop: 8,
     marginBottom: 20,
   },
-  section: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#2E4A62",
-    marginBottom: 10,
-    marginTop: 8,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  actionButton: {
-    width: "100%",
+  linkButton: {
     backgroundColor: "#2E4A62",
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  actionText: {
-    color: "#FFFFFF",
-    fontSize: 16,
+  linkText: {
+    color: "#FFF",
     fontWeight: "600",
+    fontSize: 16,
+  },
+  logoutButton: {
+    marginTop: 16,
+    backgroundColor: "#E8A838",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  logoutText: {
+    color: "#FFF",
+    fontWeight: "700",
+    fontSize: 16,
   },
 });

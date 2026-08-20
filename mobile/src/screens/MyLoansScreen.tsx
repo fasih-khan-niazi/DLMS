@@ -14,9 +14,10 @@ import api from "../config/api";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
+  embedded?: boolean;
 };
 
-export default function MyLoansScreen({ navigation }: Props) {
+export default function MyLoansScreen({ navigation, embedded }: Props) {
   const [loans, setLoans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,10 +51,13 @@ export default function MyLoansScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()}>
-        <Text style={styles.back}>← Back</Text>
-      </TouchableOpacity>
-      <Text style={styles.heading}>My Loans</Text>
+      {!embedded && (
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.back}>← Back</Text>
+        </TouchableOpacity>
+      )}
+      {!embedded && <Text style={styles.heading}>My Loans</Text>}
+      {embedded && <Text style={styles.headingEmbedded}>Your loans</Text>}
 
       {loading ? (
         <ActivityIndicator color="#2E4A62" style={{ marginTop: 40 }} />
@@ -96,7 +100,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8F7F4",
-    paddingTop: 56,
+    paddingTop: 16,
     paddingHorizontal: 20,
   },
   back: {
@@ -109,6 +113,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#2E4A62",
     marginBottom: 16,
+  },
+  headingEmbedded: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#2E4A62",
+    marginBottom: 8,
+    marginTop: 4,
   },
   card: {
     backgroundColor: "#FFFFFF",

@@ -15,9 +15,10 @@ import api from "../config/api";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
+  embedded?: boolean;
 };
 
-export default function ReservationsScreen({ navigation }: Props) {
+export default function ReservationsScreen({ navigation, embedded }: Props) {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -69,10 +70,13 @@ export default function ReservationsScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()}>
-        <Text style={styles.back}>← Back</Text>
-      </TouchableOpacity>
-      <Text style={styles.heading}>My Reservations</Text>
+      {!embedded && (
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.back}>← Back</Text>
+        </TouchableOpacity>
+      )}
+      {!embedded && <Text style={styles.heading}>My Reservations</Text>}
+      {embedded && <Text style={styles.headingEmbedded}>Your reservations</Text>}
       <Text style={styles.hint}>
         When status is Ready, scan that copy&apos;s QR (Borrow mode) within 72 hours.
       </Text>
@@ -137,7 +141,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8F7F4",
-    paddingTop: 56,
+    paddingTop: 16,
     paddingHorizontal: 20,
   },
   back: {
@@ -149,6 +153,12 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "700",
     color: "#2E4A62",
+  },
+  headingEmbedded: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#2E4A62",
+    marginTop: 4,
   },
   hint: {
     marginTop: 8,

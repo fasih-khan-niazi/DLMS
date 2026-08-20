@@ -1,5 +1,6 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { initializeApp, getApps } from "firebase/app";
+import { initializeAuth, getAuth } from "firebase/auth";
+import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCREotdbbgVbkqSIyMTA20LVbr2Bu0ZMCQ",
@@ -10,5 +11,21 @@ const firebaseConfig = {
   appId: "1:747601344349:web:5044b526512f8ca183dab4",
 };
 
-const app = initializeApp(firebaseConfig);
-export const firebaseAuth = getAuth(app);
+const app = getApps().length ? getApps()[0]! : initializeApp(firebaseConfig);
+
+function createAuth() {
+  try {
+    // RN persistence helper is on the React Native build entry.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const rnAuth = require("@firebase/auth/dist/rn/index.js") as {
+      getReactNativePersistence: (storage: typeof ReactNativeAsyncStorage) => unknown;
+    };
+    return initializeAuth(app, {
+      persistence: rnAuth.getReactNativePersistence(ReactNativeAsyncStorage) as any,
+    });
+  } catch {
+    return getAuth(app);
+  }
+}
+
+export const firebaseAuth = createAuth();

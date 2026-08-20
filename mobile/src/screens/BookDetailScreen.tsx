@@ -67,7 +67,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
     try {
       const response = await api.post("/api/reservations", { isbn });
       Alert.alert("Reserved", response.data.message || "Added to queue");
-      navigation.navigate("Reservations");
+      navigation.navigate("Activity");
     } catch (error: any) {
       Alert.alert("Could not reserve", error.response?.data?.error || "Request failed");
     } finally {

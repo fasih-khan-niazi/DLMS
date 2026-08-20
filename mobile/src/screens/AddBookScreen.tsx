@@ -84,7 +84,7 @@ export default function AddBookScreen({ navigation }: Props) {
         "Success",
         `Book saved with ${copiesResponse.data.createdCount} copy/copies.`
       );
-      navigation.navigate("Catalog");
+      navigation.getParent()?.navigate("Catalog");
     } catch (error: any) {
       Alert.alert("Error", error.response?.data?.error || "Failed to save book");
     } finally {

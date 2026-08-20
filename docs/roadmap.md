@@ -69,12 +69,13 @@
 - Reservation and fine management
 - Admin Vite app at `admin/` - see `docs/admin-web.md`
 
-### Phase 8: Reporting, Navigation Polish, and Hardening
+### Phase 8: Reporting, Navigation Polish, and Hardening ✅
 
-- Bottom tab navbar (Home, Catalog, Scan, Loans/Activity, Profile)
+- Bottom tab navbar (Home, Catalog, Scan, Activity, Profile)
 - Dedicated screens wired into tabs (not only stack buttons)
-- Daily metrics
-- Date-range reports
-- CSV/Excel export
-- PDF export
-- Security review and polish
+- Daily metrics ✅ (admin reports daily series + summary)
+- Date-range reports ✅ (`/api/admin/reports` + admin Reports page)
+- CSV export ✅ (CSV download; Excel optional later)
+- PDF export - deferred (CSV covers FYP demo needs)
+- Auth persistence via AsyncStorage
+- Security review and polish (ongoing)

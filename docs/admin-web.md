@@ -35,5 +35,12 @@ Open http://localhost:5173 (Vite default).
 - Config: edit `config/system` settings
 - Reservations: waiting/ready list
 - Fines: unpaid users/loans and mark fine paid
+- Reports: date-range summary metrics, daily series table, CSV download
+
+### Reports API
+
+- `GET /api/admin/reports/summary?from=YYYY-MM-DD&to=YYYY-MM-DD` (librarian or admin)
+- `GET /api/admin/reports/export.csv?from=&to=` (same roles; authenticated blob download)
+- Default range: last 30 days through today (Asia/Karachi calendar dates on the API)
 
 API base URL is `http://localhost:5000` (see `admin/src/config/api.ts`).

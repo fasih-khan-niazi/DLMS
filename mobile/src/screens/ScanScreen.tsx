@@ -78,9 +78,6 @@ export default function ScanScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>← Back</Text>
-        </TouchableOpacity>
         <Text style={styles.heading}>Scan QR</Text>
       </View>
 
