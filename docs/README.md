@@ -1,6 +1,6 @@
 # Documentation layout
 
-## `docs/` — engineering (on GitHub)
+## `docs/` - engineering (on GitHub)
 
 These files are for **developers, viva evidence, and GitHub visitors**. They stay in the repo.
 
@@ -8,7 +8,7 @@ Examples: architecture, setup, roadmap, Firebase notes, device LAN setup, digita
 
 **Do not put `docs/` in `.gitignore`.** Ignoring project docs is not industry practice.
 
-## `docs/fyp/` — university FYP narrative
+## `docs/fyp/` - university FYP narrative
 
 Use this folder for **thesis / report drafts** (chapters, abstracts, screenshots for the report).
 

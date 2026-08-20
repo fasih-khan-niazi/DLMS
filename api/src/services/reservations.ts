@@ -12,7 +12,7 @@ function createdAtMs(value: any): number {
   return new Date(value).getTime();
 }
 
-/** FIFO next waiter — sorted in memory (avoids composite index requirement). */
+/** FIFO next waiter - sorted in memory (avoids composite index requirement). */
 export async function getNextWaitingReservation(isbn: string): Promise<{
   id: string;
   userId: string;

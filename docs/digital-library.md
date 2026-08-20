@@ -32,9 +32,9 @@ tied to the PC disk. API routes stay the same; only the storage backend changes.
 
 ## Mobile
 
-- **E-Library** — browse/search digital books
-- **Upload PDF** — staff only
-- **Bookshelf** — progress + star rating
+- **E-Library** - browse/search digital books
+- **Upload PDF** - staff only
+- **Bookshelf** - progress + star rating
 - Open PDF downloads via authenticated API, then device share sheet
 
 ## Demo note

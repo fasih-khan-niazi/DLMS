@@ -14,7 +14,7 @@ when the console prompts you (or ahead of time):
    - Used by: claim/borrow of a ready reserved copy
 
 If a query fails at runtime, Firestore returns a link in the API error/log
-to auto-create the missing index — open that link while signed into the project.
+to auto-create the missing index - open that link while signed into the project.
 
 ## Note (Phase 4 hardening)
 

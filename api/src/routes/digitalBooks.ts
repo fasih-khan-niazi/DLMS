@@ -152,7 +152,7 @@ router.get("/:digitalBookId/file", authenticate, async (req: AuthRequest, res: R
   }
 });
 
-// Upload PDF (librarian/admin) — local disk storage (Spark workaround)
+// Upload PDF (librarian/admin) - local disk storage (Spark workaround)
 router.post(
   "/",
   authenticate,

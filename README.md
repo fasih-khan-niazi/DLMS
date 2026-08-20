@@ -1,6 +1,6 @@
 # DLMS
 
-Digital Library Management System (Android-first) — TypeScript monorepo for students, librarians, and admins.
+Digital Library Management System (Android-first) - TypeScript monorepo for students, librarians, and admins.
 
 **Live repo:** [github.com/fasih-khan-niazi/DLMS](https://github.com/fasih-khan-niazi/DLMS)
 
@@ -27,12 +27,12 @@ Digital Library Management System (Android-first) — TypeScript monorepo for st
 ├── docs/       # Engineering docs (for GitHub + contributors)
 ├── docs/fyp/   # FYP write-ups / thesis drafts (optional)
 ├── scripts/    # One-off tools (e.g. seed admin)
-└── secrets/    # Local credentials only — never committed
+└── secrets/    # Local credentials only - never committed
 ```
 
 ## Current status
 
-Phases **1–6** are implemented in this codebase:
+Phases **1-6** are implemented in this codebase:
 
 1. Foundation (auth, seed admin, monorepo)
 2. Catalog (ISBN / Google Books, copies, QR)
@@ -49,7 +49,7 @@ Phases **1–6** are implemented in this codebase:
 2. Put Firebase credentials in `secrets/` (gitignored) and copy `api/.env.example` → `api/.env`
 3. API: `cd api && npm install && npm run dev`
 4. Mobile: `cd mobile && npm install && npx expo start`
-5. Phone must reach the API on your LAN — see [`docs/device-setup.md`](docs/device-setup.md)
+5. Phone must reach the API on your LAN - see [`docs/device-setup.md`](docs/device-setup.md)
 
 ## Documentation
 
@@ -62,7 +62,7 @@ Phases **1–6** are implemented in this codebase:
 | [`docs/digital-library.md`](docs/digital-library.md) | PDF / e-library |
 | [`docs/fyp/`](docs/fyp/) | University FYP narrative (separate from eng docs) |
 
-Engineering docs under `docs/` **are committed** — that is normal industry practice. Only secrets and uploaded PDFs are ignored.
+Engineering docs under `docs/` **are committed** - that is normal industry practice. Only secrets and uploaded PDFs are ignored.
 
 ## Security
 
@@ -74,12 +74,12 @@ Never commit:
 
 ## Git workflow
 
-- `main` — stable / demo-ready  
-- `dev` — integration  
-- `feat/*` — features · `chore/*` — docs/tooling  
+- `main` - stable / demo-ready  
+- `dev` - integration  
+- `feat/*` - features · `chore/*` - docs/tooling  
 
 See [`docs/github-workflow.md`](docs/github-workflow.md).
 
 ## License
 
-MIT — see `package.json`.
+MIT - see `package.json`.

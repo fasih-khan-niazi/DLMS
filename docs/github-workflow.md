@@ -21,8 +21,8 @@ Benefits:
 
 ## Suggested flow from now
 
-1. Create `dev` from `main`
-2. For each phase: `feat/phase-6-notifications` → work → merge into `dev`
+1. Work on `dev` (integration branch) day to day
+2. For larger features: `feat/...` from `dev` → PR/merge back into `dev`
 3. When a milestone is solid: merge `dev` → `main`
 
 ## Commit style
@@ -54,5 +54,5 @@ Short, clear, present tense:
 
 ## First product commit
 
-Use **one** commit for the initial dump (phases 1–6), then small commits after that.
+Use **one** commit for the initial dump (phases 1-6), then small commits after that.
 See the agent’s step-by-step teach-through in chat when you first push.

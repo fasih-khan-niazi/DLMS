@@ -41,7 +41,7 @@
 
 ### Phase 5: Digital Library ✅
 
-- Local PDF storage on Express (`api/uploads/`) — Spark workaround (no Firebase Storage)
+- Local PDF storage on Express (`api/uploads/`) - Spark workaround (no Firebase Storage)
 - Digital book upload/list/stream APIs
 - Bookshelf with progress (0-100%) and rating (1-5)
 - Mobile E-Library, PDF download/open, Bookshelf, Upload PDF (staff)

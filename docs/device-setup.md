@@ -8,7 +8,7 @@ Detected earlier: `192.168.100.7`
 
 Even if the PC is on Ethernet and the phone is on Wi‑Fi, this often still works when both are on the **same router**.
 
-## Step A — Keep the API reachable on the LAN
+## Step A - Keep the API reachable on the LAN
 
 1. In `api/`, start the server:
    ```bash
@@ -23,7 +23,7 @@ If the phone browser shows the health JSON, the API is reachable. Good.
 
 If it fails (timeout / refused), use **Step C (USB)** or **ngrok** later.
 
-## Step B — Install Expo Go and open the app
+## Step B - Install Expo Go and open the app
 
 1. Install **Expo Go** from Play Store (this project targets **Expo SDK 54**, which matches Play Store Expo Go).
 2. On PC (LAN is enough if phone `/health` already works):
@@ -46,7 +46,7 @@ Tunnel needs `@expo/ngrok`. Answer **Y** when asked to install it.
 
 Your project SDK and Expo Go SDK must match. This repo is pinned to SDK 54 for Play Store Expo Go.
 
-## Step C — USB option (recommended for reliability)
+## Step C - USB option (recommended for reliability)
 
 Install Android Platform Tools later (gives you `adb`):
 
