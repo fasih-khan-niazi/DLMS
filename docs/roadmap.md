@@ -61,12 +61,13 @@
 - Legacy local files still readable if present
 - Onboarding: `docs/supabase.md`
 
-### Phase 7: Admin Web
+### Phase 7: Admin Web ✅
 
 - Dashboard
 - User and role management
 - Config management
 - Reservation and fine management
+- Admin Vite app at `admin/` - see `docs/admin-web.md`
 
 ### Phase 8: Reporting, Navigation Polish, and Hardening
 

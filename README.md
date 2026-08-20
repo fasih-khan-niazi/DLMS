@@ -41,7 +41,7 @@ Phases **1-6** are implemented in this codebase:
 5. Digital library (PDF ≤25MB, bookshelf)
 6. Notifications (due / overdue / reservation-ready + cron)
 
-**Next:** Phase 7 admin web, then Phase 8 reports + tab navigation.
+**Next:** Phase 8 - bottom tab navigation, reports/exports, polish.
 
 ## Quick start
 
