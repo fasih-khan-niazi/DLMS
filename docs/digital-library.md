@@ -1,22 +1,24 @@
-# Digital Library (Phase 5)
+# Digital Library (Phase 5 + 6b)
 
 ## Storage approach
 
-Firebase Storage requires Blaze on this project. **Today** PDFs live on the
-**self-hosted API machine**:
+PDF **bytes** are stored in **Supabase Storage** (private bucket `digital-books`).
+**Metadata** stays in Firestore:
 
-- Folder: `api/uploads/digital-books/`
-- Metadata: Firestore `digitalBooks/{id}`
+- Firestore: `digitalBooks/{id}`
 - Bookshelf: `users/{uid}/bookshelf/{digitalBookId}`
+- Object path example: `digital-books/{ebookId}_{name}.pdf`
 
-**Planned (Phase 6b):** move file bytes to **Supabase Storage** so PDFs are not
-tied to the PC disk. API routes stay the same; only the storage backend changes.
+See [`supabase.md`](./supabase.md) for project/bucket setup.
+
+Legacy uploads with `storageBackend: "local"` may still exist under
+`api/uploads/digital-books/` until re-uploaded.
 
 ## Limits
 
 - PDF only
 - Max **25MB** per file
-- Files are ignored by git (see root `.gitignore`)
+- Local upload folder is gitignored; cloud objects are not in git
 
 ## API
 
@@ -26,7 +28,7 @@ tied to the PC disk. API routes stay the same; only the storage backend changes.
 | GET | `/api/digital-books/:id` | any logged-in user |
 | GET | `/api/digital-books/:id/file` | authenticated stream/download |
 | POST | `/api/digital-books` (multipart `file`) | librarian/admin |
-| DELETE | `/api/digital-books/:id` | unpublish |
+| DELETE | `/api/digital-books/:id` | unpublish (+ remove from Supabase) |
 | GET | `/api/digital-books/bookshelf/mine` | student |
 | POST/PATCH/DELETE | `/api/digital-books/:id/bookshelf` | student |
 
@@ -39,5 +41,5 @@ tied to the PC disk. API routes stay the same; only the storage backend changes.
 
 ## Demo note
 
-PDFs live on your PC. The phone must reach the API (`192.168.100.7:5000`).
-If the PC is off, digital books cannot be downloaded.
+API must be running (auth + proxy). PDF files themselves live in Supabase, so they
+are not lost when the PC is off - but the phone still needs the API for access control.

@@ -6,7 +6,7 @@
 - Admin panel: React + TypeScript
 - API: Express + TypeScript + Firebase Admin SDK
 - Database: Firestore
-- File storage: Firebase Storage
+- File storage: Supabase Storage (private PDF bucket; API proxies access)
 - Authentication: Firebase Auth
 - Notifications: Firebase Cloud Messaging
 - Scheduled jobs: `node-cron`
@@ -28,9 +28,12 @@ flowchart TB
     subgraph firebase [Firebase Spark]
         Auth[Auth]
         FS[(Firestore)]
-        ST[Storage]
         FCM[FCM]
         Host[Hosting]
+    end
+
+    subgraph supabase [Supabase]
+        ST[(Storage PDFs)]
     end
 
     subgraph external [External]
@@ -48,7 +51,6 @@ flowchart TB
     Express --> Books
     Cron --> Express
 ```
-
 ## User Roles
 
 ### Student
@@ -101,9 +103,10 @@ flowchart TB
 
 ### Digital Library
 
-- PDF files are stored in Firebase Storage
+- PDF files are stored in Supabase Storage (private bucket)
 - Metadata is stored in Firestore
 - Students manage progress and ratings from bookshelf records
+- Downloads go through the authenticated Express API (not a public URL)
 
 ### Notifications
 

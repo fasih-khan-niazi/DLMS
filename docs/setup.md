@@ -55,7 +55,12 @@
 
 ## Deferred
 
-- Firebase Storage requires Blaze on newer projects, so PDF storage is deferred until Phase 5 with an alternate plan
+- (none for storage) PDF cloud storage uses Supabase - see `docs/supabase.md`
+
+## Supabase (digital PDFs)
+
+- Free Supabase project + private bucket `digital-books`
+- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` in `api/.env`
 
 ## Device Testing Notes
 

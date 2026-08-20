@@ -1,16 +1,20 @@
 import { Router, Response } from "express";
 import fs from "fs";
 import { db } from "../config/firebase";
+import { isSupabaseConfigured } from "../config/supabase";
+import { digitalBookFilePath } from "../config/storage";
 import { authenticate, AuthRequest } from "../middleware/authenticate";
 import { requireRole } from "../middleware/requireRole";
 import { uploadPdf } from "../middleware/uploadPdf";
 import { createId } from "../utils/ids";
-import { digitalBookFilePath, ensureUploadDirs } from "../config/storage";
 import { buildSearchKeywords } from "../services/googleBooks";
+import {
+  downloadDigitalBookPdf,
+  removeDigitalBookPdf,
+  uploadDigitalBookPdf,
+} from "../services/digitalBookStorage";
 
 const router = Router();
-
-ensureUploadDirs();
 
 function publicFileUrl(req: AuthRequest, digitalBookId: string) {
   const host = req.get("host") || "localhost:5000";
@@ -118,7 +122,7 @@ router.get("/:digitalBookId", authenticate, async (req: AuthRequest, res: Respon
   }
 });
 
-// Stream/download PDF (authenticated)
+// Stream/download PDF (authenticated) - proxies Supabase (or legacy local files)
 router.get("/:digitalBookId/file", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const digitalBookId = req.params.digitalBookId as string;
@@ -134,17 +138,28 @@ router.get("/:digitalBookId/file", authenticate, async (req: AuthRequest, res: R
       return;
     }
 
+    const filename = `${(data.title || "book").replace(/"/g, "")}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+
+    const backend = data.storageBackend || "local";
+
+    if (backend === "supabase") {
+      const objectPath = data.storagePath || data.storedFileName;
+      if (!objectPath) {
+        res.status(404).json({ error: "PDF storage path missing" });
+        return;
+      }
+      const buffer = await downloadDigitalBookPdf(objectPath);
+      res.send(buffer);
+      return;
+    }
+
     const filePath = digitalBookFilePath(data.storedFileName);
     if (!fs.existsSync(filePath)) {
       res.status(404).json({ error: "PDF file missing on server" });
       return;
     }
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${(data.title || "book").replace(/"/g, "")}.pdf"`
-    );
     fs.createReadStream(filePath).pipe(res);
   } catch (error) {
     console.error("Stream digital book error:", error);
@@ -152,7 +167,7 @@ router.get("/:digitalBookId/file", authenticate, async (req: AuthRequest, res: R
   }
 });
 
-// Upload PDF (librarian/admin) - local disk storage (Spark workaround)
+// Upload PDF (librarian/admin) - Supabase Storage
 router.post(
   "/",
   authenticate,
@@ -168,7 +183,15 @@ router.post(
   },
   async (req: AuthRequest, res: Response) => {
     try {
-      if (!req.file) {
+      if (!isSupabaseConfigured()) {
+        res.status(503).json({
+          error:
+            "Supabase Storage is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to api/.env (see docs/supabase.md).",
+        });
+        return;
+      }
+
+      if (!req.file?.buffer) {
         res.status(400).json({ error: "PDF file is required (field name: file)" });
         return;
       }
@@ -178,12 +201,24 @@ router.post(
       const description = String(req.body.description || "").trim();
 
       if (!title) {
-        fs.unlinkSync(req.file.path);
         res.status(400).json({ error: "title is required" });
         return;
       }
 
       const digitalBookId = createId("ebook");
+      const safeBase = (req.file.originalname || "book")
+        .replace(/\.pdf$/i, "")
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .slice(0, 40);
+      const storedFileName = `${digitalBookId}_${safeBase}.pdf`;
+      const storagePath = `digital-books/${storedFileName}`;
+
+      await uploadDigitalBookPdf({
+        objectPath: storagePath,
+        buffer: req.file.buffer,
+        contentType: "application/pdf",
+      });
+
       const now = new Date();
       const searchKeywords = buildSearchKeywords({
         title,
@@ -196,12 +231,13 @@ router.post(
         title,
         author,
         description,
-        storedFileName: req.file.filename,
+        storedFileName,
+        storagePath,
         originalFileName: req.file.originalname,
         fileSizeBytes: req.file.size,
         mimeType: "application/pdf",
         isPublished: true,
-        storageBackend: "local",
+        storageBackend: "supabase",
         searchKeywords,
         uploadedBy: req.uid,
         createdAt: now,
@@ -213,14 +249,13 @@ router.post(
       res.status(201).json({
         ...doc,
         fileUrl: publicFileUrl(req, digitalBookId),
-        message: "PDF uploaded to local server storage",
+        message: "PDF uploaded to Supabase Storage",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload digital book error:", error);
-      if (req.file?.path && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
-      res.status(500).json({ error: "Failed to upload digital book" });
+      res.status(500).json({
+        error: error?.message || "Failed to upload digital book",
+      });
     }
   }
 );
@@ -240,7 +275,21 @@ router.delete(
         return;
       }
 
+      const data = snap.data()!;
       await ref.update({ isPublished: false, updatedAt: new Date() });
+
+      // Best-effort remove from Supabase (keep metadata for audit)
+      if (data.storageBackend === "supabase") {
+        const objectPath = data.storagePath || data.storedFileName;
+        if (objectPath) {
+          try {
+            await removeDigitalBookPdf(objectPath);
+          } catch (removeError) {
+            console.error("Supabase remove after unpublish failed:", removeError);
+          }
+        }
+      }
+
       res.json({ success: true, digitalBookId });
     } catch (error) {
       console.error("Unpublish digital book error:", error);

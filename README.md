@@ -12,7 +12,7 @@ Digital Library Management System (Android-first) - TypeScript monorepo for stud
 | Admin web | React + Vite (Phase 7) |
 | API | Express + TypeScript on a self-hosted PC |
 | Auth / DB | Firebase Auth + Firestore (Spark) |
-| PDF files | Local API disk today → **Supabase Storage** planned |
+| PDF files | **Supabase Storage** (private bucket; API proxies downloads) |
 | Push | Expo push tokens / FCM via API |
 | Jobs | `node-cron` inside the API (Asia/Karachi) |
 
@@ -41,15 +41,16 @@ Phases **1-6** are implemented in this codebase:
 5. Digital library (PDF ≤25MB, bookshelf)
 6. Notifications (due / overdue / reservation-ready + cron)
 
-**Next:** Supabase Storage migration for PDFs, then Phase 7 admin web, then Phase 8 reports + tab navigation.
+**Next:** Phase 7 admin web, then Phase 8 reports + tab navigation.
 
 ## Quick start
 
 1. Read [`docs/setup.md`](docs/setup.md) and [`docs/firebase.md`](docs/firebase.md)
 2. Put Firebase credentials in `secrets/` (gitignored) and copy `api/.env.example` → `api/.env`
-3. API: `cd api && npm install && npm run dev`
-4. Mobile: `cd mobile && npm install && npx expo start`
-5. Phone must reach the API on your LAN - see [`docs/device-setup.md`](docs/device-setup.md)
+3. Add Supabase keys for PDF storage - see [`docs/supabase.md`](docs/supabase.md)
+4. API: `cd api && npm install && npm run dev`
+5. Mobile: `cd mobile && npm install && npx expo start`
+6. Phone must reach the API on your LAN - see [`docs/device-setup.md`](docs/device-setup.md)
 
 ## Documentation
 
@@ -58,6 +59,7 @@ Phases **1-6** are implemented in this codebase:
 | [`docs/architecture.md`](docs/architecture.md) | System design |
 | [`docs/setup.md`](docs/setup.md) | Local install |
 | [`docs/roadmap.md`](docs/roadmap.md) | Phases |
+| [`docs/supabase.md`](docs/supabase.md) | PDF cloud storage |
 | [`docs/github-workflow.md`](docs/github-workflow.md) | Branches & commits |
 | [`docs/digital-library.md`](docs/digital-library.md) | PDF / e-library |
 | [`docs/fyp/`](docs/fyp/) | University FYP narrative (separate from eng docs) |

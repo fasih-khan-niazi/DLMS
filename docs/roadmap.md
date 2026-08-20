@@ -54,16 +54,12 @@
 - Manual cron endpoints for testing (`/internal/cron/...`)
 - Reservation expiry cron already active (every 6 hours)
 
-### Phase 6b: Supabase Storage (planned)
+### Phase 6b: Supabase Storage ✅ (code ready - needs your project keys)
 
-Migrate digital PDF files off the API PC disk onto **Supabase Storage**:
-
-- Create free Supabase project + private bucket
-- Wire Express upload/stream to Supabase (same `/api/digital-books` routes)
-- Keep Firestore metadata; drop reliance on `api/uploads/` for demos
-- Update `docs/digital-library.md` and env examples
-
-Do this **before or right at the start of Phase 7** so admin upload also targets cloud storage.
+- Express uploads PDFs to private Supabase bucket (service role)
+- Download still via authenticated API proxy
+- Legacy local files still readable if present
+- Onboarding: `docs/supabase.md`
 
 ### Phase 7: Admin Web
 
