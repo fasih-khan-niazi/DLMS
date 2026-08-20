@@ -1,0 +1,36 @@
+{
+  "name": "dlms",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Digital Library Management System monorepo",
+  "workspaces": [
+    "api",
+    "admin",
+    "shared"
+  ],
+  "scripts": {
+    "bootstrap": "npm install --workspaces",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fasih-khan-niazi/DLMS.git"
+  },
+  "keywords": [
+    "expo",
+    "firebase",
+    "library-management",
+    "react",
+    "typescript"
+  ],
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/fasih-khan-niazi/DLMS/issues"
+  },
+  "homepage": "https://github.com/fasih-khan-niazi/DLMS#readme",
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,2 +1,85 @@
-# dlms
-A Mobile App for Digital Library Management System
+# DLMS
+
+Digital Library Management System (Android-first) — TypeScript monorepo for students, librarians, and admins.
+
+**Live repo:** [github.com/fasih-khan-niazi/DLMS](https://github.com/fasih-khan-niazi/DLMS)
+
+## Stack
+
+| Layer | Tech |
+|-------|------|
+| Mobile | Expo (React Native) + TypeScript |
+| Admin web | React + Vite (Phase 7) |
+| API | Express + TypeScript on a self-hosted PC |
+| Auth / DB | Firebase Auth + Firestore (Spark) |
+| PDF files | Local API disk today → **Supabase Storage** planned |
+| Push | Expo push tokens / FCM via API |
+| Jobs | `node-cron` inside the API (Asia/Karachi) |
+
+## Packages
+
+```text
+.
+├── mobile/     # Expo app (students + librarians)
+├── admin/      # Web admin panel
+├── api/        # Express backend (business rules + cron)
+├── shared/     # Shared types/constants
+├── docs/       # Engineering docs (for GitHub + contributors)
+├── docs/fyp/   # FYP write-ups / thesis drafts (optional)
+├── scripts/    # One-off tools (e.g. seed admin)
+└── secrets/    # Local credentials only — never committed
+```
+
+## Current status
+
+Phases **1–6** are implemented in this codebase:
+
+1. Foundation (auth, seed admin, monorepo)
+2. Catalog (ISBN / Google Books, copies, QR)
+3. Borrow / return (limits, fines, due dates)
+4. Reservations (FIFO, 72h hold, expiry cron)
+5. Digital library (PDF ≤25MB, bookshelf)
+6. Notifications (due / overdue / reservation-ready + cron)
+
+**Next:** Supabase Storage migration for PDFs, then Phase 7 admin web, then Phase 8 reports + tab navigation.
+
+## Quick start
+
+1. Read [`docs/setup.md`](docs/setup.md) and [`docs/firebase.md`](docs/firebase.md)
+2. Put Firebase credentials in `secrets/` (gitignored) and copy `api/.env.example` → `api/.env`
+3. API: `cd api && npm install && npm run dev`
+4. Mobile: `cd mobile && npm install && npx expo start`
+5. Phone must reach the API on your LAN — see [`docs/device-setup.md`](docs/device-setup.md)
+
+## Documentation
+
+| Doc | Audience |
+|-----|----------|
+| [`docs/architecture.md`](docs/architecture.md) | System design |
+| [`docs/setup.md`](docs/setup.md) | Local install |
+| [`docs/roadmap.md`](docs/roadmap.md) | Phases |
+| [`docs/github-workflow.md`](docs/github-workflow.md) | Branches & commits |
+| [`docs/digital-library.md`](docs/digital-library.md) | PDF / e-library |
+| [`docs/fyp/`](docs/fyp/) | University FYP narrative (separate from eng docs) |
+
+Engineering docs under `docs/` **are committed** — that is normal industry practice. Only secrets and uploaded PDFs are ignored.
+
+## Security
+
+Never commit:
+
+- `.env` / service account JSON / `google-services.json`
+- `secrets/`
+- `api/uploads/` (local PDF files)
+
+## Git workflow
+
+- `main` — stable / demo-ready  
+- `dev` — integration  
+- `feat/*` — features · `chore/*` — docs/tooling  
+
+See [`docs/github-workflow.md`](docs/github-workflow.md).
+
+## License
+
+MIT — see `package.json`.
