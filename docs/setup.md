@@ -51,7 +51,7 @@
 3. Workspace dependencies installed
 4. Expo app and React admin app initialized
 5. Firebase Auth + Firestore enabled
-6. Admin seed script run successfully
+6. Admin seed: `npm run seed` (optional demo users: see [`docs/seed.md`](docs/seed.md))
 
 ## Deferred
 

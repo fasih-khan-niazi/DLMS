@@ -14,7 +14,7 @@ No em dashes in docs or UI copy.
 | **D** | PDF report export (+ CSV already done) |
 | **E** | Security checklist |
 | **F** | Business logic VnV matrix |
-| **G** | Demo script, seed, tag `v1.0.0-mvp`, park |
+| **G** | Seed polish, tag `v1.0.0-mvp`, park (demo script skipped) |
 
 ## Notifications (two layers)
 
@@ -48,6 +48,6 @@ OTP would need a separate email/SMS provider; out of scope for park unless requi
 - Block D: done (PDF report export alongside CSV)
 - Block E: done (see `docs/security.md`)
 - Block F: done (see `docs/vnv-matrix.md`)
-- Block G: pending (demo script, seed, tag `v1.0.0-mvp`, park)
+- Block G: done (seed + park tag; demo script skipped). See `docs/seed.md`, `docs/park.md`
 
 Note: digital PDF upload limit follows `config.maxPdfSizeMb` (default 25MB).

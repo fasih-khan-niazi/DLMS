@@ -66,6 +66,8 @@ Phases **1-6** are implemented in this codebase:
 | [`docs/notifications-inbox.md`](docs/notifications-inbox.md) | In-app notification inbox |
 | [`docs/security.md`](docs/security.md) | Security checklist |
 | [`docs/vnv-matrix.md`](docs/vnv-matrix.md) | Business logic VnV matrix |
+| [`docs/seed.md`](docs/seed.md) | MVP seed script |
+| [`docs/park.md`](docs/park.md) | MVP freeze / park notes |
 
 Engineering docs under `docs/` **are committed** - that is normal industry practice. Only secrets and uploaded PDFs are ignored.
 

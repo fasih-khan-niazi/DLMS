@@ -1,7 +1,7 @@
 {
   "name": "dlms",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0-mvp",
   "description": "Digital Library Management System monorepo",
   "workspaces": [
     "api",
@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "bootstrap": "npm install --workspaces",
+    "seed": "tsx scripts/seed-admin.ts",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
