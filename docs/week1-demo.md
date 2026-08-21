@@ -1,6 +1,6 @@
 # Week 1 public demo checklist
 
-API (done): `https://dlms-csaj.onrender.com/health`
+API (done): `https://dlms-csij.onrender.com/health`
 
 ## 1. Clients point at Render
 
@@ -8,7 +8,7 @@ Defaults in code now use the Render API URL.
 
 | Client | How |
 |--------|-----|
-| Admin local | `admin/.env` with `VITE_API_URL=https://dlms-csaj.onrender.com` then `npm run dev` |
+| Admin local | `admin/.env` with `VITE_API_URL=https://dlms-csij.onrender.com` then `npm run dev` |
 | Mobile Expo | `mobile/.env` with `EXPO_PUBLIC_API_URL=...` then `npx expo start -c` |
 | APK | Set in `mobile/eas.json` preview env (already Render) |
 
@@ -21,14 +21,18 @@ Home LAN API: set those env vars back to `http://192.168.100.7:5000` / `http://l
 3. Root directory: `admin`
 4. Build: `npm install && npm run build`
 5. Publish directory: `dist`
-6. Environment (build-time): `VITE_API_URL` = `https://dlms-csaj.onrender.com`
+6. Environment (build-time): `VITE_API_URL` = `https://dlms-csij.onrender.com`
 7. After deploy, copy the admin URL (e.g. `https://dlms-admin-xxxx.onrender.com`)
 
 ### Firebase Auth authorized domain
 
-Firebase Console → Authentication → Settings → **Authorized domains** → add your admin Render hostname (without `https://`).
+Firebase Console → Authentication → Settings → **Authorized domains** → add:
 
-Without this, admin login from the hosted site will fail.
+`dlms-admin.onrender.com`
+
+(hostname only — no `https://`, no `/login`).
+
+This allows Firebase email/password sign-in from that website. Without it, the browser blocks Auth as an untrusted origin.
 
 ## 3. Smoke test (phone on mobile data)
 

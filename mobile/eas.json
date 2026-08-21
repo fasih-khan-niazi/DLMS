@@ -10,7 +10,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://dlms-csaj.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://dlms-csij.onrender.com"
       }
     },
     "production": {
@@ -18,7 +18,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://dlms-csaj.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://dlms-csij.onrender.com"
       }
     }
   },

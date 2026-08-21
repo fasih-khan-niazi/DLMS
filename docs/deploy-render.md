@@ -79,7 +79,7 @@ Cron jobs inside the API only run while the instance is awake. For Week 1 demos 
 
 ## Point clients at this API
 
-Defaults in `admin` and `mobile` already use `https://dlms-csaj.onrender.com`.
+Defaults in `admin` and `mobile` already use `https://dlms-csij.onrender.com`.
 
 | Client | How |
 |--------|-----|
@@ -101,7 +101,7 @@ To force Week 1 forever on this service: keep the service branch on `main` and o
 2. Root Directory: `admin`.
 3. Build: `npm install && npm run build`.
 4. Publish directory: `dist`.
-5. Env at **build** time: `VITE_API_URL=https://dlms-csaj.onrender.com`.
+5. Env at **build** time: `VITE_API_URL=https://dlms-csij.onrender.com`.
 6. Firebase Console → Authentication → Authorized domains → add the new admin hostname.
 
 See also `docs/week1-demo.md`.

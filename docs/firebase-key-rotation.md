@@ -24,6 +24,6 @@ Mobile and admin apps do **not** use this key. Only the Express API (and seed sc
 7. Render → Manual Deploy
 8. In Google Cloud Console → IAM → Service Accounts → open the old key → **Delete** the old private key id (or disable it)
 
-Confirm: `https://dlms-csaj.onrender.com/health` still OK, then login once via admin/mobile.
+Confirm: `https://dlms-csij.onrender.com/health` still OK, then login once via admin/mobile.
 
 Never commit the JSON. Never paste it into chat.

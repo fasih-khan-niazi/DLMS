@@ -3,7 +3,7 @@ import { firebaseAuth } from "./firebase";
 
 /** Default = Render Week 1 API. Override with VITE_API_URL in admin/.env */
 export const API_BASE_URL = (
-  import.meta.env.VITE_API_URL || "https://dlms-csaj.onrender.com"
+  import.meta.env.VITE_API_URL || "https://dlms-csij.onrender.com"
 ).replace(/\/$/, "");
 
 export const api = axios.create({

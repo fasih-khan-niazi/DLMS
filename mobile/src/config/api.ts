@@ -8,7 +8,7 @@ import { firebaseAuth } from "./firebase";
  *   e.g. http://192.168.100.7:5000 for home LAN
  */
 export const API_BASE_URL = (
-  process.env.EXPO_PUBLIC_API_URL || "https://dlms-csaj.onrender.com"
+  process.env.EXPO_PUBLIC_API_URL || "https://dlms-csij.onrender.com"
 ).replace(/\/$/, "");
 
 const api = axios.create({

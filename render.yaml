@@ -26,4 +26,4 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://dlms-csaj.onrender.com
+        value: https://dlms-csij.onrender.com
