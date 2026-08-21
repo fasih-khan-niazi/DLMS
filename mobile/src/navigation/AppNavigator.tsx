@@ -9,6 +9,7 @@ import { firebaseAuth } from "../config/firebase";
 import { registerForPushNotifications } from "../utils/notifications";
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
+import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
 import HomeScreen from "../screens/HomeScreen";
 import CatalogScreen from "../screens/CatalogScreen";
 import BookDetailScreen from "../screens/BookDetailScreen";
@@ -177,6 +178,10 @@ export default function AppNavigator() {
         <AuthStackNav.Navigator screenOptions={{ headerShown: false }}>
           <AuthStackNav.Screen name="Login" component={LoginScreen} />
           <AuthStackNav.Screen name="Register" component={RegisterScreen} />
+          <AuthStackNav.Screen
+            name="ForgotPassword"
+            component={ForgotPasswordScreen as React.ComponentType<any>}
+          />
         </AuthStackNav.Navigator>
       )}
     </NavigationContainer>

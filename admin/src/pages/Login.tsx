@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export function LoginPage() {
@@ -19,18 +19,27 @@ export function LoginPage() {
     try {
       await login(email.trim(), password);
     } catch {
-      // error shown via context
+      // error via context
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="login-page">
-      <form className="login-card" onSubmit={(e) => void onSubmit(e)}>
-        <h1>DLMS Admin</h1>
-        <p className="muted">Sign in with an admin account</p>
+    <div className="auth-shell">
+      <div className="auth-hero">
+        <p className="auth-eyebrow">Library operations</p>
+        <h1 className="auth-brand">DLMS</h1>
+        <p className="auth-lede">
+          Admin console for users, config, fines, reservations, and reports.
+        </p>
+      </div>
+
+      <form className="auth-panel" onSubmit={(e) => void onSubmit(e)}>
+        <h2>Sign in</h2>
+        <p className="muted">Admin accounts only. Librarians use the mobile app.</p>
         {error ? <p className="error-banner">{error}</p> : null}
+
         <label>
           Email
           <input
@@ -51,7 +60,18 @@ export function LoginPage() {
             required
           />
         </label>
-        <button type="submit" className="btn btn-primary" disabled={submitting || loading}>
+
+        <div className="auth-row">
+          <Link className="auth-link" to="/forgot-password" state={{ email: email.trim() }}>
+            Forgot password?
+          </Link>
+        </div>
+
+        <button
+          type="submit"
+          className="btn btn-primary btn-block"
+          disabled={submitting || loading}
+        >
           {submitting || loading ? "Signing in..." : "Sign in"}
         </button>
       </form>

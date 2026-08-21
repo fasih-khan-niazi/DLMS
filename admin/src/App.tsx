@@ -6,6 +6,7 @@ import { ConfigPage } from "./pages/Config";
 import { DashboardPage } from "./pages/Dashboard";
 import { FinesPage } from "./pages/Fines";
 import { LoginPage } from "./pages/Login";
+import { ForgotPasswordPage } from "./pages/ForgotPassword";
 import { ReportsPage } from "./pages/Reports";
 import { ReservationsPage } from "./pages/Reservations";
 import { UsersPage } from "./pages/Users";
@@ -15,8 +16,8 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="login-page">
-        <p>Loading...</p>
+      <div className="auth-shell">
+        <p className="auth-loading">Loading...</p>
       </div>
     );
   }
@@ -34,6 +35,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route
             path="/"
             element={

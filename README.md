@@ -62,7 +62,8 @@ Phases **1-6** are implemented in this codebase:
 | [`docs/supabase.md`](docs/supabase.md) | PDF cloud storage |
 | [`docs/github-workflow.md`](docs/github-workflow.md) | Branches & commits |
 | [`docs/digital-library.md`](docs/digital-library.md) | PDF / e-library |
-| [`docs/fyp/`](docs/fyp/) | University FYP narrative (separate from eng docs) |
+| [`docs/polish-plan.md`](docs/polish-plan.md) | Completion / park polish blocks |
+| [`docs/auth.md`](docs/auth.md) | Sign-in and password reset |
 
 Engineering docs under `docs/` **are committed** - that is normal industry practice. Only secrets and uploaded PDFs are ignored.
 

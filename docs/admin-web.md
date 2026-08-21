@@ -27,6 +27,9 @@ Open http://localhost:5173 (Vite default).
 - After login the app calls `GET /api/auth/me`
 - Only Firestore role `admin` is allowed; others are signed out
 - Seed admin: `fasihxniazi+dlmsadmin@gmail.com`
+- Forgot password: `/forgot-password` (Firebase email reset link)
+
+See also `docs/auth.md`.
 
 ## Features
 

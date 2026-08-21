@@ -9,10 +9,13 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { firebaseAuth } from "../config/firebase";
 import api from "../config/api";
+import { colors, radius, space, type } from "../theme";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 type Props = {
@@ -20,30 +23,35 @@ type Props = {
 };
 
 export default function RegisterScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!displayName || !email || !password) {
-      Alert.alert("Error", "Please fill in all fields");
+    if (!displayName.trim() || !email.trim() || !password) {
+      Alert.alert("Missing details", "Fill in name, email, and password.");
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters");
+      Alert.alert("Weak password", "Use at least 6 characters.");
       return;
     }
 
     setLoading(true);
     try {
-      await api.post("/api/auth/register", { email, password, displayName });
-      await signInWithEmailAndPassword(firebaseAuth, email, password);
+      await api.post("/api/auth/register", {
+        email: email.trim(),
+        password,
+        displayName: displayName.trim(),
+      });
+      await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
     } catch (error: any) {
       const message =
         error.response?.data?.error || error.message || "Registration failed";
-      Alert.alert("Registration Failed", message);
+      Alert.alert("Could not sign up", message);
     } finally {
       setLoading(false);
     }
@@ -51,110 +59,150 @@ export default function RegisterScreen({ navigation }: Props) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.root}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={styles.header}>
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Join as a student</Text>
-      </View>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingTop: insets.top + space.xl, paddingBottom: insets.bottom + space.xl },
+        ]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.hero}>
+          <Text style={styles.brand}>DLMS</Text>
+          <Text style={styles.tagline}>Join as a student in under a minute</Text>
+        </View>
 
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Full Name"
-          placeholderTextColor="#9CA3AF"
-          value={displayName}
-          onChangeText={setDisplayName}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#9CA3AF"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#9CA3AF"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+        <View style={styles.panel}>
+          <Text style={styles.panelTitle}>Create account</Text>
+          <Text style={styles.panelHint}>Staff roles are assigned by an admin later</Text>
 
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleRegister}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Sign Up</Text>
-          )}
-        </TouchableOpacity>
+          <Text style={styles.label}>Full name</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Your name"
+            placeholderTextColor={colors.muted}
+            value={displayName}
+            onChangeText={setDisplayName}
+          />
 
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.link}>Already have an account? Sign in</Text>
-        </TouchableOpacity>
-      </View>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="you@university.edu"
+            placeholderTextColor={colors.muted}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="At least 6 characters"
+            placeholderTextColor={colors.muted}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleRegister}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.buttonText}>Create account</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
+            <Text style={styles.link}>Already have an account? Sign in</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8F7F4",
+  root: { flex: 1, backgroundColor: colors.navy },
+  scroll: {
+    flexGrow: 1,
+    paddingHorizontal: space.lg,
     justifyContent: "center",
-    paddingHorizontal: 32,
   },
-  header: {
-    alignItems: "center",
-    marginBottom: 48,
+  hero: {
+    marginBottom: space.lg,
+    paddingHorizontal: space.sm,
   },
-  title: {
-    fontSize: 28,
+  brand: {
+    fontSize: type.brand,
+    fontWeight: "800",
+    color: colors.white,
+  },
+  tagline: {
+    marginTop: space.sm,
+    fontSize: type.subtitle,
+    color: "rgba(255,255,255,0.78)",
+  },
+  panel: {
+    backgroundColor: colors.cream,
+    borderRadius: radius.lg,
+    padding: space.lg,
+  },
+  panelTitle: {
+    fontSize: 22,
     fontWeight: "700",
-    color: "#2E4A62",
+    color: colors.navy,
   },
-  subtitle: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginTop: 8,
+  panelHint: {
+    marginTop: 4,
+    marginBottom: space.md,
+    color: colors.muted,
+    fontSize: type.small,
   },
-  form: {
-    gap: 16,
+  label: {
+    fontSize: type.small,
+    fontWeight: "600",
+    color: colors.navy,
+    marginBottom: 6,
+    marginTop: space.sm,
   },
   input: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    paddingHorizontal: space.md,
     paddingVertical: 14,
-    fontSize: 16,
+    fontSize: type.body,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    color: "#1F2937",
+    borderColor: colors.border,
+    color: colors.text,
   },
   button: {
-    backgroundColor: "#2E4A62",
-    borderRadius: 12,
+    backgroundColor: colors.navy,
+    borderRadius: radius.md,
     paddingVertical: 16,
     alignItems: "center",
-    marginTop: 8,
+    marginTop: space.md,
   },
+  buttonDisabled: { opacity: 0.7 },
   buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
+    color: colors.white,
+    fontSize: type.body,
+    fontWeight: "700",
   },
   link: {
     textAlign: "center",
-    color: "#E8A838",
-    fontSize: 14,
-    marginTop: 16,
+    color: colors.navy,
+    fontSize: type.small,
+    marginTop: space.md,
+    fontWeight: "600",
   },
 });
