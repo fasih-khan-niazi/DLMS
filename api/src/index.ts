@@ -12,6 +12,7 @@ import catalogRoutes from "./routes/catalog";
 import loanRoutes from "./routes/loans";
 import reservationRoutes from "./routes/reservations";
 import digitalBookRoutes from "./routes/digitalBooks";
+import notificationRoutes from "./routes/notifications";
 import cronRoutes from "./routes/cron";
 import { ensureUploadDirs } from "./config/storage";
 
@@ -39,6 +40,7 @@ app.use("/api/catalog", catalogRoutes);
 app.use("/api/loans", loanRoutes);
 app.use("/api/reservations", reservationRoutes);
 app.use("/api/digital-books", digitalBookRoutes);
+app.use("/api/notifications", notificationRoutes);
 app.use("/internal/cron", cronRoutes);
 
 app.listen(port, "0.0.0.0", () => {

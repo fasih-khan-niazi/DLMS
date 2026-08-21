@@ -63,7 +63,7 @@ Phases **1-6** are implemented in this codebase:
 | [`docs/github-workflow.md`](docs/github-workflow.md) | Branches & commits |
 | [`docs/digital-library.md`](docs/digital-library.md) | PDF / e-library |
 | [`docs/polish-plan.md`](docs/polish-plan.md) | Completion / park polish blocks |
-| [`docs/auth.md`](docs/auth.md) | Sign-in and password reset |
+| [`docs/notifications-inbox.md`](docs/notifications-inbox.md) | In-app notification inbox |
 
 Engineering docs under `docs/` **are committed** - that is normal industry practice. Only secrets and uploaded PDFs are ignored.
 

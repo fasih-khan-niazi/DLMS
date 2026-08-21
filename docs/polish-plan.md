@@ -42,5 +42,6 @@ OTP would need a separate email/SMS provider; out of scope for park unless requi
 
 ## Status
 
-- Block A: done (design tokens, auth UI, forgot password)
-- Blocks B-G: pending
+- Block A: done
+- Block B: done (mobile polish starters, Ionicons tabs, skeletons on catalog, in-app notifications inbox)
+- Blocks C-G: pending

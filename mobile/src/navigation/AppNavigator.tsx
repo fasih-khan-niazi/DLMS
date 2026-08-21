@@ -4,9 +4,11 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { firebaseAuth } from "../config/firebase";
 import { registerForPushNotifications } from "../utils/notifications";
+import { colors } from "../theme";
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
@@ -21,6 +23,7 @@ import DigitalLibraryScreen from "../screens/DigitalLibraryScreen";
 import DigitalBookDetailScreen from "../screens/DigitalBookDetailScreen";
 import BookshelfScreen from "../screens/BookshelfScreen";
 import UploadDigitalBookScreen from "../screens/UploadDigitalBookScreen";
+import NotificationsScreen from "../screens/NotificationsScreen";
 
 const AuthStackNav = createNativeStackNavigator();
 const HomeStackNav = createNativeStackNavigator();
@@ -28,18 +31,11 @@ const CatalogStackNav = createNativeStackNavigator();
 const ProfileStackNav = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-function TabIcon({ label, color }: { label: string; color: string }) {
-  return (
-    <View style={styles.tabIconWrap}>
-      <Text style={[styles.tabIcon, { color }]}>{label}</Text>
-    </View>
-  );
-}
-
 function HomeStackNavigator() {
   return (
     <HomeStackNav.Navigator screenOptions={{ headerShown: false }}>
       <HomeStackNav.Screen name="HomeMain" component={HomeScreen} />
+      <HomeStackNav.Screen name="Notifications" component={NotificationsScreen} />
       <HomeStackNav.Screen name="DigitalLibrary" component={DigitalLibraryScreen} />
       <HomeStackNav.Screen
         name="DigitalBookDetail"
@@ -68,6 +64,7 @@ function ProfileStackNavigator() {
   return (
     <ProfileStackNav.Navigator screenOptions={{ headerShown: false }}>
       <ProfileStackNav.Screen name="ProfileMain" component={ProfileScreen} />
+      <ProfileStackNav.Screen name="Notifications" component={NotificationsScreen} />
       <ProfileStackNav.Screen name="DigitalLibrary" component={DigitalLibraryScreen} />
       <ProfileStackNav.Screen
         name="DigitalBookDetail"
@@ -89,7 +86,7 @@ function MainTabs() {
       detachInactiveScreens={false}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#2E4A62",
+        tabBarActiveTintColor: colors.navy,
         tabBarInactiveTintColor: "#9CA3AF",
         tabBarLabelStyle: {
           fontSize: 11,
@@ -97,8 +94,8 @@ function MainTabs() {
           marginBottom: 2,
         },
         tabBarStyle: {
-          backgroundColor: "#FFFFFF",
-          borderTopColor: "#E5E1D8",
+          backgroundColor: colors.white,
+          borderTopColor: colors.border,
           borderTopWidth: 1,
           height: 56 + bottomPad,
           paddingTop: 6,
@@ -112,7 +109,9 @@ function MainTabs() {
         component={HomeStackNavigator}
         options={{
           title: "Home",
-          tabBarIcon: ({ color }) => <TabIcon label="H" color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tab.Screen
@@ -120,7 +119,9 @@ function MainTabs() {
         component={CatalogStackNavigator}
         options={{
           title: "Catalog",
-          tabBarIcon: ({ color }) => <TabIcon label="C" color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="library-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tab.Screen
@@ -128,7 +129,9 @@ function MainTabs() {
         component={ScanScreen}
         options={{
           title: "Scan",
-          tabBarIcon: ({ color }) => <TabIcon label="S" color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="qr-code-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tab.Screen
@@ -136,7 +139,9 @@ function MainTabs() {
         component={ActivityScreen}
         options={{
           title: "Activity",
-          tabBarIcon: ({ color }) => <TabIcon label="A" color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="time-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tab.Screen
@@ -144,7 +149,9 @@ function MainTabs() {
         component={ProfileStackNavigator}
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) => <TabIcon label="P" color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" size={size} color={color} />
+          ),
         }}
       />
     </Tab.Navigator>
@@ -189,15 +196,5 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  boot: { flex: 1, backgroundColor: "#F8F7F4" },
-  tabIconWrap: {
-    width: 28,
-    height: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tabIcon: {
-    fontSize: 13,
-    fontWeight: "800",
-  },
+  boot: { flex: 1, backgroundColor: colors.cream },
 });

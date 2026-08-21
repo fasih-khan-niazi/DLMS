@@ -6,12 +6,15 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
+import { colors, radius, space, type } from "../theme";
+import { SkeletonList } from "../components/Skeleton";
+import { EmptyState } from "../components/EmptyState";
 
 type CatalogBook = {
   isbn: string;
@@ -20,7 +23,6 @@ type CatalogBook = {
   availableCount?: number;
   totalCopies?: number;
   availability?: string;
-  thumbnailUrl?: string;
 };
 
 type Props = {
@@ -28,6 +30,7 @@ type Props = {
 };
 
 export default function CatalogScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
   const [books, setBooks] = useState<CatalogBook[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,30 +63,31 @@ export default function CatalogScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.heading}>Library Catalog</Text>
+    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
+      <Text style={styles.heading}>Catalog</Text>
 
       <View style={styles.searchRow}>
         <TextInput
           style={styles.input}
           placeholder="Search title, author, or ISBN"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={colors.muted}
           value={query}
           onChangeText={setQuery}
           onSubmitEditing={onSearch}
           returnKeyType="search"
         />
-        <TouchableOpacity style={styles.searchButton} onPress={onSearch}>
+        <TouchableOpacity style={styles.searchButton} onPress={onSearch} activeOpacity={0.85}>
           <Text style={styles.searchButtonText}>Search</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? (
-        <ActivityIndicator color="#2E4A62" style={{ marginTop: 40 }} />
+        <SkeletonList rows={6} />
       ) : (
         <FlatList
           data={books}
           keyExtractor={(item) => item.isbn}
+          contentContainerStyle={{ paddingBottom: 24 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -91,15 +95,20 @@ export default function CatalogScreen({ navigation }: Props) {
                 setRefreshing(true);
                 loadBooks();
               }}
+              tintColor={colors.navy}
             />
           }
           ListEmptyComponent={
-            <Text style={styles.empty}>No books found. Try another search.</Text>
+            <EmptyState
+              title="No books found"
+              message="Try another search, or ask a librarian to add titles."
+            />
           }
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
               onPress={() => navigation.navigate("BookDetail", { isbn: item.isbn })}
+              activeOpacity={0.85}
             >
               <View style={styles.cardBody}>
                 <Text style={styles.title}>{item.title}</Text>
@@ -125,81 +134,75 @@ export default function CatalogScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F7F4",
-    paddingTop: 56,
+    backgroundColor: colors.cream,
     paddingHorizontal: 20,
   },
   heading: {
     fontSize: 28,
-    fontWeight: "700",
-    color: "#2E4A62",
-    marginBottom: 16,
+    fontWeight: "800",
+    color: colors.navy,
+    marginBottom: 14,
   },
   searchRow: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   input: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 15,
-    color: "#1F2937",
+    borderWidth: 1,
+    borderColor: colors.border,
+    color: colors.text,
+    fontSize: type.body,
   },
   searchButton: {
-    backgroundColor: "#2E4A62",
-    borderRadius: 12,
+    backgroundColor: colors.navy,
+    borderRadius: radius.md,
     paddingHorizontal: 16,
     justifyContent: "center",
   },
   searchButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
+    color: colors.white,
+    fontWeight: "700",
   },
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
     flexDirection: "row",
-    justifyContent: "space-between",
     gap: 12,
   },
-  cardBody: {
-    flex: 1,
-  },
+  cardBody: { flex: 1 },
   title: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#2E4A62",
+    color: colors.navy,
   },
   meta: {
     marginTop: 4,
-    color: "#6B7280",
-    fontSize: 13,
+    color: colors.muted,
+    fontSize: type.small,
   },
   badge: {
     alignItems: "flex-end",
     justifyContent: "center",
+    minWidth: 88,
   },
   badgeText: {
-    color: "#E8A838",
+    color: colors.amberDark,
     fontWeight: "700",
-    fontSize: 13,
+    fontSize: 12,
   },
   countText: {
     marginTop: 4,
-    color: "#6BA3A8",
+    color: colors.muted,
     fontSize: 12,
-  },
-  empty: {
-    textAlign: "center",
-    color: "#6B7280",
-    marginTop: 40,
   },
 });

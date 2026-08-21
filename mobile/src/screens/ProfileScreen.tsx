@@ -51,7 +51,16 @@ export default function ProfileScreen({ navigation }: Props) {
 
       <TouchableOpacity
         style={styles.linkButton}
+        onPress={() => navigation.navigate("Notifications")}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.linkText}>Notifications</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.linkButton}
         onPress={() => navigation.navigate("DigitalLibrary")}
+        activeOpacity={0.85}
       >
         <Text style={styles.linkText}>E-Library</Text>
       </TouchableOpacity>
