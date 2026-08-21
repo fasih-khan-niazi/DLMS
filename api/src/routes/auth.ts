@@ -14,10 +14,23 @@ router.post("/register", async (req: Request, res: Response) => {
       return;
     }
 
+    const emailStr = String(email).trim().toLowerCase();
+    const nameStr = String(displayName).trim();
+    const passwordStr = String(password);
+
+    if (!emailStr.includes("@") || nameStr.length < 2) {
+      res.status(400).json({ error: "Valid email and displayName (min 2 chars) are required" });
+      return;
+    }
+    if (passwordStr.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters" });
+      return;
+    }
+
     const userRecord = await auth.createUser({
-      email,
-      password,
-      displayName,
+      email: emailStr,
+      password: passwordStr,
+      displayName: nameStr,
     });
 
     // Set custom claims (role = student by default)
@@ -25,8 +38,8 @@ router.post("/register", async (req: Request, res: Response) => {
 
     // Create Firestore user document
     await db.collection("users").doc(userRecord.uid).set({
-      email,
-      displayName,
+      email: emailStr,
+      displayName: nameStr,
       role: "student",
       activeBorrowCount: 0,
       hasUnpaidFines: false,
