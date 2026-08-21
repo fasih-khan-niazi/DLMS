@@ -134,6 +134,7 @@ router.post(
         categories: categoryList,
         searchKeywords,
         source: metadata ? "google_books" : "manual",
+        isActive: existing.exists ? existing.data()?.isActive !== false : true,
         totalCopies: existing.exists ? existing.data()?.totalCopies || 0 : 0,
         availableCount: existing.exists ? existing.data()?.availableCount || 0 : 0,
         issuedCount: existing.exists ? existing.data()?.issuedCount || 0 : 0,
@@ -249,6 +250,9 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const q = String(req.query.q || "").trim().toLowerCase();
     const limit = Math.min(Number(req.query.limit) || 30, 100);
+    const isStaff = req.role === "librarian" || req.role === "admin";
+    const includeInactive =
+      isStaff && String(req.query.includeInactive || "") === "1";
 
     let snapshot;
 
@@ -258,10 +262,15 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
       const byIsbn = await db.collection("catalog").doc(isbnCandidate).get();
       if (byIsbn.exists) {
         const data = byIsbn.data()!;
+        if (!includeInactive && data.isActive === false) {
+          res.json({ results: [] });
+          return;
+        }
         res.json({
           results: [
             {
               ...data,
+              isActive: data.isActive !== false,
               availability: getAvailabilityLabel(data),
             },
           ],
@@ -289,13 +298,16 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
       snapshot = await db.collection("catalog").orderBy("title").limit(limit).get();
     }
 
-    const results = snapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        ...data,
-        availability: getAvailabilityLabel(data),
-      };
-    });
+    const results = snapshot.docs
+      .map((doc) => {
+        const data = doc.data();
+        return {
+          ...data,
+          isActive: data.isActive !== false,
+          availability: getAvailabilityLabel(data),
+        };
+      })
+      .filter((row) => includeInactive || row.isActive !== false);
 
     res.json({ results });
   } catch (error) {
@@ -303,6 +315,54 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: "Failed to search catalog" });
   }
 });
+
+// Soft-activate / soft-deactivate a catalog title (keeps loan/reservation history)
+router.patch(
+  "/books/:isbn/status",
+  authenticate,
+  requireRole("librarian", "admin"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const isbn = normalizeIsbn(req.params.isbn as string);
+      const { isActive } = req.body;
+
+      if (typeof isActive !== "boolean") {
+        res.status(400).json({ error: "isActive must be a boolean" });
+        return;
+      }
+
+      const catalogRef = db.collection("catalog").doc(isbn);
+      const catalogDoc = await catalogRef.get();
+      if (!catalogDoc.exists) {
+        res.status(404).json({ error: "Book not found" });
+        return;
+      }
+
+      const now = new Date();
+      await catalogRef.update({ isActive, updatedAt: now });
+
+      await db.collection("auditLog").add({
+        action: isActive ? "catalog_activated" : "catalog_deactivated",
+        actorId: req.uid,
+        targetId: isbn,
+        metadata: { title: catalogDoc.data()?.title || "" },
+        timestamp: now,
+      });
+
+      res.json({
+        success: true,
+        isbn,
+        isActive,
+        message: isActive
+          ? "Book is active in the catalog again"
+          : "Book deactivated (hidden from students; history kept)",
+      });
+    } catch (error) {
+      console.error("Catalog status error:", error);
+      res.status(500).json({ error: "Failed to update book status" });
+    }
+  }
+);
 
 // Get a single catalog title with its copies
 router.get("/books/:isbn", authenticate, async (req: AuthRequest, res: Response) => {
@@ -315,16 +375,23 @@ router.get("/books/:isbn", authenticate, async (req: AuthRequest, res: Response)
       return;
     }
 
+    const data = catalogDoc.data()!;
+    const isStaff = req.role === "librarian" || req.role === "admin";
+    if (data.isActive === false && !isStaff) {
+      res.status(404).json({ error: "Book not found" });
+      return;
+    }
+
     const copiesSnap = await db
       .collection("bookCopies")
       .where("isbn", "==", isbn)
       .get();
 
     const copies = copiesSnap.docs.map((doc) => doc.data());
-    const data = catalogDoc.data()!;
 
     res.json({
       ...data,
+      isActive: data.isActive !== false,
       availability: getAvailabilityLabel(data),
       copies,
     });

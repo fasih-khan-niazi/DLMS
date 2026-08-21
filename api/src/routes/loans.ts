@@ -108,6 +108,9 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
       if (!catalogSnap.exists) {
         throw new Error("CATALOG_MISSING");
       }
+      if (catalogSnap.data()?.isActive === false) {
+        throw new Error("CATALOG_INACTIVE");
+      }
 
       const now = new Date();
       const loanId = createId("loan");
@@ -214,6 +217,7 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
       RESERVED_FOR_OTHER: [409, "Copy is reserved for another student"],
       COPY_UNAVAILABLE: [409, "Copy is not available"],
       CATALOG_MISSING: [404, "Catalog entry missing"],
+      CATALOG_INACTIVE: [409, "This title is deactivated and cannot be borrowed"],
     };
 
     const mapped = map[error.message];

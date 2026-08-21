@@ -51,6 +51,11 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
     const user = userSnap.data()!;
     const catalog = catalogSnap.data()!;
 
+    if (catalog.isActive === false) {
+      res.status(409).json({ error: "This title is deactivated and cannot be reserved" });
+      return;
+    }
+
     if (!user.isActive) {
       res.status(403).json({ error: "Account is suspended" });
       return;

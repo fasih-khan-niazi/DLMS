@@ -68,6 +68,7 @@ Phases **1-6** are implemented in this codebase:
 | [`docs/vnv-matrix.md`](docs/vnv-matrix.md) | Business logic VnV matrix |
 | [`docs/seed.md`](docs/seed.md) | MVP seed script |
 | [`docs/park.md`](docs/park.md) | MVP freeze / park notes |
+| [`docs/deploy-render.md`](docs/deploy-render.md) | Public API on Render (off-LAN) |
 
 Engineering docs under `docs/` **are committed** - that is normal industry practice. Only secrets and uploaded PDFs are ignored.
 

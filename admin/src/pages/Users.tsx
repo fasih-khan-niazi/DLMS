@@ -105,7 +105,7 @@ export function UsersPage() {
       <header className="page-header">
         <div>
           <h1>Users</h1>
-          <p className="muted">Search accounts, change roles, and suspend access</p>
+          <p className="muted">Promote students to librarian, or suspend accounts. Admin is seed-only.</p>
         </div>
         {refreshing ? <span className="pill">Refreshing...</span> : null}
       </header>
@@ -156,16 +156,19 @@ export function UsersPage() {
                     <td>{user.displayName || "-"}</td>
                     <td>{user.email || "-"}</td>
                     <td>
-                      <select
-                        value={user.role || "student"}
-                        onChange={(e) =>
-                          void changeRole(user.id, e.target.value, user.role || "student")
-                        }
-                      >
-                        <option value="student">student</option>
-                        <option value="librarian">librarian</option>
-                        <option value="admin">admin</option>
-                      </select>
+                      {user.role === "admin" ? (
+                        <span className="status-pill ok">admin</span>
+                      ) : (
+                        <select
+                          value={user.role || "student"}
+                          onChange={(e) =>
+                            void changeRole(user.id, e.target.value, user.role || "student")
+                          }
+                        >
+                          <option value="student">student</option>
+                          <option value="librarian">librarian</option>
+                        </select>
+                      )}
                     </td>
                     <td>
                       <span
@@ -185,11 +188,16 @@ export function UsersPage() {
                       <button
                         type="button"
                         className="btn btn-small"
+                        disabled={user.role === "admin"}
                         onClick={() =>
                           void toggleStatus(user.id, user.isActive === false)
                         }
                       >
-                        {user.isActive === false ? "Activate" : "Suspend"}
+                        {user.role === "admin"
+                          ? "Protected"
+                          : user.isActive === false
+                            ? "Activate"
+                            : "Suspend"}
                       </button>
                     </td>
                   </tr>

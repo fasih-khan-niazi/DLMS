@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { CatalogPage } from "./pages/Catalog";
 import { ConfigPage } from "./pages/Config";
 import { DashboardPage } from "./pages/Dashboard";
 import { FinesPage } from "./pages/Fines";
@@ -46,6 +47,7 @@ export default function App() {
           >
             <Route index element={<DashboardPage />} />
             <Route path="users" element={<UsersPage />} />
+            <Route path="catalog" element={<CatalogPage />} />
             <Route path="config" element={<ConfigPage />} />
             <Route path="reservations" element={<ReservationsPage />} />
             <Route path="fines" element={<FinesPage />} />

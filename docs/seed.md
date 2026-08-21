@@ -1,48 +1,30 @@
 # Seed script
 
-Idempotent MVP seed for Firebase Auth + Firestore.
+Idempotent seed for **catalog + config**. It does **not** create users.
+
+## Why seed?
+
+Manual entry is slow and easy to get wrong: each book needs metadata, search keywords, and multiple physical copies with QR payloads. Seeding drops a ready-made shelf into Firestore so browse, search, borrow, and reservations work immediately for demos and testing. Config and holidays get the same treatment so due dates and fines match the MVP defaults without clicking through Admin first.
+
+Your real accounts stay as you created them.
 
 ## Run
-
-From the repo root (service account must exist under `secrets/` or `FIREBASE_SERVICE_ACCOUNT_PATH`):
 
 ```bash
 npm run seed
 ```
 
-Optional demo librarian + student accounts:
-
-```bash
-# Windows PowerShell
-$env:SEED_DEMO_USERS="true"; npm run seed
-```
-
-```bash
-# bash
-SEED_DEMO_USERS=true npm run seed
-```
+Needs the Firebase service account under `secrets/` (or `FIREBASE_SERVICE_ACCOUNT_PATH`).
 
 ## What it writes
 
 | Item | Details |
 |------|---------|
-| Admin user | Default email from script / `SEED_ADMIN_EMAIL` |
-| System config | Borrow limit 5, loan 14 days, fine Rs 50/day, hold 72h, PDF 25MB, Sunday off |
-| Holidays | Pakistan Day 2026-03-23, Independence Day 2026-08-14 |
-| Sample book | ISBN `9780141036144` (Animal Farm), 2 available copies |
-| Sample QR | `cpy_seed_af_01_9780141036144`, `cpy_seed_af_02_9780141036144` |
-| Demo users | Only if `SEED_DEMO_USERS=true` |
+| System config | Borrow 5, loan 14 days, fine Rs 50/day, hold 72h, PDF 25MB, Sunday off |
+| Holidays | Pakistan Day, Independence Day (2026) |
+| Catalog | 12 classic titles with descriptions, categories, cover URLs |
+| Copies | 1-3 available copies per title with stable `cpy_seed_...` IDs and QR payloads |
 
-Safe to re-run: existing users/copies are updated or skipped, not duplicated as new ISBNs.
+Safe to re-run: existing copies are skipped; book metadata is refreshed.
 
-## Env overrides
-
-| Variable | Purpose |
-|----------|---------|
-| `FIREBASE_SERVICE_ACCOUNT_PATH` | Path to Admin SDK JSON |
-| `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_NAME` | Admin account |
-| `SEED_DEMO_USERS` | `true` to create librarian + student |
-| `SEED_LIBRARIAN_EMAIL` / `SEED_LIBRARIAN_PASSWORD` | Librarian demo |
-| `SEED_STUDENT_EMAIL` / `SEED_STUDENT_PASSWORD` | Student demo |
-
-Change any default password after first login.
+Deactivate the **seeded** Great Gatsby (ISBN `9780743273565`) if your original listing has the loan history you care about. Soft-deactivate hides it from students without deleting loans or reservations.

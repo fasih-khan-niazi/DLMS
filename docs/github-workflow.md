@@ -12,18 +12,22 @@ Benefits:
 
 ## Branch model (what we agreed)
 
-| Branch | Purpose |
-|--------|---------|
-| `main` | Stable, demo-ready |
-| `dev` | Integration of finished phases |
+| Branch / tag | Purpose |
+|--------------|---------|
+| `main` | Frozen Week 1 client delivery |
+| `v1.0.0-week1` | Exact commit for Week 1 (do not move) |
+| `dev` | Week 2+ integration |
 | `feat/...` | One feature at a time |
-| `chore/...` | Docs, tooling, cleanup |
 
-## Suggested flow from now
+## Week 1 lock flow (already done once)
 
-1. Work on `dev` (integration branch) day to day
-2. For larger features: `feat/...` from `dev` → PR/merge back into `dev`
-3. When a milestone is solid: merge `dev` → `main`
+1. Finish work on `dev` and commit
+2. `git checkout main` → `git merge dev`
+3. Tag `v1.0.0-week1` on that merge commit
+4. Push `main` + tag
+5. `git checkout dev` and continue Week 2 here
+
+Clients use the **hosted** API (Render), not a git checkout on their machine. You only check out the tag when you need to rebuild or redeploy that exact code.
 
 ## Commit style
 

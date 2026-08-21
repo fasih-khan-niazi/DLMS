@@ -289,8 +289,10 @@ router.post("/users/:uid/role", requireRole("admin"), async (req: AuthRequest, r
     const uid = req.params.uid as string;
     const { role } = req.body;
 
-    if (!["student", "librarian", "admin"].includes(role)) {
-      res.status(400).json({ error: "Invalid role. Must be student, librarian, or admin" });
+    if (!["student", "librarian"].includes(role)) {
+      res.status(400).json({
+        error: "Invalid role. Only student or librarian can be assigned here. Admin is seed-only.",
+      });
       return;
     }
 
@@ -301,6 +303,18 @@ router.post("/users/:uid/role", requireRole("admin"), async (req: AuthRequest, r
     }
 
     const userData = userDoc.data()!;
+
+    if (userData.role === "admin") {
+      res.status(400).json({
+        error: "The admin account role cannot be changed from the portal",
+      });
+      return;
+    }
+
+    if (uid === req.uid) {
+      res.status(400).json({ error: "You cannot change your own role" });
+      return;
+    }
 
     // Block promotion if user has unpaid fines
     if (role !== "student" && userData.hasUnpaidFines) {
@@ -372,6 +386,20 @@ router.post("/users/:uid/status", requireRole("admin"), async (req: AuthRequest,
 
     if (typeof isActive !== "boolean") {
       res.status(400).json({ error: "isActive must be a boolean" });
+      return;
+    }
+
+    const target = await db.collection("users").doc(uid).get();
+    if (!target.exists) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    if (target.data()?.role === "admin" && isActive === false) {
+      res.status(400).json({ error: "The admin account cannot be suspended" });
+      return;
+    }
+    if (uid === req.uid && isActive === false) {
+      res.status(400).json({ error: "You cannot suspend your own account" });
       return;
     }
 

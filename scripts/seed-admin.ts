@@ -1,19 +1,11 @@
 /**
- * Idempotent MVP seed: admin, system config, holidays, sample catalog copies,
- * optional demo librarian + student.
+ * Idempotent seed: system config, holidays, and a catalog of real books + copies.
+ * Does NOT create users (you already have accounts).
  *
- * From project root:
- *   npm run seed
- *   SEED_DEMO_USERS=true npm run seed
- *
- * Env overrides (optional):
- *   FIREBASE_SERVICE_ACCOUNT_PATH
- *   SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD / SEED_ADMIN_NAME
- *   SEED_DEMO_USERS=true
+ * From project root: npm run seed
  */
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
 import path from "path";
 import fs from "fs";
 
@@ -35,128 +27,197 @@ if (getApps().length === 0) {
 }
 
 const db = getFirestore();
-const auth = getAuth();
 
-const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL || "fasihxniazi+dlmsadmin@gmail.com";
-const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || "Password123";
-const ADMIN_NAME = process.env.SEED_ADMIN_NAME || "DLMS Admin";
+type SeedBook = {
+  isbn: string;
+  title: string;
+  authors: string[];
+  description: string;
+  categories: string[];
+  publishedDate: string;
+  pageCount: number;
+  publisher: string;
+  thumbnailUrl: string;
+  copies: number;
+};
 
-const DEMO_USERS = process.env.SEED_DEMO_USERS === "true";
+/** Well-known titles with stable ISBNs for a believable demo catalog. */
+const BOOKS: SeedBook[] = [
+  {
+    isbn: "9780141439518",
+    title: "Pride and Prejudice",
+    authors: ["Jane Austen"],
+    description:
+      "Elizabeth Bennet navigates manners, upbringing, morality, and marriage in Georgian England.",
+    categories: ["Fiction", "Classics", "Romance"],
+    publishedDate: "1813",
+    pageCount: 480,
+    publisher: "Penguin Classics",
+    thumbnailUrl: "https://books.google.com/books/content?id=s1gVAAAAYAAJ&printsec=frontcover&img=1&zoom=1",
+    copies: 3,
+  },
+  {
+    isbn: "9780451524935",
+    title: "1984",
+    authors: ["George Orwell"],
+    description:
+      "A dystopian novel about totalitarianism, surveillance, and the rewriting of truth.",
+    categories: ["Fiction", "Classics", "Dystopian"],
+    publishedDate: "1949",
+    pageCount: 328,
+    publisher: "Signet Classic",
+    thumbnailUrl: "https://books.google.com/books/content?id=kakvlOMV2uYC&printsec=frontcover&img=1&zoom=1",
+    copies: 3,
+  },
+  {
+    isbn: "9780141036144",
+    title: "Animal Farm",
+    authors: ["George Orwell"],
+    description:
+      "A political allegory in which farm animals overthrow their human farmer, then face a new tyranny.",
+    categories: ["Fiction", "Classics", "Satire"],
+    publishedDate: "1945",
+    pageCount: 112,
+    publisher: "Penguin",
+    thumbnailUrl: "https://books.google.com/books/content?id=1YkQywEACAAJ&printsec=frontcover&img=1&zoom=1",
+    copies: 2,
+  },
+  {
+    isbn: "9780743273565",
+    title: "The Great Gatsby",
+    authors: ["F. Scott Fitzgerald"],
+    description:
+      "Jay Gatsby's pursuit of Daisy Buchanan against the backdrop of Jazz Age wealth and illusion.",
+    categories: ["Fiction", "Classics"],
+    publishedDate: "1925",
+    pageCount: 180,
+    publisher: "Scribner",
+    thumbnailUrl: "https://books.google.com/books/content?id=iXn5U2Sz8SQC&printsec=frontcover&img=1&zoom=1",
+    copies: 2,
+  },
+  {
+    isbn: "9780061120084",
+    title: "To Kill a Mockingbird",
+    authors: ["Harper Lee"],
+    description:
+      "Scout Finch recalls her childhood in Alabama and her father's defense of a Black man falsely accused.",
+    categories: ["Fiction", "Classics"],
+    publishedDate: "1960",
+    pageCount: 336,
+    publisher: "Harper Perennial",
+    thumbnailUrl: "https://books.google.com/books/content?id=PGR2AwAAQBAJ&printsec=frontcover&img=1&zoom=1",
+    copies: 2,
+  },
+  {
+    isbn: "9780547928227",
+    title: "The Hobbit",
+    authors: ["J. R. R. Tolkien"],
+    description:
+      "Bilbo Baggins joins dwarves on a quest to reclaim a treasure guarded by the dragon Smaug.",
+    categories: ["Fiction", "Fantasy"],
+    publishedDate: "1937",
+    pageCount: 300,
+    publisher: "Houghton Mifflin Harcourt",
+    thumbnailUrl: "https://books.google.com/books/content?id=llV9BAAAQBAJ&printsec=frontcover&img=1&zoom=1",
+    copies: 2,
+  },
+  {
+    isbn: "9780140449266",
+    title: "Crime and Punishment",
+    authors: ["Fyodor Dostoyevsky"],
+    description:
+      "A poverty-stricken student commits a murder and wrestles with guilt, ideology, and redemption.",
+    categories: ["Fiction", "Classics"],
+    publishedDate: "1866",
+    pageCount: 671,
+    publisher: "Penguin Classics",
+    thumbnailUrl: "https://books.google.com/books/content?id=AAuGQgAACAAJ&printsec=frontcover&img=1&zoom=1",
+    copies: 2,
+  },
+  {
+    isbn: "9780140449136",
+    title: "The Odyssey",
+    authors: ["Homer"],
+    description:
+      "Odysseus's long journey home after the Trojan War, through monsters, gods, and temptation.",
+    categories: ["Poetry", "Classics", "Mythology"],
+    publishedDate: "800",
+    pageCount: 541,
+    publisher: "Penguin Classics",
+    thumbnailUrl: "https://books.google.com/books/content?id=2iYqAAAAYAAJ&printsec=frontcover&img=1&zoom=1",
+    copies: 2,
+  },
+  {
+    isbn: "9780141187761",
+    title: "Brave New World",
+    authors: ["Aldous Huxley"],
+    description:
+      "A futuristic society engineered for stability confronts freedom, individuality, and discontent.",
+    categories: ["Fiction", "Classics", "Dystopian"],
+    publishedDate: "1932",
+    pageCount: 288,
+    publisher: "Penguin",
+    thumbnailUrl: "https://books.google.com/books/content?id=5Z9cPgAACAAJ&printsec=frontcover&img=1&zoom=1",
+    copies: 2,
+  },
+  {
+    isbn: "9780140449181",
+    title: "Frankenstein",
+    authors: ["Mary Shelley"],
+    description:
+      "Victor Frankenstein creates life and faces the moral cost of scientific ambition.",
+    categories: ["Fiction", "Classics", "Gothic"],
+    publishedDate: "1818",
+    pageCount: 273,
+    publisher: "Penguin Classics",
+    thumbnailUrl: "https://books.google.com/books/content?id=2ygGtwAACAAJ&printsec=frontcover&img=1&zoom=1",
+    copies: 2,
+  },
+  {
+    isbn: "9780199535569",
+    title: "The Adventures of Sherlock Holmes",
+    authors: ["Arthur Conan Doyle"],
+    description:
+      "Twelve short stories featuring Sherlock Holmes and Dr Watson solving cases in Victorian London.",
+    categories: ["Fiction", "Mystery", "Classics"],
+    publishedDate: "1892",
+    pageCount: 368,
+    publisher: "Oxford University Press",
+    thumbnailUrl: "https://books.google.com/books/content?id=VVwvAAAAQBAJ&printsec=frontcover&img=1&zoom=1",
+    copies: 2,
+  },
+  {
+    isbn: "9780140449273",
+    title: "Anna Karenina",
+    authors: ["Leo Tolstoy"],
+    description:
+      "A tragedy of love, family, and society in nineteenth-century Russia.",
+    categories: ["Fiction", "Classics"],
+    publishedDate: "1878",
+    pageCount: 864,
+    publisher: "Penguin Classics",
+    thumbnailUrl: "https://books.google.com/books/content?id=b0g9EAAAQBAJ&printsec=frontcover&img=1&zoom=1",
+    copies: 1,
+  },
+];
 
-const SAMPLE_ISBN = "9780141036144";
-const SAMPLE_TITLE = "Animal Farm";
-const SAMPLE_AUTHORS = ["George Orwell"];
-
-async function upsertAuthUser(input: {
-  email: string;
-  password: string;
-  displayName: string;
-  role: "admin" | "librarian" | "student";
-}): Promise<string> {
-  let uid: string;
-  try {
-    const existing = await auth.getUserByEmail(input.email);
-    uid = existing.uid;
-    console.log(`  exists ${input.role}: ${uid} (${input.email})`);
-  } catch {
-    const user = await auth.createUser({
-      email: input.email,
-      password: input.password,
-      displayName: input.displayName,
-    });
-    uid = user.uid;
-    console.log(`  created ${input.role}: ${uid} (${input.email})`);
-  }
-
-  await auth.setCustomUserClaims(uid, { role: input.role });
-  await db.collection("users").doc(uid).set(
-    {
-      email: input.email,
-      displayName: input.displayName,
-      role: input.role,
-      activeBorrowCount: 0,
-      hasUnpaidFines: false,
-      totalOutstandingFines: 0,
-      fcmTokens: [],
-      isActive: true,
-      updatedAt: new Date(),
-      createdAt: new Date(),
-    },
-    { merge: true }
-  );
-  return uid;
+function buildSearchKeywords(input: {
+  title: string;
+  authors: string[];
+  isbn: string;
+  categories?: string[];
+}): string[] {
+  const raw = [input.title, ...input.authors, input.isbn, ...(input.categories || [])]
+    .join(" ")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  return Array.from(new Set(raw));
 }
 
-async function seedSampleCatalog() {
-  const catalogRef = db.collection("catalog").doc(SAMPLE_ISBN);
-  const existing = await catalogRef.get();
-
-  const copyDefs = [
-    { copyId: "cpy_seed_af_01", barcode: "SEED-AF-01" },
-    { copyId: "cpy_seed_af_02", barcode: "SEED-AF-02" },
-  ];
-
-  if (existing.exists) {
-    console.log(`Sample catalog already present: ${SAMPLE_ISBN}`);
-  } else {
-    await catalogRef.set({
-      isbn: SAMPLE_ISBN,
-      title: SAMPLE_TITLE,
-      authors: SAMPLE_AUTHORS,
-      description: "Seed sample title for borrow / QR / reservation tests.",
-      categories: ["Fiction"],
-      publishedDate: "1945",
-      pageCount: 112,
-      thumbnailUrl: "",
-      totalCopies: copyDefs.length,
-      availableCount: copyDefs.length,
-      issuedCount: 0,
-      reservedCount: 0,
-      damagedCount: 0,
-      searchKeywords: [
-        "animal",
-        "farm",
-        "orwell",
-        SAMPLE_ISBN.toLowerCase(),
-        SAMPLE_TITLE.toLowerCase(),
-      ],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    console.log(`Catalog seeded: ${SAMPLE_TITLE} (${SAMPLE_ISBN})`);
-  }
-
-  for (const def of copyDefs) {
-    const copyRef = db.collection("bookCopies").doc(def.copyId);
-    const copySnap = await copyRef.get();
-    if (copySnap.exists) {
-      console.log(`  copy exists: ${def.copyId}`);
-      continue;
-    }
-    const qrPayload = `${def.copyId}_${SAMPLE_ISBN}`;
-    await copyRef.set({
-      copyId: def.copyId,
-      isbn: SAMPLE_ISBN,
-      title: SAMPLE_TITLE,
-      authors: SAMPLE_AUTHORS,
-      barcode: def.barcode,
-      qrPayload,
-      status: "available",
-      currentLoanId: null,
-      reservedForUserId: null,
-      readyAt: null,
-      expiresAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    console.log(`  copy created: ${def.copyId}  QR: ${qrPayload}`);
-  }
-
-  // Keep counts consistent if catalog existed but copies were missing
-  const copiesSnap = await db
-    .collection("bookCopies")
-    .where("isbn", "==", SAMPLE_ISBN)
-    .get();
+async function refreshCopyCounts(isbn: string) {
+  const copiesSnap = await db.collection("bookCopies").where("isbn", "==", isbn).get();
   let available = 0;
   let issued = 0;
   let reserved = 0;
@@ -168,48 +229,114 @@ async function seedSampleCatalog() {
     else if (status === "reserved") reserved += 1;
     else if (status === "damaged") damaged += 1;
   });
-  await catalogRef.set(
-    {
-      totalCopies: copiesSnap.size,
-      availableCount: available,
-      issuedCount: issued,
-      reservedCount: reserved,
-      damagedCount: damaged,
-      updatedAt: new Date(),
-    },
-    { merge: true }
-  );
+  await db
+    .collection("catalog")
+    .doc(isbn)
+    .set(
+      {
+        totalCopies: copiesSnap.size,
+        availableCount: available,
+        issuedCount: issued,
+        reservedCount: reserved,
+        damagedCount: damaged,
+        updatedAt: new Date(),
+      },
+      { merge: true }
+    );
+}
+
+async function seedBook(book: SeedBook) {
+  const catalogRef = db.collection("catalog").doc(book.isbn);
+  const existing = await catalogRef.get();
+  const now = new Date();
+
+  if (!existing.exists) {
+    await catalogRef.set({
+      isbn: book.isbn,
+      title: book.title,
+      authors: book.authors,
+      publisher: book.publisher,
+      publishedDate: book.publishedDate,
+      description: book.description,
+      thumbnailUrl: book.thumbnailUrl,
+      categories: book.categories,
+      pageCount: book.pageCount,
+      searchKeywords: buildSearchKeywords({
+        title: book.title,
+        authors: book.authors,
+        isbn: book.isbn,
+        categories: book.categories,
+      }),
+      source: "seed",
+      isActive: true,
+      totalCopies: 0,
+      availableCount: 0,
+      issuedCount: 0,
+      reservedCount: 0,
+      damagedCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+    console.log(`  + ${book.title}`);
+  } else {
+    // Refresh metadata for nicer covers/descriptions without wiping live counts
+    await catalogRef.set(
+      {
+        title: book.title,
+        authors: book.authors,
+        publisher: book.publisher,
+        publishedDate: book.publishedDate,
+        description: book.description,
+        thumbnailUrl: book.thumbnailUrl || existing.data()?.thumbnailUrl || "",
+        categories: book.categories,
+        pageCount: book.pageCount,
+        searchKeywords: buildSearchKeywords({
+          title: book.title,
+          authors: book.authors,
+          isbn: book.isbn,
+          categories: book.categories,
+        }),
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+    console.log(`  ~ ${book.title} (metadata refreshed)`);
+  }
+
+  for (let i = 1; i <= book.copies; i += 1) {
+    const n = String(i).padStart(2, "0");
+    const copyId = `cpy_seed_${book.isbn.slice(-6)}_${n}`;
+    const copyRef = db.collection("bookCopies").doc(copyId);
+    const copySnap = await copyRef.get();
+    if (copySnap.exists) {
+      continue;
+    }
+    const qrPayload = `${copyId}_${book.isbn}`;
+    await copyRef.set({
+      copyId,
+      isbn: book.isbn,
+      title: book.title,
+      authors: book.authors,
+      barcode: `SEED-${book.isbn.slice(-6)}-${n}`,
+      qrPayload,
+      status: "available",
+      currentLoanId: null,
+      reservedForUserId: null,
+      readyAt: null,
+      expiresAt: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    console.log(`      copy ${copyId}`);
+  }
+
+  await refreshCopyCounts(book.isbn);
 }
 
 async function seed() {
-  console.log("Seeding DLMS MVP...\n");
+  console.log("Seeding DLMS catalog (no users)...\n");
 
-  console.log("1) Users");
-  await upsertAuthUser({
-    email: ADMIN_EMAIL,
-    password: ADMIN_PASSWORD,
-    displayName: ADMIN_NAME,
-    role: "admin",
-  });
-
-  if (DEMO_USERS) {
-    await upsertAuthUser({
-      email: process.env.SEED_LIBRARIAN_EMAIL || "fasihxniazi+dlmslib@gmail.com",
-      password: process.env.SEED_LIBRARIAN_PASSWORD || "Password123",
-      displayName: "DLMS Librarian",
-      role: "librarian",
-    });
-    await upsertAuthUser({
-      email: process.env.SEED_STUDENT_EMAIL || "fasihxniazi+dlmsstudent@gmail.com",
-      password: process.env.SEED_STUDENT_PASSWORD || "Password123",
-      displayName: "DLMS Student",
-      role: "student",
-    });
-  } else {
-    console.log("  (skip demo librarian/student; set SEED_DEMO_USERS=true to create)");
-  }
-
-  console.log("\n2) System config");
+  console.log("1) System config");
   await db.collection("config").doc("system").set(
     {
       timezone: "Asia/Karachi",
@@ -228,7 +355,7 @@ async function seed() {
   );
   console.log("  config/system upserted");
 
-  console.log("\n3) Holidays");
+  console.log("\n2) Holidays");
   const holidays = [
     { date: "2026-03-23", name: "Pakistan Day" },
     { date: "2026-08-14", name: "Independence Day" },
@@ -241,17 +368,14 @@ async function seed() {
     console.log(`  ${h.date} ${h.name}`);
   }
 
-  console.log("\n4) Sample catalog");
-  await seedSampleCatalog();
-
-  console.log("\nSeed complete.");
-  console.log(`  Admin: ${ADMIN_EMAIL}`);
-  if (DEMO_USERS) {
-    console.log("  Demo librarian/student emails printed above; change passwords after first login.");
+  console.log(`\n3) Catalog (${BOOKS.length} titles)`);
+  for (const book of BOOKS) {
+    await seedBook(book);
   }
-  console.log("  Sample QR payloads: cpy_seed_af_01_" + SAMPLE_ISBN);
-  console.log("                     cpy_seed_af_02_" + SAMPLE_ISBN);
-  console.log("\nChange default passwords after first login.");
+
+  const totalCopies = BOOKS.reduce((sum, b) => sum + b.copies, 0);
+  console.log(`\nSeed complete: ${BOOKS.length} books, up to ${totalCopies} physical copies.`);
+  console.log("Users were not touched. Re-run anytime; existing copies are skipped.");
 }
 
 seed().catch((err) => {

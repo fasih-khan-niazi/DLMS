@@ -23,6 +23,7 @@ type CatalogBook = {
   availableCount?: number;
   totalCopies?: number;
   availability?: string;
+  isActive?: boolean;
 };
 
 type Props = {
@@ -35,11 +36,15 @@ export default function CatalogScreen({ navigation }: Props) {
   const [books, setBooks] = useState<CatalogBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
 
-  const loadBooks = async (search = query) => {
+  const loadBooks = async (search = query, staff = isStaff) => {
     try {
       const response = await api.get("/api/catalog/books", {
-        params: search.trim() ? { q: search.trim() } : {},
+        params: {
+          ...(search.trim() ? { q: search.trim() } : {}),
+          ...(staff ? { includeInactive: "1" } : {}),
+        },
       });
       setBooks(response.data.results || []);
     } catch {
@@ -53,7 +58,17 @@ export default function CatalogScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
-      loadBooks();
+      (async () => {
+        let staff = false;
+        try {
+          const me = await api.get("/api/auth/me");
+          staff = me.data?.role === "librarian" || me.data?.role === "admin";
+          setIsStaff(staff);
+        } catch {
+          setIsStaff(false);
+        }
+        await loadBooks(query, staff);
+      })();
     }, [])
   );
 
@@ -116,6 +131,9 @@ export default function CatalogScreen({ navigation }: Props) {
                   {(item.authors || []).join(", ") || "Unknown author"}
                 </Text>
                 <Text style={styles.meta}>ISBN: {item.isbn}</Text>
+                {item.isActive === false ? (
+                  <Text style={styles.inactiveLabel}>Inactive (hidden from students)</Text>
+                ) : null}
               </View>
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{item.availability || "Unavailable"}</Text>
@@ -189,6 +207,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: colors.muted,
     fontSize: type.small,
+  },
+  inactiveLabel: {
+    marginTop: 6,
+    color: "#B91C1C",
+    fontSize: 12,
+    fontWeight: "700",
   },
   badge: {
     alignItems: "flex-end",

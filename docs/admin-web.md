@@ -34,7 +34,8 @@ See also `docs/auth.md`.
 ## Features
 
 - Dashboard counts (users, loans, reservations, digital books, unpaid fines)
-- Users: search, role change, suspend/activate (with confirmations)
+- Users: search, promote student↔librarian only (admin is seed-only and protected), suspend/activate
+- Catalog: soft-deactivate / reactivate titles (history kept)
 - Config: grouped sections (loans, fines, reservations, calendar, digital)
 - Reservations: waiting/ready list
 - Fines: unpaid users/loans and mark fine paid

@@ -2,11 +2,11 @@ import axios from "axios";
 import { firebaseAuth } from "./firebase";
 
 /**
- * How your phone reaches the Express API on your PC.
+ * How your phone reaches the Express API.
  *
- * - "lan"      → PC Ethernet/Wi-Fi IP (try this first)
- * - "usb"      → after: adb reverse tcp:5000 tcp:5000
- * - "emulator" → Android emulator only
+ * Priority:
+ * 1. EXPO_PUBLIC_API_URL (EAS / release builds, Render URL)
+ * 2. Mode below for local Expo Go
  */
 type ApiMode = "lan" | "usb" | "emulator";
 
@@ -18,11 +18,13 @@ const API_URLS: Record<ApiMode, string> = {
   emulator: "http://10.0.2.2:5000",
 };
 
-export const API_BASE_URL = API_URLS[API_MODE];
+export const API_BASE_URL = (
+  process.env.EXPO_PUBLIC_API_URL || API_URLS[API_MODE]
+).replace(/\/$/, "");
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 20000,
 });
 
 api.interceptors.request.use(async (config) => {

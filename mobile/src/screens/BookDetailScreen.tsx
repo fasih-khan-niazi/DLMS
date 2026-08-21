@@ -30,14 +30,20 @@ export default function BookDetailScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [reserving, setReserving] = useState(false);
   const [actionCopyId, setActionCopyId] = useState<string | null>(null);
+  const [isStaff, setIsStaff] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState(false);
 
   const load = async () => {
     try {
-      const [bookRes, loansRes] = await Promise.all([
+      const [bookRes, loansRes, meRes] = await Promise.all([
         api.get(`/api/catalog/books/${isbn}`),
         api.get("/api/loans/mine", { params: { status: "active" } }),
+        api.get("/api/auth/me").catch(() => null),
       ]);
       setBook(bookRes.data);
+      setIsStaff(
+        meRes?.data?.role === "librarian" || meRes?.data?.role === "admin"
+      );
 
       const mine = new Set<string>();
       (loansRes.data.loans || []).forEach((loan: any) => {
@@ -101,6 +107,41 @@ export default function BookDetailScreen({ navigation, route }: Props) {
     }
   };
 
+  const toggleCatalogActive = () => {
+    if (!book) return;
+    const next = book.isActive === false;
+    const label = next ? "Reactivate" : "Deactivate";
+    Alert.alert(
+      `${label} title?`,
+      next
+        ? "Students will see this book in the catalog again."
+        : "Students will not see this book. Loan and reservation history is kept.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: label,
+          style: next ? "default" : "destructive",
+          onPress: async () => {
+            setTogglingStatus(true);
+            try {
+              await api.patch(`/api/catalog/books/${encodeURIComponent(isbn)}/status`, {
+                isActive: next,
+              });
+              await load();
+            } catch (error: any) {
+              Alert.alert(
+                "Update failed",
+                error.response?.data?.error || "Could not update book status"
+              );
+            } finally {
+              setTogglingStatus(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -130,12 +171,31 @@ export default function BookDetailScreen({ navigation, route }: Props) {
       <Text style={styles.meta}>{(book.authors || []).join(", ") || "Unknown author"}</Text>
       <Text style={styles.meta}>ISBN: {book.isbn}</Text>
       <Text style={styles.availability}>{book.availability}</Text>
+      {book.isActive === false ? (
+        <Text style={styles.inactiveBanner}>Inactive · hidden from students</Text>
+      ) : null}
       <Text style={styles.counts}>
         {book.availableCount || 0} available · {book.issuedCount || 0} issued ·{" "}
         {book.reservedCount || 0} reserved · {book.totalCopies || 0} total
       </Text>
 
-      {canReserve ? (
+      {isStaff ? (
+        <TouchableOpacity
+          style={styles.staffStatusButton}
+          onPress={toggleCatalogActive}
+          disabled={togglingStatus}
+        >
+          {togglingStatus ? (
+            <ActivityIndicator color="#2E4A62" />
+          ) : (
+            <Text style={styles.staffStatusText}>
+              {book.isActive === false ? "Reactivate title" : "Deactivate title"}
+            </Text>
+          )}
+        </TouchableOpacity>
+      ) : null}
+
+      {canReserve && book.isActive !== false ? (
         <TouchableOpacity
           style={styles.reserveButton}
           onPress={reserveBook}
@@ -183,7 +243,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
                 </View>
               )}
 
-              {copy.status === "available" && (
+              {copy.status === "available" && book.isActive !== false && (
                 <TouchableOpacity
                   style={styles.actionButton}
                   onPress={() => borrowCopy(copy.copyId)}
@@ -275,6 +335,24 @@ const styles = StyleSheet.create({
   counts: {
     marginTop: 6,
     color: "#4B5563",
+  },
+  inactiveBanner: {
+    marginTop: 8,
+    color: "#B91C1C",
+    fontWeight: "700",
+  },
+  staffStatusButton: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#2E4A62",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  staffStatusText: {
+    color: "#2E4A62",
+    fontWeight: "700",
   },
   reserveButton: {
     marginTop: 16,
