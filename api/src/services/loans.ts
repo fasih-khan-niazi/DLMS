@@ -30,6 +30,8 @@ export async function getSystemConfig() {
       blockCheckoutIfUnpaidFine: true,
       workingDaysOff: ["Sunday"],
       librariansCanBorrow: true,
+      maxPdfSizeMb: 25,
+      reminderDaysBefore: [2, 1],
     }
   );
 }

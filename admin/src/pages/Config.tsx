@@ -40,10 +40,23 @@ export function ConfigPage() {
     let cancelled = false;
     (async () => {
       try {
+        const cached = sessionStorage.getItem("dlms.admin.config");
+        if (cached) {
+          const cfg = { ...defaults, ...JSON.parse(cached) };
+          setForm(cfg);
+          const reminders = Array.isArray(cfg.reminderDaysBefore)
+            ? cfg.reminderDaysBefore.join(",")
+            : String(cfg.reminderDaysBefore ?? "2,1");
+          setReminderText(reminders);
+          setDaysOffText((cfg.workingDaysOff || ["Sunday"]).join(","));
+          setLoading(false);
+        }
+
         const { data } = await api.get<{ config: SystemConfig }>("/api/admin/config");
         if (cancelled) return;
         const cfg = { ...defaults, ...data.config };
         setForm(cfg);
+        sessionStorage.setItem("dlms.admin.config", JSON.stringify(cfg));
         const reminders = Array.isArray(cfg.reminderDaysBefore)
           ? cfg.reminderDaysBefore.join(",")
           : String(cfg.reminderDaysBefore ?? "2,1");
@@ -94,8 +107,10 @@ export function ConfigPage() {
       };
 
       const { data } = await api.put<{ config: SystemConfig }>("/api/admin/config", payload);
-      setForm({ ...defaults, ...data.config });
-      setMessage("Config saved");
+      const cfg = { ...defaults, ...data.config };
+      setForm(cfg);
+      sessionStorage.setItem("dlms.admin.config", JSON.stringify(cfg));
+      setMessage("Configuration saved successfully.");
     } catch {
       setError("Failed to save config");
     } finally {
@@ -106,7 +121,15 @@ export function ConfigPage() {
   if (loading) {
     return (
       <div className="page">
-        <p>Loading...</p>
+        <header className="page-header">
+          <h1>Configuration</h1>
+          <p className="muted">Loading system settings...</p>
+        </header>
+        <div className="skeleton-stack">
+          <div className="skeleton-block" />
+          <div className="skeleton-block" />
+          <div className="skeleton-block" />
+        </div>
       </div>
     );
   }
@@ -114,101 +137,159 @@ export function ConfigPage() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1>Config</h1>
-        <p className="muted">System settings for loans, fines, and digital uploads</p>
+        <h1>Configuration</h1>
+        <p className="muted">
+          Grouped system settings for loans, fines, reservations, calendar, and digital library.
+        </p>
       </header>
 
       {message ? <p className="success-banner">{message}</p> : null}
       {error ? <p className="error-banner">{error}</p> : null}
 
-      <form className="config-form" onSubmit={(e) => void onSubmit(e)}>
-        <label>
-          Max borrow limit
-          <input
-            type="number"
-            value={form.maxBorrowLimit ?? 5}
-            onChange={(e) => updateNumber("maxBorrowLimit", e.target.value)}
-          />
-        </label>
-        <label>
-          Loan period (days)
-          <input
-            type="number"
-            value={form.loanPeriodDays ?? 14}
-            onChange={(e) => updateNumber("loanPeriodDays", e.target.value)}
-          />
-        </label>
-        <label>
-          Fine per day (Rs)
-          <input
-            type="number"
-            value={form.finePerDayRs ?? 50}
-            onChange={(e) => updateNumber("finePerDayRs", e.target.value)}
-          />
-        </label>
-        <label>
-          Reservation hold (hours)
-          <input
-            type="number"
-            value={form.reservationHoldHours ?? 72}
-            onChange={(e) => updateNumber("reservationHoldHours", e.target.value)}
-          />
-        </label>
-        <label>
-          Reminder days before (comma-separated)
-          <input
-            type="text"
-            value={reminderText}
-            onChange={(e) => setReminderText(e.target.value)}
-          />
-        </label>
-        <label>
-          Working days off (comma-separated)
-          <input
-            type="text"
-            value={daysOffText}
-            onChange={(e) => setDaysOffText(e.target.value)}
-          />
-        </label>
-        <label>
-          Max PDF size (MB)
-          <input
-            type="number"
-            value={form.maxPdfSizeMb ?? 25}
-            onChange={(e) => updateNumber("maxPdfSizeMb", e.target.value)}
-          />
-        </label>
-        <label>
-          Timezone
-          <input
-            type="text"
-            value={form.timezone || "Asia/Karachi"}
-            onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
-          />
-        </label>
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={!!form.blockCheckoutIfUnpaidFine}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, blockCheckoutIfUnpaidFine: e.target.checked }))
-            }
-          />
-          Block checkout if unpaid fine
-        </label>
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={!!form.librariansCanBorrow}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, librariansCanBorrow: e.target.checked }))
-            }
-          />
-          Librarians can borrow
-        </label>
-        <button type="submit" className="btn btn-primary" disabled={saving}>
-          {saving ? "Saving..." : "Save config"}
-        </button>
+      <form className="config-form config-form-sections" onSubmit={(e) => void onSubmit(e)}>
+        <section className="config-section">
+          <div className="config-section-head">
+            <h2>Loans</h2>
+            <p className="muted small">Borrow limits and loan duration</p>
+          </div>
+          <div className="config-grid">
+            <label>
+              Max borrow limit
+              <input
+                type="number"
+                min={1}
+                value={form.maxBorrowLimit ?? 5}
+                onChange={(e) => updateNumber("maxBorrowLimit", e.target.value)}
+              />
+            </label>
+            <label>
+              Loan period (days)
+              <input
+                type="number"
+                min={1}
+                value={form.loanPeriodDays ?? 14}
+                onChange={(e) => updateNumber("loanPeriodDays", e.target.value)}
+              />
+            </label>
+            <label className="checkbox-row config-span">
+              <input
+                type="checkbox"
+                checked={!!form.librariansCanBorrow}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, librariansCanBorrow: e.target.checked }))
+                }
+              />
+              Librarians can borrow physical books
+            </label>
+          </div>
+        </section>
+
+        <section className="config-section">
+          <div className="config-section-head">
+            <h2>Fines</h2>
+            <p className="muted small">Late return charges and checkout blocking</p>
+          </div>
+          <div className="config-grid">
+            <label>
+              Fine per day (Rs)
+              <input
+                type="number"
+                min={0}
+                value={form.finePerDayRs ?? 50}
+                onChange={(e) => updateNumber("finePerDayRs", e.target.value)}
+              />
+            </label>
+            <label className="checkbox-row config-span">
+              <input
+                type="checkbox"
+                checked={!!form.blockCheckoutIfUnpaidFine}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, blockCheckoutIfUnpaidFine: e.target.checked }))
+                }
+              />
+              Block borrow and reserve while unpaid fines exist
+            </label>
+          </div>
+        </section>
+
+        <section className="config-section">
+          <div className="config-section-head">
+            <h2>Reservations</h2>
+            <p className="muted small">Hold window after a copy becomes ready</p>
+          </div>
+          <div className="config-grid">
+            <label>
+              Reservation hold (hours)
+              <input
+                type="number"
+                min={1}
+                value={form.reservationHoldHours ?? 72}
+                onChange={(e) => updateNumber("reservationHoldHours", e.target.value)}
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className="config-section">
+          <div className="config-section-head">
+            <h2>Calendar and reminders</h2>
+            <p className="muted small">Timezone, closed days, and due reminders</p>
+          </div>
+          <div className="config-grid">
+            <label>
+              Timezone
+              <input
+                type="text"
+                value={form.timezone || "Asia/Karachi"}
+                onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
+              />
+            </label>
+            <label>
+              Reminder days before due
+              <input
+                type="text"
+                value={reminderText}
+                onChange={(e) => setReminderText(e.target.value)}
+                placeholder="2,1"
+              />
+              <span className="field-hint">Comma-separated day offsets (example: 2,1)</span>
+            </label>
+            <label className="config-span">
+              Working days off
+              <input
+                type="text"
+                value={daysOffText}
+                onChange={(e) => setDaysOffText(e.target.value)}
+                placeholder="Sunday"
+              />
+              <span className="field-hint">Comma-separated weekday names</span>
+            </label>
+          </div>
+        </section>
+
+        <section className="config-section">
+          <div className="config-section-head">
+            <h2>Digital library</h2>
+            <p className="muted small">Upload limits for PDF resources</p>
+          </div>
+          <div className="config-grid">
+            <label>
+              Max PDF size (MB)
+              <input
+                type="number"
+                min={1}
+                value={form.maxPdfSizeMb ?? 25}
+                onChange={(e) => updateNumber("maxPdfSizeMb", e.target.value)}
+              />
+            </label>
+          </div>
+        </section>
+
+        <div className="config-actions">
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? "Saving..." : "Save all settings"}
+          </button>
+        </div>
       </form>
     </div>
   );

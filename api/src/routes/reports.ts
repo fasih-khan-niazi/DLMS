@@ -347,4 +347,72 @@ router.get("/export.csv", async (req: AuthRequest, res: Response) => {
   }
 });
 
+router.get("/export.pdf", async (req: AuthRequest, res: Response) => {
+  try {
+    const range = parseRange(req);
+    if (!range) {
+      res.status(400).json({ error: "Invalid from/to. Use YYYY-MM-DD with from <= to" });
+      return;
+    }
+
+    const { metrics, series } = await computeReport(
+      range.from,
+      range.to,
+      range.fromDate,
+      range.toDate
+    );
+
+    const PDFDocument = (await import("pdfkit")).default;
+    const doc = new PDFDocument({ margin: 50, size: "A4" });
+    const filename = `dlms-report-${range.from}-${range.to}.pdf`;
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    doc.pipe(res);
+
+    doc.fontSize(20).fillColor("#2E4A62").text("DLMS Library Report", { align: "left" });
+    doc.moveDown(0.4);
+    doc
+      .fontSize(11)
+      .fillColor("#667788")
+      .text(`Period: ${range.from} to ${range.to} (Asia/Karachi)`);
+    doc.text(`Generated: ${new Date().toLocaleString("en-PK", { timeZone: "Asia/Karachi" })}`);
+    doc.moveDown();
+
+    doc.fontSize(14).fillColor("#2E4A62").text("Summary metrics");
+    doc.moveDown(0.5);
+    doc.fontSize(11).fillColor("#2a2a2a");
+    for (const [key, value] of Object.entries(metrics)) {
+      doc.text(`${key}: ${value}`);
+    }
+
+    doc.moveDown();
+    doc.fontSize(14).fillColor("#2E4A62").text("Daily activity");
+    doc.moveDown(0.5);
+    doc.fontSize(10).fillColor("#2a2a2a");
+    doc.text("Date            Loans   Returns   Reservations");
+    doc.moveDown(0.3);
+
+    for (const day of series) {
+      const line = `${day.date}      ${String(day.loans).padStart(5)}   ${String(day.returns).padStart(7)}   ${String(day.reservations).padStart(12)}`;
+      doc.text(line);
+      if (doc.y > 750) {
+        doc.addPage();
+        doc.fontSize(10).fillColor("#2a2a2a");
+      }
+    }
+
+    if (series.length === 0) {
+      doc.text("No daily activity in this range.");
+    }
+
+    doc.end();
+  } catch (error) {
+    console.error("Reports PDF export error:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Failed to export report PDF" });
+    }
+  }
+});
+
 export default router;

@@ -61,7 +61,7 @@ export function ReportsPage() {
   const [to, setTo] = useState(() => todayLocalIso());
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadSummary = useCallback(async (fromDate: string, toDate: string) => {
@@ -86,7 +86,7 @@ export function ReportsPage() {
   }
 
   async function downloadCsv() {
-    setExporting(true);
+    setExporting("csv");
     setError(null);
     try {
       const response = await api.get("/api/admin/reports/export.csv", {
@@ -105,7 +105,31 @@ export function ReportsPage() {
     } catch {
       setError("Failed to download CSV");
     } finally {
-      setExporting(false);
+      setExporting(null);
+    }
+  }
+
+  async function downloadPdf() {
+    setExporting("pdf");
+    setError(null);
+    try {
+      const response = await api.get("/api/admin/reports/export.pdf", {
+        params: { from, to },
+        responseType: "blob",
+      });
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `dlms-report-${from}-${to}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Failed to download PDF");
+    } finally {
+      setExporting(null);
     }
   }
 
@@ -121,7 +145,7 @@ export function ReportsPage() {
     <div className="page">
       <header className="page-header">
         <h1>Reports</h1>
-        <p className="muted">Date-range metrics and CSV export (Asia/Karachi calendar days on the API)</p>
+        <p className="muted">Date-range metrics with CSV and PDF export</p>
       </header>
 
       <form className="toolbar" onSubmit={onLoad}>
@@ -149,10 +173,18 @@ export function ReportsPage() {
         <button
           type="button"
           className="btn"
-          disabled={exporting || loading}
+          disabled={!!exporting || loading}
           onClick={() => void downloadCsv()}
         >
-          {exporting ? "Downloading..." : "Download CSV"}
+          {exporting === "csv" ? "Downloading..." : "Download CSV"}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={!!exporting || loading}
+          onClick={() => void downloadPdf()}
+        >
+          {exporting === "pdf" ? "Downloading..." : "Download PDF"}
         </button>
       </form>
 

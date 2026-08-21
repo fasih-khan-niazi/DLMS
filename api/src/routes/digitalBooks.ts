@@ -8,6 +8,7 @@ import { requireRole } from "../middleware/requireRole";
 import { uploadPdf } from "../middleware/uploadPdf";
 import { createId } from "../utils/ids";
 import { buildSearchKeywords } from "../services/googleBooks";
+import { getSystemConfig } from "../services/loans";
 import {
   downloadDigitalBookPdf,
   removeDigitalBookPdf,
@@ -193,6 +194,16 @@ router.post(
 
       if (!req.file?.buffer) {
         res.status(400).json({ error: "PDF file is required (field name: file)" });
+        return;
+      }
+
+      const config = await getSystemConfig();
+      const maxMb = Number(config.maxPdfSizeMb || 25);
+      const maxBytes = maxMb * 1024 * 1024;
+      if (req.file.size > maxBytes) {
+        res.status(400).json({
+          error: `PDF exceeds the configured limit of ${maxMb}MB`,
+        });
         return;
       }
 

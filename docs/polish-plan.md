@@ -43,5 +43,9 @@ OTP would need a separate email/SMS provider; out of scope for park unless requi
 ## Status
 
 - Block A: done
-- Block B: done (mobile polish starters, Ionicons tabs, skeletons on catalog, in-app notifications inbox)
-- Blocks C-G: pending
+- Block B: done
+- Block C: done (grouped config, admin skeletons/cache; config layout responsive)
+- Block D: done (PDF report export alongside CSV)
+- Blocks E-G: pending
+
+Note: digital PDF upload limit follows `config.maxPdfSizeMb` (default 25MB).
