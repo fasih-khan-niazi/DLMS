@@ -47,6 +47,7 @@ OTP would need a separate email/SMS provider; out of scope for park unless requi
 - Block C: done (grouped config, admin skeletons/cache; config layout responsive)
 - Block D: done (PDF report export alongside CSV)
 - Block E: done (see `docs/security.md`)
-- Blocks F-G: pending
+- Block F: done (see `docs/vnv-matrix.md`)
+- Block G: pending (demo script, seed, tag `v1.0.0-mvp`, park)
 
 Note: digital PDF upload limit follows `config.maxPdfSizeMb` (default 25MB).

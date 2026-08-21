@@ -64,6 +64,8 @@ Phases **1-6** are implemented in this codebase:
 | [`docs/digital-library.md`](docs/digital-library.md) | PDF / e-library |
 | [`docs/polish-plan.md`](docs/polish-plan.md) | Completion / park polish blocks |
 | [`docs/notifications-inbox.md`](docs/notifications-inbox.md) | In-app notification inbox |
+| [`docs/security.md`](docs/security.md) | Security checklist |
+| [`docs/vnv-matrix.md`](docs/vnv-matrix.md) | Business logic VnV matrix |
 
 Engineering docs under `docs/` **are committed** - that is normal industry practice. Only secrets and uploaded PDFs are ignored.
 
