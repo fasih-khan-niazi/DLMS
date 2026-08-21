@@ -12,8 +12,21 @@ dotenv.config();
 function loadCredential() {
   const jsonInline = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();
   if (jsonInline) {
-    const parsed = JSON.parse(jsonInline) as ServiceAccount;
-    return cert(parsed);
+    try {
+      const parsed = JSON.parse(jsonInline) as ServiceAccount;
+      return cert(parsed);
+    } catch (err) {
+      throw new Error(
+        `FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON. Paste the full service account file contents. (${String(err)})`
+      );
+    }
+  }
+
+  // Render has no secrets/ folder. PATH from a copied local .env will crash deploy.
+  if (process.env.RENDER === "true") {
+    throw new Error(
+      "On Render, set FIREBASE_SERVICE_ACCOUNT_JSON to the full service account JSON. Remove FIREBASE_SERVICE_ACCOUNT_PATH."
+    );
   }
 
   const relative =
@@ -21,7 +34,7 @@ function loadCredential() {
   const serviceAccountPath = path.resolve(__dirname, "../../", relative);
   if (!fs.existsSync(serviceAccountPath)) {
     throw new Error(
-      `Firebase service account not found. Set FIREBASE_SERVICE_ACCOUNT_JSON (Render) or FIREBASE_SERVICE_ACCOUNT_PATH (local). Tried: ${serviceAccountPath}`
+      `Firebase service account file not found at ${serviceAccountPath}. For Render use FIREBASE_SERVICE_ACCOUNT_JSON instead.`
     );
   }
   return cert(serviceAccountPath);

@@ -25,33 +25,45 @@ Firebase Auth/Firestore and Supabase stay in the cloud as today. Only the **API*
 | Start Command | `npm start` |
 | Instance | Free |
 
-4. Add environment variables (Render → Environment):
+4. Add environment variables (Render → Environment).
 
-| Key | Value |
-|-----|--------|
-| `NODE_ENV` | `production` |
-| `PORT` | leave unset (Render sets it) or `10000` |
-| `FIREBASE_PROJECT_ID` | from your `.env` |
-| `FIREBASE_STORAGE_BUCKET` | from your `.env` |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | **entire** service account JSON as one line (see below) |
-| `GOOGLE_BOOKS_API_KEY` | from your `.env` |
-| `CRON_SECRET` | strong random string (not `replace_me`) |
-| `ALLOWED_ORIGINS` | `*` for Week 1, or your admin URL later |
-| `SUPABASE_URL` | from your `.env` |
-| `SUPABASE_SERVICE_ROLE_KEY` | from your `.env` |
+Copy values from local `api/.env`, **except**:
+
+| Do NOT set on Render | Why |
+|----------------------|-----|
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | No secret files on the server; this crashes startup |
+| `PORT` | Render sets this automatically |
+
+| Must set on Render | Value |
+|--------------------|--------|
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Full contents of the Firebase Admin SDK JSON file |
+| `FIREBASE_PROJECT_ID` | from `.env` |
+| `FIREBASE_STORAGE_BUCKET` | from `.env` |
+| `GOOGLE_BOOKS_API_KEY` | from `.env` |
+| `CRON_SECRET` | from `.env` (not `replace_me`) |
+| `ALLOWED_ORIGINS` | `*` |
+| `SUPABASE_URL` | from `.env` |
+| `SUPABASE_SERVICE_ROLE_KEY` | from `.env` |
 | `SUPABASE_DIGITAL_BOOKS_BUCKET` | `digital-books` |
+| `NODE_ENV` | `production` |
 
 ### Packing the service account for Render
 
-On your PC (PowerShell), from the repo root:
+PowerShell (repo root), copies JSON onto clipboard as one line:
 
 ```powershell
-Get-Content secrets\YOUR-firebase-adminsdk.json -Raw
+Get-Content .\secrets\dlms-b7390-firebase-adminsdk-fbsvc-9468ed8000.json -Raw | Set-Clipboard
 ```
 
-Copy the whole JSON (starts with `{` … ends with `}`). Paste into `FIREBASE_SERVICE_ACCOUNT_JSON`. Do **not** commit this value.
+In Render → Environment → add `FIREBASE_SERVICE_ACCOUNT_JSON` → paste (Ctrl+V).
 
-Do **not** set `FIREBASE_SERVICE_ACCOUNT_PATH` on Render.
+If deploy logs say JSON parse error, paste as a **Secret File** is not required; multiline paste in the value box usually works on Render. The value must start with `{` and end with `}`.
+
+### After a failed deploy
+
+1. Delete env var `FIREBASE_SERVICE_ACCOUNT_PATH` if present.
+2. Confirm `FIREBASE_SERVICE_ACCOUNT_JSON` is set.
+3. Manual Deploy → clear build cache optional → Deploy.
 
 5. Deploy. When live, open:
 
@@ -67,11 +79,15 @@ Cron jobs inside the API only run while the instance is awake. For Week 1 demos 
 
 ## Point clients at this API
 
+Defaults in `admin` and `mobile` already use `https://dlms-csaj.onrender.com`.
+
 | Client | How |
 |--------|-----|
-| Admin (local Vite) | Create `admin/.env`: `VITE_API_URL=https://YOUR-SERVICE.onrender.com` then restart `npm run dev` |
-| Mobile Expo Go | Set in shell before start: `$env:EXPO_PUBLIC_API_URL="https://YOUR-SERVICE.onrender.com"` then `npx expo start -c` |
-| Android APK (later) | EAS build with `EXPO_PUBLIC_API_URL` set to the Render URL |
+| Admin | `admin/.env` → `VITE_API_URL=...` (see `.env.example`) |
+| Mobile Expo | `mobile/.env` → `EXPO_PUBLIC_API_URL=...` then `npx expo start -c` |
+| Android APK | `mobile/eas.json` preview profile env (already set) |
+
+Full checklist: `docs/week1-demo.md`.
 
 ## Redeploy Week 1 later
 
@@ -81,11 +97,14 @@ To force Week 1 forever on this service: keep the service branch on `main` and o
 
 ## Optional: admin static site on Render
 
-1. New → **Static Site**.
+1. New → **Static Site** (not Web Service).
 2. Root Directory: `admin`.
 3. Build: `npm install && npm run build`.
 4. Publish directory: `dist`.
-5. Env at build time: `VITE_API_URL=https://YOUR-API.onrender.com`.
+5. Env at **build** time: `VITE_API_URL=https://dlms-csaj.onrender.com`.
+6. Firebase Console → Authentication → Authorized domains → add the new admin hostname.
+
+See also `docs/week1-demo.md`.
 
 ## Checklist
 

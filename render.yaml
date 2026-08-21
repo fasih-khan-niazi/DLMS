@@ -12,7 +12,18 @@ services:
         value: production
       - key: ALLOWED_ORIGINS
         value: "*"
-      # Set the rest in the Render dashboard (secrets):
+      # Secrets in Render dashboard:
       # FIREBASE_SERVICE_ACCOUNT_JSON, FIREBASE_PROJECT_ID,
       # FIREBASE_STORAGE_BUCKET, GOOGLE_BOOKS_API_KEY, CRON_SECRET,
       # SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_DIGITAL_BOOKS_BUCKET
+
+  - type: web
+    name: dlms-admin
+    runtime: static
+    plan: free
+    rootDir: admin
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://dlms-csaj.onrender.com

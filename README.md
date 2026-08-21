@@ -69,6 +69,8 @@ Phases **1-6** are implemented in this codebase:
 | [`docs/seed.md`](docs/seed.md) | MVP seed script |
 | [`docs/park.md`](docs/park.md) | MVP freeze / park notes |
 | [`docs/deploy-render.md`](docs/deploy-render.md) | Public API on Render (off-LAN) |
+| [`docs/week1-demo.md`](docs/week1-demo.md) | Week 1 public demo checklist |
+| [`docs/firebase-key-rotation.md`](docs/firebase-key-rotation.md) | Rotate leaked Admin SDK key |
 
 Engineering docs under `docs/` **are committed** - that is normal industry practice. Only secrets and uploaded PDFs are ignored.
 
