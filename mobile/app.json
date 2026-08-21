@@ -28,7 +28,9 @@
       "package": "com.fyp.dlms",
       "permissions": [
         "CAMERA",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#F8F7F4",
@@ -38,6 +40,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "66fc1c67-e7fa-4586-93b3-6c394481a19e"
+      }
     }
   }
 }
