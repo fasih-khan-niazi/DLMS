@@ -68,7 +68,8 @@ Phases **1-6** are implemented in this codebase:
 | [`docs/vnv-matrix.md`](docs/vnv-matrix.md) | Business logic VnV matrix |
 | [`docs/seed.md`](docs/seed.md) | MVP seed script |
 | [`docs/park.md`](docs/park.md) | MVP freeze / park notes |
-| [`docs/deploy-render.md`](docs/deploy-render.md) | Public API on Render (off-LAN) |
+| [`docs/mobile-week2-scope.md`](docs/mobile-week2-scope.md) | Week 2 mobile scope (locked) |
+| [`docs/mobile-week2-plan.md`](docs/mobile-week2-plan.md) | Week 2 mobile phased plan |
 | [`docs/week1-demo.md`](docs/week1-demo.md) | Week 1 public demo checklist |
 | [`docs/firebase-key-rotation.md`](docs/firebase-key-rotation.md) | Rotate leaked Admin SDK key |
 
