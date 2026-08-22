@@ -1,20 +1,9 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from "react-native";
+import { Alert, Pressable, Text } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { firebaseAuth } from "../config/firebase";
-import { colors, radius, space, type } from "../theme";
+import { AuthLayout, AuthLink, Button, Input } from "../components/ui";
+import { useTheme } from "../theme";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 type Props = {
@@ -22,7 +11,7 @@ type Props = {
 };
 
 export default function LoginScreen({ navigation }: Props) {
-  const insets = useSafeAreaInsets();
+  const { colors, fontFamily, type, space } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -50,160 +39,52 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    <AuthLayout
+      brandLine="Your campus library, in your pocket"
+      panelTitle="Sign in"
+      panelHint="Students and staff use the same app"
+      footer={
+        <AuthLink
+          label="New here? Create a student account"
+          onPress={() => navigation.navigate("Register")}
+        />
+      }
     >
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingTop: insets.top + space.xl, paddingBottom: insets.bottom + space.xl },
-        ]}
-        keyboardShouldPersistTaps="handled"
+      <Input
+        label="Email"
+        placeholder="you@university.edu"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+
+      <Input
+        label="Password"
+        placeholder="Your password"
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+
+      <Pressable
+        onPress={() => navigation.navigate("ForgotPassword", { email: email.trim() })}
+        hitSlop={8}
+        style={{ alignSelf: "flex-end", marginTop: space.sm, marginBottom: space.md }}
       >
-        <View style={styles.hero}>
-          <Text style={styles.brand}>DLMS</Text>
-          <Text style={styles.tagline}>Your campus library, in your pocket</Text>
-        </View>
+        <Text
+          style={{
+            color: colors.amberDark,
+            fontSize: type.small,
+            fontFamily: fontFamily.bodySemiBold,
+          }}
+        >
+          Forgot password?
+        </Text>
+      </Pressable>
 
-        <View style={styles.panel}>
-          <Text style={styles.panelTitle}>Sign in</Text>
-          <Text style={styles.panelHint}>Students and staff use the same app</Text>
-
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="you@university.edu"
-            placeholderTextColor={colors.muted}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Your password"
-            placeholderTextColor={colors.muted}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-
-          <TouchableOpacity
-            onPress={() => navigation.navigate("ForgotPassword", { email: email.trim() })}
-            hitSlop={8}
-          >
-            <Text style={styles.forgot}>Forgot password?</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.buttonText}>Sign in</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => navigation.navigate("Register")} hitSlop={8}>
-            <Text style={styles.link}>New here? Create a student account</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      <Button title="Sign in" onPress={handleLogin} loading={loading} />
+    </AuthLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.navy },
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: space.lg,
-    justifyContent: "center",
-  },
-  hero: {
-    marginBottom: space.lg,
-    paddingHorizontal: space.sm,
-  },
-  brand: {
-    fontSize: type.brand,
-    fontWeight: "800",
-    color: colors.white,
-    letterSpacing: 0.5,
-  },
-  tagline: {
-    marginTop: space.sm,
-    fontSize: type.subtitle,
-    color: "rgba(255,255,255,0.78)",
-    lineHeight: 22,
-  },
-  panel: {
-    backgroundColor: colors.cream,
-    borderRadius: radius.lg,
-    padding: space.lg,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-  panelTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: colors.navy,
-  },
-  panelHint: {
-    marginTop: 4,
-    marginBottom: space.md,
-    color: colors.muted,
-    fontSize: type.small,
-  },
-  label: {
-    fontSize: type.small,
-    fontWeight: "600",
-    color: colors.navy,
-    marginBottom: 6,
-    marginTop: space.sm,
-  },
-  input: {
-    backgroundColor: colors.white,
-    borderRadius: radius.md,
-    paddingHorizontal: space.md,
-    paddingVertical: 14,
-    fontSize: type.body,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-  },
-  forgot: {
-    alignSelf: "flex-end",
-    marginTop: space.sm,
-    marginBottom: space.md,
-    color: colors.amberDark,
-    fontSize: type.small,
-    fontWeight: "600",
-  },
-  button: {
-    backgroundColor: colors.navy,
-    borderRadius: radius.md,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  buttonDisabled: { opacity: 0.7 },
-  buttonText: {
-    color: colors.white,
-    fontSize: type.body,
-    fontWeight: "700",
-  },
-  link: {
-    textAlign: "center",
-    color: colors.navy,
-    fontSize: type.small,
-    marginTop: space.md,
-    fontWeight: "600",
-  },
-});
