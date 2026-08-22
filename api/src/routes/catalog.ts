@@ -8,8 +8,36 @@ import {
   BookMetadata,
 } from "../services/googleBooks";
 import { createId } from "../utils/ids";
+import {
+  LIST_FETCH_CAP,
+  paginateArray,
+  parseListQuery,
+  toMillis,
+} from "../utils/pagination";
 
 const router = Router();
+
+function sortCatalogResults(items: Record<string, unknown>[], sort: string) {
+  const copy = [...items];
+  switch (sort) {
+    case "title_desc":
+      return copy.sort((a, b) => String(b.title || "").localeCompare(String(a.title || "")));
+    case "newest":
+      return copy.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+    default:
+      return copy.sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")));
+  }
+}
+
+function matchesAvailabilityFilter(doc: Record<string, unknown>, availability: string) {
+  if (!availability || availability === "all") return true;
+  const label = getAvailabilityLabel({
+    availableCount: Number(doc.availableCount) || 0,
+    issuedCount: Number(doc.issuedCount) || 0,
+    reservedCount: Number(doc.reservedCount) || 0,
+  }).toLowerCase();
+  return label === availability.toLowerCase();
+}
 
 function normalizeIsbn(isbn: string): string {
   return isbn.replace(/[-\s]/g, "").toUpperCase();
@@ -249,32 +277,32 @@ router.post(
 router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const q = String(req.query.q || "").trim().toLowerCase();
-    const limit = Math.min(Number(req.query.limit) || 30, 100);
+    const sort = String(req.query.sort || "title_asc");
+    const availability = String(req.query.availability || "").trim();
+    const { page, pageSize } = parseListQuery(req.query as Record<string, unknown>);
     const isStaff = req.role === "librarian" || req.role === "admin";
     const includeInactive =
       isStaff && String(req.query.includeInactive || "") === "1";
 
-    let snapshot;
-
     if (q) {
-      // Prefer exact ISBN match first
       const isbnCandidate = normalizeIsbn(q);
       const byIsbn = await db.collection("catalog").doc(isbnCandidate).get();
       if (byIsbn.exists) {
         const data = byIsbn.data()!;
         if (!includeInactive && data.isActive === false) {
-          res.json({ results: [] });
+          res.json(paginateArray([], page, pageSize));
           return;
         }
-        res.json({
-          results: [
-            {
-              ...data,
-              isActive: data.isActive !== false,
-              availability: getAvailabilityLabel(data),
-            },
-          ],
-        });
+        const row = {
+          ...data,
+          isActive: data.isActive !== false,
+          availability: getAvailabilityLabel(data),
+        };
+        if (!matchesAvailabilityFilter(data, availability)) {
+          res.json(paginateArray([], page, pageSize));
+          return;
+        }
+        res.json(paginateArray([row], page, pageSize));
         return;
       }
 
@@ -285,18 +313,37 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
         .slice(0, 10);
 
       if (tokens.length === 0) {
-        res.json({ results: [] });
+        res.json(paginateArray([], page, pageSize));
         return;
       }
 
-      snapshot = await db
+      const snapshot = await db
         .collection("catalog")
         .where("searchKeywords", "array-contains-any", tokens)
-        .limit(limit)
+        .limit(LIST_FETCH_CAP)
         .get();
-    } else {
-      snapshot = await db.collection("catalog").orderBy("title").limit(limit).get();
+
+      const results = snapshot.docs
+        .map((doc) => {
+          const data = doc.data();
+          return {
+            ...data,
+            isActive: data.isActive !== false,
+            availability: getAvailabilityLabel(data),
+          };
+        })
+        .filter((row) => includeInactive || row.isActive !== false)
+        .filter((row) => matchesAvailabilityFilter(row, availability));
+
+      res.json(paginateArray(sortCatalogResults(results, sort), page, pageSize));
+      return;
     }
+
+    const snapshot = await db
+      .collection("catalog")
+      .orderBy("title")
+      .limit(LIST_FETCH_CAP)
+      .get();
 
     const results = snapshot.docs
       .map((doc) => {
@@ -307,9 +354,10 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
           availability: getAvailabilityLabel(data),
         };
       })
-      .filter((row) => includeInactive || row.isActive !== false);
+      .filter((row) => includeInactive || row.isActive !== false)
+      .filter((row) => matchesAvailabilityFilter(row, availability));
 
-    res.json({ results });
+    res.json(paginateArray(sortCatalogResults(results, sort), page, pageSize));
   } catch (error) {
     console.error("Catalog search error:", error);
     res.status(500).json({ error: "Failed to search catalog" });

@@ -14,8 +14,26 @@ import {
   removeDigitalBookPdf,
   uploadDigitalBookPdf,
 } from "../services/digitalBookStorage";
+import {
+  LIST_FETCH_CAP,
+  paginateArray,
+  parseListQuery,
+  toMillis,
+} from "../utils/pagination";
 
 const router = Router();
+
+function sortDigitalBooks(items: Record<string, unknown>[], sort: string) {
+  const copy = [...items];
+  switch (sort) {
+    case "title_desc":
+      return copy.sort((a, b) => String(b.title || "").localeCompare(String(a.title || "")));
+    case "newest":
+      return copy.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+    default:
+      return copy.sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")));
+  }
+}
 
 function publicFileUrl(req: AuthRequest, digitalBookId: string) {
   const host = req.get("host") || "localhost:5000";
@@ -29,7 +47,8 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
     const q = String(req.query.q || "")
       .trim()
       .toLowerCase();
-    const limit = Math.min(Number(req.query.limit) || 40, 100);
+    const sort = String(req.query.sort || "title_asc");
+    const { page, pageSize } = parseListQuery(req.query as Record<string, unknown>);
 
     let snap;
     if (q) {
@@ -39,24 +58,24 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
         .filter(Boolean)
         .slice(0, 10);
       if (tokens.length === 0) {
-        res.json({ results: [] });
+        res.json(paginateArray([], page, pageSize));
         return;
       }
       snap = await db
         .collection("digitalBooks")
         .where("isPublished", "==", true)
         .where("searchKeywords", "array-contains-any", tokens)
-        .limit(limit)
+        .limit(LIST_FETCH_CAP)
         .get();
     } else {
       snap = await db
         .collection("digitalBooks")
         .where("isPublished", "==", true)
-        .limit(limit)
+        .limit(LIST_FETCH_CAP)
         .get();
     }
 
-    const results: any[] = snap.docs.map((doc) => {
+    const results = snap.docs.map((doc) => {
       const data = doc.data();
       return {
         ...data,
@@ -65,8 +84,7 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
       };
     });
 
-    results.sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")));
-    res.json({ results });
+    res.json(paginateArray(sortDigitalBooks(results, sort), page, pageSize));
   } catch (error) {
     console.error("List digital books error:", error);
     res.status(500).json({ error: "Failed to list digital books" });
