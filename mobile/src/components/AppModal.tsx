@@ -12,7 +12,9 @@ type Props = {
   title: string;
   message: string;
   confirmLabel?: string;
+  cancelLabel?: string;
   onClose: () => void;
+  onConfirm?: () => void;
 };
 
 const ICONS: Record<AppModalVariant, { name: keyof typeof Ionicons.glyphMap; colorKey: "success" | "danger" | "navy" }> = {
@@ -27,7 +29,9 @@ export function AppModal({
   title,
   message,
   confirmLabel = "Done",
+  cancelLabel = "Cancel",
   onClose,
+  onConfirm,
 }: Props) {
   const { colors, fontFamily, space, type, radius } = useTheme();
   const icon = ICONS[variant];
@@ -65,7 +69,14 @@ export function AppModal({
           >
             {message}
           </Text>
-          <Button title={confirmLabel} onPress={onClose} style={{ marginTop: space.lg }} />
+          <Button
+            title={confirmLabel}
+            onPress={onConfirm ?? onClose}
+            style={{ marginTop: space.lg }}
+          />
+          {onConfirm ? (
+            <Button title={cancelLabel} variant="ghost" onPress={onClose} style={{ marginTop: space.sm }} />
+          ) : null}
         </Pressable>
       </Pressable>
     </Modal>

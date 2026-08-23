@@ -1,6 +1,8 @@
 import api from "../config/api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const TTL_MS = 2 * 60 * 1000;
+const STORAGE_KEY = "dlms.app.config";
+const TTL_MS = 10 * 60 * 1000;
 const FALLBACK_PAGE_SIZE = 10;
 const FALLBACK_MAX_PDF_MB = 25;
 
@@ -11,8 +13,43 @@ type AppConfig = {
 };
 
 let memory: AppConfig | null = null;
+let hydratePromise: Promise<AppConfig | null> | null = null;
+
+async function readStoredConfig(): Promise<AppConfig | null> {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AppConfig;
+    if (!parsed?.fetchedAt) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function writeStoredConfig(config: AppConfig): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  } catch {
+    // ignore
+  }
+}
+
+/** Load cached config from disk into memory — call early at app start. */
+export async function hydrateAppConfig(): Promise<AppConfig | null> {
+  if (memory) return memory;
+  if (!hydratePromise) {
+    hydratePromise = readStoredConfig().then((stored) => {
+      if (stored) memory = stored;
+      return stored;
+    });
+  }
+  return hydratePromise;
+}
 
 export async function getAppConfig(force = false): Promise<{ catalogPageSize: number; maxPdfSizeMb: number }> {
+  await hydrateAppConfig();
+
   if (!force && memory && Date.now() - memory.fetchedAt < TTL_MS) {
     return {
       catalogPageSize: memory.catalogPageSize,
@@ -27,6 +64,7 @@ export async function getAppConfig(force = false): Promise<{ catalogPageSize: nu
     const catalogPageSize = Number(response.data.catalogPageSize) || FALLBACK_PAGE_SIZE;
     const maxPdfSizeMb = Number(response.data.maxPdfSizeMb) || FALLBACK_MAX_PDF_MB;
     memory = { catalogPageSize, maxPdfSizeMb, fetchedAt: Date.now() };
+    await writeStoredConfig(memory);
     return { catalogPageSize, maxPdfSizeMb };
   } catch {
     return {
@@ -46,6 +84,12 @@ export async function getMaxPdfSizeMb(): Promise<number> {
   return config.maxPdfSizeMb;
 }
 
+/** Returns cached max PDF size immediately when available (no network). */
+export function peekMaxPdfSizeMb(): number | null {
+  return memory?.maxPdfSizeMb ?? null;
+}
+
 export function invalidateAppConfigCache(): void {
   memory = null;
+  hydratePromise = null;
 }

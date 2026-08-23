@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Text,
   ScrollView,
@@ -7,14 +7,13 @@ import {
   Platform,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
-import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { API_BASE_URL } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
 import { Button, Input } from "../components/ui";
 import { AppModal } from "../components/AppModal";
 import { invalidateDigitalCache } from "../utils/digitalCache";
-import { getAppConfig, invalidateAppConfigCache } from "../utils/appConfig";
+import { getAppConfig, hydrateAppConfig, peekMaxPdfSizeMb } from "../utils/appConfig";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -33,15 +32,15 @@ export default function UploadDigitalBookScreen({ navigation }: Props) {
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [loading, setLoading] = useState(false);
-  const [maxMb, setMaxMb] = useState(25);
+  const [maxMb, setMaxMb] = useState<number | null>(peekMaxPdfSizeMb());
   const [modal, setModal] = useState<ModalState>({ kind: "none" });
 
-  useFocusEffect(
-    React.useCallback(() => {
-      invalidateAppConfigCache();
-      void getAppConfig(true).then((cfg) => setMaxMb(cfg.maxPdfSizeMb));
-    }, [])
-  );
+  useEffect(() => {
+    void hydrateAppConfig().then((stored) => {
+      if (stored) setMaxMb(stored.maxPdfSizeMb);
+      void getAppConfig().then((cfg) => setMaxMb(cfg.maxPdfSizeMb));
+    });
+  }, []);
 
   const pickPdf = async () => {
     const result = await DocumentPicker.getDocumentAsync({
@@ -62,10 +61,11 @@ export default function UploadDigitalBookScreen({ navigation }: Props) {
       setModal({ kind: "error", message: "Choose a PDF file first." });
       return;
     }
-    if (file.size && file.size > maxMb * 1024 * 1024) {
+    const limit = maxMb ?? (await getAppConfig()).maxPdfSizeMb;
+    if (file.size && file.size > limit * 1024 * 1024) {
       setModal({
         kind: "error",
-        message: `This PDF is too large. Maximum size is ${maxMb} MB.`,
+        message: `This PDF is too large. Maximum size is ${limit} MB.`,
       });
       return;
     }
@@ -149,17 +149,31 @@ export default function UploadDigitalBookScreen({ navigation }: Props) {
           >
             Upload digital copy
           </Text>
-          <Text
-            style={{
-              fontFamily: fontFamily.body,
-              fontSize: type.small,
-              color: colors.muted,
-              marginBottom: space.lg,
-              lineHeight: 22,
-            }}
-          >
-            PDFs are stored securely in the library cloud. Maximum file size: {maxMb} MB.
-          </Text>
+          {maxMb !== null ? (
+            <Text
+              style={{
+                fontFamily: fontFamily.body,
+                fontSize: type.small,
+                color: colors.muted,
+                marginBottom: space.lg,
+                lineHeight: 22,
+              }}
+            >
+              PDFs are stored securely in the library cloud. Maximum file size: {maxMb} MB.
+            </Text>
+          ) : (
+            <Text
+              style={{
+                fontFamily: fontFamily.body,
+                fontSize: type.small,
+                color: colors.muted,
+                marginBottom: space.lg,
+                lineHeight: 22,
+              }}
+            >
+              PDFs are stored securely in the library cloud.
+            </Text>
+          )}
 
           <Input label="Title" value={title} onChangeText={setTitle} placeholder="Book title" />
           <Input label="Author" value={author} onChangeText={setAuthor} placeholder="Author name" />
