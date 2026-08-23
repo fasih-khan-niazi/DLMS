@@ -1,8 +1,11 @@
-/** In-app PDF.js viewer — smooth vertical scroll + page mode. */
+/** In-app PDF.js viewer — continuous pinch, hi-DPI pages, free pan when zoomed. */
 
 const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174";
 
 export type ReaderMode = "scroll" | "page";
+
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2;
 
 export function buildPdfViewerHtml(input: {
   pdfUrl: string;
@@ -30,26 +33,49 @@ export function buildPdfViewerHtml(input: {
     position: absolute; top: 0; left: 0; right: 0; bottom: 0;
     overflow: auto; -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    touch-action: pan-x pan-y;
   }
-  body.page-mode #scrollWrap { bottom: 72px; overflow: hidden; }
+  body.page-mode #scrollWrap { bottom: 72px; }
   #pagesRoot {
+    padding: 12px 0 40px;
+    min-height: 100%;
+    min-width: 100%;
+    width: max-content;
     transform-origin: top center;
     will-change: transform;
-    padding: 12px 0 32px;
   }
-  body.page-mode #pagesRoot { padding: 0; height: 100%; }
+  body.page-mode #pagesRoot {
+    padding: 0; height: 100%; min-height: 100%;
+    width: 100%; min-width: 100%;
+    transform-origin: center center;
+  }
   .pageSlot {
-    display: flex; align-items: center; justify-content: center;
-    padding: 8px 10px;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 10px 8px;
+    min-width: 100%;
+    width: max-content;
+    box-sizing: border-box;
   }
   body.page-mode .pageSlot {
-    display: none; height: 100%; padding: 12px;
+    display: none; height: 100%; width: 100%; min-width: 100%;
+    align-items: center; justify-content: center;
+    overflow: auto; -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+    padding: 8px;
   }
   body.page-mode .pageSlot.active { display: flex; }
-  .pageInner { transform-origin: center center; touch-action: none; }
+  .pageInner {
+    display: inline-block;
+    transform-origin: center center;
+    will-change: transform;
+  }
+  body.page-mode .pageInner { transform-origin: center center; }
   canvas {
-    display: block; max-width: 100%; height: auto !important;
-    border-radius: 4px; box-shadow: 0 6px 18px rgba(0,0,0,.3); background: #fff;
+    display: block;
+    border-radius: 4px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.3);
+    background: #fff;
+    image-rendering: -webkit-optimize-contrast;
   }
   .bar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
@@ -91,21 +117,28 @@ export function buildPdfViewerHtml(input: {
 <script>
   pdfjsLib.GlobalWorkerOptions.workerSrc = "${PDFJS}/pdf.worker.min.js";
 
+  var MIN_Z = ${MIN_ZOOM};
+  var MAX_Z = ${MAX_ZOOM};
   var pdfUrl = '${pdfUrl}';
   var authToken = '${token}';
   var startPage = ${startPage};
   var readMode = '${readMode}';
-  var globalZoom = ${zoomPercent} / 100;
-  var pageZoom = 1;
+  var zoom = ${zoomPercent} / 100;
   var pdfDoc = null;
   var totalPages = 0;
   var pageNum = startPage;
-  var pageHeight = 600;
+  var basePageHeight = 520;
   var rendering = {};
-  var renderedBitmaps = {};
+  var renderedAt = {};
   var pinchStartDist = 0;
   var pinchStartZoom = 1;
+  var pinchActive = false;
+  var liveZoom = zoom;
   var scrollRaf = 0;
+  var commitTimer = 0;
+
+  function clampZoom(z) { return Math.min(MAX_Z, Math.max(MIN_Z, z)); }
+  function dpr() { return Math.min(window.devicePixelRatio || 2, 4); }
 
   function post(type, extra) {
     if (window.ReactNativeWebView) {
@@ -113,22 +146,32 @@ export function buildPdfViewerHtml(input: {
     }
   }
 
-  function fitScale() {
-    var maxW = window.innerWidth - 20;
-    var maxH = window.innerHeight - (readMode === 'page' ? 120 : 24);
+  function fitBaseScale() {
+    var maxW = Math.max(window.innerWidth - 24, 120);
+    var maxH = Math.max(window.innerHeight - (readMode === 'page' ? 100 : 32), 160);
     return { maxW: maxW, maxH: maxH };
   }
 
-  function applyGlobalZoom() {
+  function cssPageHeight() {
+    return Math.max(160, Math.round(basePageHeight * zoom) + 20);
+  }
+
+  function clearLivePreview() {
     var root = document.getElementById('pagesRoot');
+    root.style.transform = '';
+    document.querySelectorAll('.pageInner').forEach(function (el) {
+      el.style.transform = '';
+    });
+  }
+
+  function applyLivePreview(z) {
+    liveZoom = clampZoom(z);
+    var factor = liveZoom / zoom;
     if (readMode === 'scroll') {
-      root.style.transform = 'scale(' + globalZoom + ')';
-      root.style.width = (100 / globalZoom) + '%';
-      root.style.marginLeft = ((100 - 100 / globalZoom) / 2) + '%';
+      document.getElementById('pagesRoot').style.transform = 'scale(' + factor + ')';
     } else {
-      root.style.transform = 'none';
-      root.style.width = '100%';
-      root.style.marginLeft = '0';
+      var inner = document.querySelector('.pageSlot.active .pageInner');
+      if (inner) inner.style.transform = 'scale(' + factor + ')';
     }
   }
 
@@ -145,142 +188,225 @@ export function buildPdfViewerHtml(input: {
     post('page', { page: pageNum, total: totalPages });
   }
 
-  async function renderPage(num) {
+  function alignSlot(slot, cssW) {
+    var wrap = document.getElementById('scrollWrap');
+    var room = readMode === 'page' ? slot.clientWidth : wrap.clientWidth;
+    slot.style.justifyContent = cssW > room - 8 ? 'flex-start' : 'center';
+  }
+
+  async function renderPage(num, force) {
     if (!pdfDoc || rendering[num]) return;
     var slot = document.querySelector('.pageSlot[data-page="' + num + '"]');
     if (!slot) return;
-    if (renderedBitmaps[num] && slot.querySelector('canvas')) {
-      if (readMode === 'page') applyPageZoom(slot);
+    var zoomKey = Math.round(zoom * 100);
+    if (!force && renderedAt[num] === zoomKey && slot.querySelector('canvas')) {
+      alignSlot(slot, slot.querySelector('canvas').clientWidth);
       return;
     }
+
     rendering[num] = true;
     try {
       var page = await pdfDoc.getPage(num);
       var base = page.getViewport({ scale: 1 });
-      var fit = fitScale();
-      var scale = Math.min(fit.maxW / base.width, fit.maxH / base.height, 2.2);
-      scale = Math.max(scale, 0.5);
-      var viewport = page.getViewport({ scale: scale });
+      var fit = fitBaseScale();
+      // Fit to screen at 100% zoom; allow higher ceiling so text stays sharp on phones
+      var fitScale = Math.min(fit.maxW / base.width, fit.maxH / base.height, 3.5);
+      fitScale = Math.max(fitScale, 0.55);
+      var pixelRatio = dpr();
+      var renderScale = fitScale * zoom * pixelRatio;
+      var viewport = page.getViewport({ scale: renderScale });
+      var cssW = viewport.width / pixelRatio;
+      var cssH = viewport.height / pixelRatio;
+
       var canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      canvas.style.width = cssW + 'px';
+      canvas.style.height = cssH + 'px';
+
+      var ctx = canvas.getContext('2d', { alpha: false });
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+      }
+
       var inner = document.createElement('div');
       inner.className = 'pageInner';
       inner.appendChild(canvas);
       slot.innerHTML = '';
       slot.appendChild(inner);
-      pageHeight = Math.max(pageHeight, viewport.height + 16);
+      alignSlot(slot, cssW);
+
       if (readMode === 'scroll') {
-        slot.style.minHeight = pageHeight + 'px';
+        slot.style.minHeight = Math.round(cssH + 20) + 'px';
+        if (num === 1) basePageHeight = cssH / zoom;
       }
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
-      renderedBitmaps[num] = true;
-      attachPinch(inner, num);
-      if (readMode === 'page') applyPageZoom(slot);
+
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      renderedAt[num] = zoomKey;
     } finally {
       rendering[num] = false;
     }
   }
 
-  function applyPageZoom(slot) {
-    var inner = slot.querySelector('.pageInner');
-    if (inner) inner.style.transform = 'scale(' + pageZoom + ')';
-  }
-
-  function attachPinch(inner, num) {
-    inner.addEventListener('touchstart', function (e) {
-      if (e.touches.length === 2) {
-        pinchStartDist = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        );
-        pinchStartZoom = readMode === 'scroll' ? globalZoom : pageZoom;
-      }
-    }, { passive: true });
-    inner.addEventListener('touchmove', function (e) {
-      if (e.touches.length === 2 && pinchStartDist > 0) {
-        var dist = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        );
-        var next = Math.min(2, Math.max(0.5, pinchStartZoom * (dist / pinchStartDist)));
-        if (readMode === 'scroll') {
-          globalZoom = next;
-          applyGlobalZoom();
-          post('zoom', { percent: Math.round(globalZoom * 100) });
-        } else {
-          pageZoom = next;
-          applyPageZoom(inner.parentElement);
-        }
-        e.preventDefault();
-      }
-    }, { passive: false });
-    inner.addEventListener('touchend', function () { pinchStartDist = 0; });
-  }
-
   function buildSlots() {
     var root = document.getElementById('pagesRoot');
     root.innerHTML = '';
-    renderedBitmaps = {};
+    renderedAt = {};
     rendering = {};
+    clearLivePreview();
+    var h = cssPageHeight();
     for (var i = 1; i <= totalPages; i++) {
       var slot = document.createElement('div');
       slot.className = 'pageSlot' + (i === pageNum ? ' active' : '');
       slot.dataset.page = String(i);
-      if (readMode === 'scroll') slot.style.minHeight = pageHeight + 'px';
+      if (readMode === 'scroll') slot.style.minHeight = h + 'px';
       root.appendChild(slot);
     }
-    applyGlobalZoom();
   }
 
   function visibleRange() {
     var wrap = document.getElementById('scrollWrap');
-    var top = wrap.scrollTop / globalZoom;
-    var bottom = top + wrap.clientHeight / globalZoom;
-    var first = Math.max(1, Math.floor(top / pageHeight) - 1);
-    var last = Math.min(totalPages, Math.ceil(bottom / pageHeight) + 2);
-    return { first: first, last: last };
+    var h = cssPageHeight();
+    var top = wrap.scrollTop;
+    var bottom = top + wrap.clientHeight;
+    return {
+      first: Math.max(1, Math.floor(top / h) - 1),
+      last: Math.min(totalPages, Math.ceil(bottom / h) + 2)
+    };
   }
 
-  function renderVisible() {
+  function renderVisible(force) {
     if (readMode === 'page') {
-      renderPage(pageNum);
+      renderPage(pageNum, force);
       return;
     }
     var range = visibleRange();
-    for (var n = range.first; n <= range.last; n++) renderPage(n);
-    var mid = Math.round((range.first + range.last) / 2);
-    if (mid !== pageNum && mid >= 1 && mid <= totalPages) {
+    for (var n = range.first; n <= range.last; n++) renderPage(n, force);
+    var h = cssPageHeight();
+    var wrap = document.getElementById('scrollWrap');
+    var mid = Math.min(totalPages, Math.max(1, Math.round((wrap.scrollTop + wrap.clientHeight * 0.35) / h) + 1));
+    if (mid !== pageNum) {
       pageNum = mid;
       notifyPage();
     }
   }
 
-  function goToPage(num) {
-    pageNum = Math.min(Math.max(Math.floor(num), 1), totalPages || 1);
-    pageZoom = 1;
-    notifyPage();
+  function enableFreePan(opts) {
+    opts = opts || {};
+    var wrap = document.getElementById('scrollWrap');
+    // Start at left edge so the full page is reachable by one-finger pan
+    wrap.scrollLeft = 0;
+    if (opts.resetPage && readMode === 'scroll') {
+      wrap.scrollTop = (pageNum - 1) * cssPageHeight();
+    }
     if (readMode === 'page') {
-      document.querySelectorAll('.pageSlot').forEach(function (s) {
-        s.classList.toggle('active', Number(s.dataset.page) === pageNum);
-      });
-      renderPage(pageNum);
-    } else {
-      var slot = document.querySelector('.pageSlot[data-page="' + pageNum + '"]');
-      var wrap = document.getElementById('scrollWrap');
-      if (slot && wrap) {
-        wrap.scrollTop = slot.offsetTop * globalZoom;
+      var slot = document.querySelector('.pageSlot.active');
+      if (slot) {
+        slot.scrollLeft = 0;
+        slot.scrollTop = 0;
       }
-      renderVisible();
     }
   }
 
-  document.getElementById('scrollWrap').addEventListener('scroll', function () {
-    if (readMode !== 'scroll') return;
+  function commitZoom(next, opts) {
+    opts = opts || {};
+    zoom = clampZoom(next);
+    liveZoom = zoom;
+    clearLivePreview();
+    post('zoom', { percent: Math.round(zoom * 100) });
+
+    if (readMode === 'scroll') {
+      document.querySelectorAll('.pageSlot').forEach(function (s) {
+        s.style.minHeight = cssPageHeight() + 'px';
+      });
+    }
+
+    // Anchor to current page first so re-render + pan start from a clean default frame
+    if (opts.keepPage && readMode === 'scroll') {
+      var wrap = document.getElementById('scrollWrap');
+      wrap.scrollTop = (pageNum - 1) * cssPageHeight();
+      wrap.scrollLeft = 0;
+    }
+
+    renderVisible(true);
+    setTimeout(function () {
+      enableFreePan({ resetPage: !!opts.keepPage });
+    }, 30);
+  }
+
+  function goToPage(num, resetPageZoom) {
+    pageNum = Math.min(Math.max(Math.floor(num), 1), totalPages || 1);
+    if (readMode === 'page') {
+      if (resetPageZoom !== false) {
+        zoom = 1;
+        liveZoom = 1;
+        clearLivePreview();
+        post('zoom', { percent: 100 });
+      }
+      document.querySelectorAll('.pageSlot').forEach(function (s) {
+        s.classList.toggle('active', Number(s.dataset.page) === pageNum);
+      });
+      notifyPage();
+      renderPage(pageNum, true);
+      enableFreePan();
+    } else {
+      notifyPage();
+      var wrap = document.getElementById('scrollWrap');
+      wrap.scrollTop = (pageNum - 1) * cssPageHeight();
+      renderVisible(false);
+    }
+  }
+
+  function onTouchStart(e) {
+    if (e.touches.length === 2) {
+      pinchActive = true;
+      pinchStartDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      ) || 1;
+      pinchStartZoom = liveZoom;
+      if (commitTimer) {
+        clearTimeout(commitTimer);
+        commitTimer = 0;
+      }
+    }
+  }
+
+  function onTouchMove(e) {
+    if (!pinchActive || e.touches.length !== 2) return;
+    e.preventDefault();
+    var dist = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    applyLivePreview(pinchStartZoom * (dist / pinchStartDist));
+  }
+
+  function onTouchEnd(e) {
+    if (e.touches.length >= 2) return;
+    if (!pinchActive) return;
+    pinchActive = false;
+    pinchStartDist = 0;
+    var finalZoom = liveZoom;
+    commitTimer = setTimeout(function () {
+      commitTimer = 0;
+      commitZoom(finalZoom, { keepPage: true });
+    }, 40);
+  }
+
+  var wrapEl = document.getElementById('scrollWrap');
+  wrapEl.addEventListener('touchstart', onTouchStart, { passive: true });
+  wrapEl.addEventListener('touchmove', onTouchMove, { passive: false });
+  wrapEl.addEventListener('touchend', onTouchEnd, { passive: true });
+  wrapEl.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+  wrapEl.addEventListener('scroll', function () {
+    if (readMode !== 'scroll' || pinchActive) return;
     if (scrollRaf) return;
     scrollRaf = requestAnimationFrame(function () {
       scrollRaf = 0;
-      renderVisible();
+      renderVisible(false);
     });
   }, { passive: true });
 
@@ -296,44 +422,40 @@ export function buildPdfViewerHtml(input: {
     if (opts.mode && opts.mode !== readMode) {
       readMode = opts.mode;
       document.body.className = readMode + '-mode';
-      pageZoom = 1;
+      zoom = 1;
+      liveZoom = 1;
       needsRebuild = true;
     }
-    if (typeof opts.zoomPercent === 'number') {
-      globalZoom = Math.min(2, Math.max(0.5, opts.zoomPercent / 100));
-      pageZoom = readMode === 'page' ? globalZoom : pageZoom;
-      if (readMode === 'page') pageZoom = opts.zoomPercent / 100;
-      applyGlobalZoom();
-      if (readMode === 'page') {
-        var slot = document.querySelector('.pageSlot.active');
-        if (slot) applyPageZoom(slot);
-      }
-      post('zoom', { percent: Math.round((readMode === 'page' ? pageZoom : globalZoom) * 100) });
-    }
     if (opts.resetZoom) {
-      globalZoom = 1;
-      pageZoom = 1;
-      applyGlobalZoom();
-      var active = document.querySelector('.pageSlot.active');
-      if (active) applyPageZoom(active);
-      post('zoom', { percent: 100 });
+      if (needsRebuild) {
+        zoom = 1;
+        liveZoom = 1;
+      } else {
+        commitZoom(1, { keepPage: true });
+      }
+    } else if (typeof opts.zoomPercent === 'number') {
+      if (needsRebuild) {
+        zoom = clampZoom(opts.zoomPercent / 100);
+        liveZoom = zoom;
+      } else {
+        commitZoom(opts.zoomPercent / 100, { keepPage: true });
+      }
     }
     if (needsRebuild) {
+      post('zoom', { percent: Math.round(zoom * 100) });
       buildSlots();
-      goToPage(pageNum);
-    } else if (opts.rerender) {
-      renderedBitmaps = {};
-      goToPage(pageNum);
+      goToPage(pageNum, false);
+      enableFreePan();
     }
   };
 
   window.addEventListener('orientationchange', function () {
-    renderedBitmaps = {};
-    setTimeout(function () { goToPage(pageNum); }, 280);
+    renderedAt = {};
+    setTimeout(function () { renderVisible(true); enableFreePan(); }, 280);
   });
   window.addEventListener('resize', function () {
-    renderedBitmaps = {};
-    setTimeout(function () { goToPage(pageNum); }, 160);
+    renderedAt = {};
+    setTimeout(function () { renderVisible(true); enableFreePan(); }, 160);
   });
 
   fetch(pdfUrl, { headers: { Authorization: 'Bearer ' + authToken } })
@@ -348,13 +470,14 @@ export function buildPdfViewerHtml(input: {
       document.getElementById('status').textContent = '';
       var firstPage = await pdf.getPage(1);
       var vp = firstPage.getViewport({ scale: 1 });
-      var fit = fitScale();
-      var scale = Math.min(fit.maxW / vp.width, fit.maxH / vp.height, 2.2);
-      pageHeight = vp.height * Math.max(scale, 0.5) + 16;
+      var fit = fitBaseScale();
+      var scale = Math.min(fit.maxW / vp.width, fit.maxH / vp.height, 2.8);
+      basePageHeight = vp.height * Math.max(scale, 0.5);
       buildSlots();
       var first = Math.min(Math.max(startPage, 1), totalPages);
       post('ready', { total: totalPages, page: first });
-      goToPage(first);
+      post('zoom', { percent: Math.round(zoom * 100) });
+      goToPage(first, false);
     })
     .catch(function (err) {
       document.getElementById('status').textContent = 'Could not open PDF.';

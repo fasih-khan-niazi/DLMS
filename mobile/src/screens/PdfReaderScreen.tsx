@@ -5,9 +5,8 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Platform,
   Modal,
-  ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
@@ -41,7 +40,7 @@ type Props = {
 };
 
 const SAVE_INTERVAL_MS = 15000;
-const ZOOM_PILLS = [50, 75, 100, 110, 125, 140, 150, 175, 200];
+const ZOOM_PILLS = [50, 75, 100, 110, 125, 150, 175, 200];
 
 async function applyOrientation(lock: ReaderPrefs["orientation"]) {
   if (lock === "landscape") {
@@ -62,6 +61,8 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
   } = route.params;
   const { colors, fontFamily, space, type, radius } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isLandscape = windowWidth > windowHeight;
   const webRef = useRef<WebView>(null);
   const tabParent = navigation.getParent();
 
@@ -251,7 +252,8 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
     );
   }
 
-  const topPad = Math.max(insets.top, Platform.OS === "ios" ? 12 : 8);
+  const topPad = insets.top + (isLandscape ? 8 : 10);
+  const barPadY = isLandscape ? 8 : 10;
   const landscapeDraft = draftPrefs.orientation === "landscape";
   const pageModeDraft = draftPrefs.readMode === "page";
 
@@ -262,36 +264,35 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
           styles.topBar,
           {
             backgroundColor: colors.cream,
-            paddingTop: topPad + 10,
-            paddingBottom: 16,
-            minHeight: topPad + 72,
+            paddingTop: topPad,
+            paddingBottom: barPadY,
           },
         ]}
       >
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.iconBtn}>
-          <Ionicons name="close" size={26} color={colors.navy} />
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.iconBtnCompact}>
+          <Ionicons name="close" size={24} color={colors.navy} />
         </Pressable>
         <View style={styles.titleWrap}>
           <Text
-            numberOfLines={2}
+            numberOfLines={isLandscape ? 1 : 2}
             style={{
               fontFamily: fontFamily.bodyBold,
-              fontSize: type.body,
+              fontSize: isLandscape ? type.small : type.body,
               color: colors.navy,
-              lineHeight: 22,
+              lineHeight: isLandscape ? 18 : 22,
             }}
           >
             {title}
           </Text>
         </View>
-        <View style={styles.rightWrap}>
+        <View style={styles.rightCluster}>
           {pageLabel ? (
             <Text
               style={{
                 fontFamily: fontFamily.bodySemiBold,
                 fontSize: type.caption,
                 color: colors.muted,
-                textAlign: "right",
+                marginRight: 10,
               }}
             >
               {pageLabel}
@@ -304,7 +305,7 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
               setSettingsOpen(true);
             }}
             hitSlop={10}
-            style={{ marginTop: 4 }}
+            style={styles.iconBtnCompact}
           >
             <Ionicons name="settings-outline" size={22} color={colors.navy} />
           </Pressable>
@@ -317,138 +318,143 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
         originWhitelist={["*"]}
         javaScriptEnabled
         domStorageEnabled
+        nestedScrollEnabled
         onMessage={onMessage}
         style={{ flex: 1, backgroundColor: "#1a2a38" }}
       />
 
       <Modal visible={settingsOpen} transparent animationType="fade" onRequestClose={() => setSettingsOpen(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setSettingsOpen(false)}>
+        <Pressable
+          style={[
+            styles.modalBackdrop,
+            isLandscape && { justifyContent: "center", paddingHorizontal: 16 },
+          ]}
+          onPress={() => setSettingsOpen(false)}
+        >
           <Pressable
-            style={[styles.modalCard, { backgroundColor: colors.cream, borderRadius: radius.lg }]}
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: colors.cream,
+                borderRadius: radius.lg,
+                width: isLandscape ? Math.min(windowWidth - 32, 760) : undefined,
+                alignSelf: isLandscape ? "center" : undefined,
+                maxWidth: "100%",
+              },
+            ]}
             onPress={(e) => e.stopPropagation()}
           >
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <Text style={{ fontFamily: fontFamily.display, fontSize: type.titleSm, color: colors.navy }}>
                 Reader settings
               </Text>
+              <Pressable onPress={() => setSettingsOpen(false)} hitSlop={10}>
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </Pressable>
+            </View>
 
-              <Text
-                style={{
-                  marginTop: space.md,
-                  marginBottom: space.sm,
-                  fontFamily: fontFamily.bodyBold,
-                  fontSize: type.small,
-                  color: colors.navy,
-                }}
-              >
-                Reading layout
-              </Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                <Chip
-                  label="Vertical scroll"
-                  selected={draftPrefs.readMode === "scroll"}
-                  onPress={() => setDraftPrefs((p) => ({ ...p, readMode: "scroll" }))}
-                />
-                <View style={{ opacity: landscapeDraft ? 0.4 : 1 }}>
+            <View style={isLandscape ? styles.landscapeRow : undefined}>
+              <View style={isLandscape ? { flex: 1, marginRight: 12 } : undefined}>
+                <Text style={labelStyle(fontFamily, type, colors, 0)}>Reading layout</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                   <Chip
-                    label="Page by page"
-                    selected={draftPrefs.readMode === "page"}
-                    onPress={() => {
-                      if (landscapeDraft) return;
-                      setDraftPrefs((p) => ({ ...p, readMode: "page", orientation: "portrait" }));
-                    }}
+                    label="Vertical scroll"
+                    selected={draftPrefs.readMode === "scroll"}
+                    onPress={() => setDraftPrefs((p) => ({ ...p, readMode: "scroll" }))}
                   />
+                  <View style={{ opacity: landscapeDraft ? 0.4 : 1 }}>
+                    <Chip
+                      label="Page by page"
+                      selected={draftPrefs.readMode === "page"}
+                      onPress={() => {
+                        if (landscapeDraft) return;
+                        setDraftPrefs((p) => ({ ...p, readMode: "page", orientation: "portrait" }));
+                      }}
+                    />
+                  </View>
                 </View>
-              </View>
-              {landscapeDraft ? (
-                <Text
-                  style={{
-                    marginTop: space.xs,
-                    fontFamily: fontFamily.body,
-                    fontSize: type.caption,
-                    color: colors.muted,
-                  }}
-                >
-                  Page by page is unavailable in landscape.
-                </Text>
-              ) : null}
 
-              <Text
-                style={{
-                  marginTop: space.md,
-                  marginBottom: space.sm,
-                  fontFamily: fontFamily.bodyBold,
-                  fontSize: type.small,
-                  color: colors.navy,
-                }}
-              >
-                Screen orientation
-              </Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                <Chip
-                  label="Portrait"
-                  selected={draftPrefs.orientation === "portrait"}
-                  onPress={() => setDraftPrefs((p) => ({ ...p, orientation: "portrait" }))}
-                />
-                <View style={{ opacity: pageModeDraft ? 0.4 : 1 }}>
+                <Text style={labelStyle(fontFamily, type, colors, 10)}>Screen orientation</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                   <Chip
-                    label="Landscape"
-                    selected={draftPrefs.orientation === "landscape"}
-                    onPress={() => {
-                      if (pageModeDraft) return;
-                      setDraftPrefs((p) => ({ ...p, orientation: "landscape", readMode: "scroll" }));
-                    }}
+                    label="Portrait"
+                    selected={draftPrefs.orientation === "portrait"}
+                    onPress={() => setDraftPrefs((p) => ({ ...p, orientation: "portrait" }))}
                   />
+                  <View style={{ opacity: pageModeDraft ? 0.4 : 1 }}>
+                    <Chip
+                      label="Landscape"
+                      selected={draftPrefs.orientation === "landscape"}
+                      onPress={() => {
+                        if (pageModeDraft) return;
+                        setDraftPrefs((p) => ({
+                          ...p,
+                          orientation: "landscape",
+                          readMode: "scroll",
+                        }));
+                      }}
+                    />
+                  </View>
                 </View>
+                {landscapeDraft || pageModeDraft ? (
+                  <Text
+                    style={{
+                      marginTop: 6,
+                      fontFamily: fontFamily.body,
+                      fontSize: type.caption,
+                      color: colors.muted,
+                      lineHeight: 16,
+                    }}
+                  >
+                    {landscapeDraft
+                      ? "Page by page is only available in portrait."
+                      : "Landscape is only available with vertical scroll."}
+                  </Text>
+                ) : null}
               </View>
-              {pageModeDraft ? (
-                <Text
-                  style={{
-                    marginTop: space.xs,
-                    fontFamily: fontFamily.body,
-                    fontSize: type.caption,
-                    color: colors.muted,
-                  }}
-                >
-                  Landscape is available with vertical scroll only.
-                </Text>
-              ) : null}
 
-              <Text
-                style={{
-                  marginTop: space.md,
-                  marginBottom: space.sm,
-                  fontFamily: fontFamily.bodyBold,
-                  fontSize: type.small,
-                  color: colors.navy,
-                }}
-              >
-                Zoom
-              </Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                {ZOOM_PILLS.map((z) => (
-                  <Chip
-                    key={z}
-                    label={`${z}%`}
-                    selected={draftZoom === z}
-                    onPress={() => setDraftZoom(z)}
-                  />
-                ))}
+              <View style={isLandscape ? { flex: 1.2 } : { marginTop: 10 }}>
+                <Text style={labelStyle(fontFamily, type, colors, 0)}>Zoom</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                  {ZOOM_PILLS.map((z) => (
+                    <Chip
+                      key={z}
+                      label={`${z}%`}
+                      selected={draftZoom === z}
+                      onPress={() => setDraftZoom(z)}
+                    />
+                  ))}
+                </View>
+                <Pressable onPress={() => setDraftZoom(100)} style={{ marginTop: 8 }}>
+                  <Text
+                    style={{
+                      fontFamily: fontFamily.bodySemiBold,
+                      fontSize: type.small,
+                      color: colors.amberDark,
+                    }}
+                  >
+                    Reset zoom to 100%
+                  </Text>
+                </Pressable>
               </View>
-              <Button
-                title="Reset zoom"
-                variant="ghost"
-                onPress={() => setDraftZoom(100)}
-                style={{ marginTop: space.sm }}
-              />
+            </View>
 
-              <Button title="Apply" onPress={() => void applySettings()} style={{ marginTop: space.md }} />
-            </ScrollView>
+            <Button title="Apply" onPress={() => void applySettings()} style={{ marginTop: 12 }} />
           </Pressable>
         </Pressable>
       </Modal>
     </View>
   );
+}
+
+function labelStyle(fontFamily: any, type: any, colors: any, marginTop: number) {
+  return {
+    marginTop,
+    marginBottom: 6,
+    fontFamily: fontFamily.bodyBold,
+    fontSize: type.small,
+    color: colors.navy,
+  };
 }
 
 const styles = StyleSheet.create({
@@ -461,25 +467,25 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#E5E7EB",
   },
-  iconBtn: {
-    width: 44,
-    height: 44,
+  iconBtnCompact: {
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
   },
   titleWrap: {
     flex: 1,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     justifyContent: "center",
   },
-  rightWrap: {
-    width: 72,
-    alignItems: "flex-end",
-    justifyContent: "center",
+  rightCluster: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
   },
   modalBackdrop: {
     flex: 1,
@@ -487,8 +493,11 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   modalCard: {
-    padding: 20,
-    paddingBottom: 32,
-    maxHeight: "85%",
+    padding: 14,
+    paddingBottom: 16,
+  },
+  landscapeRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
 });
