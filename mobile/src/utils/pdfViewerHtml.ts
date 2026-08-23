@@ -55,13 +55,15 @@ export function buildPdfViewerHtml(input: {
   }
   body.page-mode .pageSlot {
     display: none; height: 100%; width: 100%; min-width: 100%;
-    align-items: center; justify-content: center;
+    /* flex-start so zoomed pages can scroll to every edge (center clips the left) */
+    align-items: flex-start; justify-content: flex-start;
     overflow: auto; -webkit-overflow-scrolling: touch;
     touch-action: pan-x pan-y;
-    padding: 8px;
+    padding: 0;
   }
   body.page-mode .pageSlot.active { display: flex; }
   .pageInner { display: inline-block; }
+  body.page-mode .pageInner { margin: 0; }
   canvas {
     display: block;
     border-radius: 4px;
@@ -193,7 +195,33 @@ export function buildPdfViewerHtml(input: {
           s.style.minHeight = h + 'px';
         }
       });
+    } else {
+      layoutPageMode();
     }
+  }
+
+  /**
+   * Page mode: keep the page visually centered when it fits, but when zoomed
+   * larger than the viewport use top-left layout + scroll so every edge is reachable.
+   * (justify-content:center makes the left overflow unreachable.)
+   */
+  function layoutPageMode() {
+    if (readMode !== 'page') return;
+    var slot = document.querySelector('.pageSlot.active');
+    if (!slot) return;
+    var inner = slot.querySelector('.pageInner');
+    var canvas = slot.querySelector('canvas');
+    if (!inner || !canvas) return;
+
+    slot.style.justifyContent = 'flex-start';
+    slot.style.alignItems = 'flex-start';
+
+    var padX = Math.max(0, (slot.clientWidth - canvas.offsetWidth) / 2);
+    var padY = Math.max(0, (slot.clientHeight - canvas.offsetHeight) / 2);
+    inner.style.marginLeft = padX + 'px';
+    inner.style.marginRight = padX + 'px';
+    inner.style.marginTop = padY + 'px';
+    inner.style.marginBottom = padY + 'px';
   }
 
   function setFocusFromScreen(mx, my, canvas) {
@@ -299,7 +327,11 @@ export function buildPdfViewerHtml(input: {
       var prev = slot.querySelector('.pageInner');
       if (prev) slot.replaceChild(inner, prev);
       else slot.appendChild(inner);
-      slot.style.justifyContent = 'center';
+      if (readMode === 'scroll') {
+        slot.style.justifyContent = 'center';
+      } else {
+        layoutPageMode();
+      }
       rendered[num] = true;
     } finally {
       rendering[num] = false;
@@ -358,6 +390,7 @@ export function buildPdfViewerHtml(input: {
     post('zoom', { percent: Math.round(zoom * 100) });
 
     requestAnimationFrame(function () {
+      if (readMode === 'page') layoutPageMode();
       if (opts.fromPinch) {
         pinFocusToScreen();
       } else {
@@ -380,7 +413,10 @@ export function buildPdfViewerHtml(input: {
         s.classList.toggle('active', Number(s.dataset.page) === pageNum);
       });
       notifyPage();
-      renderPage(pageNum);
+      Promise.resolve(renderPage(pageNum)).then(function () {
+        layoutPageMode();
+        centerPageInView(pageNum);
+      });
     } else {
       notifyPage();
       var wrap = document.getElementById('scrollWrap');
