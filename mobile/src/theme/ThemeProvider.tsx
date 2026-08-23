@@ -2,15 +2,11 @@ import React, { createContext, useContext, useMemo, type ReactNode } from "react
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import {
   useFonts,
-  PlusJakartaSans_400Regular,
-  PlusJakartaSans_500Medium,
-  PlusJakartaSans_600SemiBold,
-  PlusJakartaSans_700Bold,
-} from "@expo-google-fonts/plus-jakarta-sans";
-import {
-  Literata_400Regular,
-  Literata_700Bold,
-} from "@expo-google-fonts/literata";
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+} from "@expo-google-fonts/poppins";
 import * as SplashScreen from "expo-splash-screen";
 import { lightTheme, type AppTheme } from "./lightTheme";
 
@@ -20,12 +16,10 @@ const ThemeContext = createContext<AppTheme>(lightTheme);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [loaded] = useFonts({
-    PlusJakartaSans_400Regular,
-    PlusJakartaSans_500Medium,
-    PlusJakartaSans_600SemiBold,
-    PlusJakartaSans_700Bold,
-    Literata_400Regular,
-    Literata_700Bold,
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
   });
 
   React.useEffect(() => {

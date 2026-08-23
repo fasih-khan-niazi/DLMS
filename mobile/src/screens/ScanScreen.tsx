@@ -115,7 +115,7 @@ export default function ScanScreen({ navigation }: Props) {
       </View>
 
       <Text style={styles.hint}>
-        Point at a book QR code to {mode}. Format: copyId_isbn
+        Point your camera at the QR code on the book label to {mode}.
       </Text>
     </View>
   );

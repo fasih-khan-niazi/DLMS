@@ -105,7 +105,7 @@ export default function ProfileScreen({ navigation }: Props) {
         <MenuRow label="My Bookshelf" onPress={() => navigation.navigate("Bookshelf")} />
         {isStaff ? (
           <>
-            <MenuRow label="Add physical book" onPress={() => navigation.navigate("AddBook")} />
+            <MenuRow label="Add physical copy" onPress={() => navigation.navigate("AddBook")} />
             <MenuRow
               label="Upload PDF"
               onPress={() => navigation.navigate("UploadDigitalBook")}

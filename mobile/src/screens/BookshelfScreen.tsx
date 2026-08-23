@@ -64,7 +64,7 @@ export default function BookshelfScreen({ navigation }: Props) {
           }
           ListEmptyComponent={
             <Text style={styles.empty}>
-              No saved digital books yet. Browse E-books in Catalog and save one.
+              No saved digital copies yet. Browse Digital Copies in Catalog and save one.
             </Text>
           }
           renderItem={({ item }) => (

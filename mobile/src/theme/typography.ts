@@ -1,10 +1,10 @@
 export const fontFamily = {
-  display: "Literata_700Bold",
-  displayRegular: "Literata_400Regular",
-  body: "PlusJakartaSans_400Regular",
-  bodyMedium: "PlusJakartaSans_500Medium",
-  bodySemiBold: "PlusJakartaSans_600SemiBold",
-  bodyBold: "PlusJakartaSans_700Bold",
+  display: "Poppins_700Bold",
+  displayRegular: "Poppins_400Regular",
+  body: "Poppins_400Regular",
+  bodyMedium: "Poppins_500Medium",
+  bodySemiBold: "Poppins_600SemiBold",
+  bodyBold: "Poppins_700Bold",
 } as const;
 
 export const type = {

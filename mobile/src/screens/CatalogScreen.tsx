@@ -1,73 +1,238 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   FlatList,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   RefreshControl,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
-import { colors, radius, space, type } from "../theme";
-import { useProfile } from "../context/ProfileContext";
+import { SearchBar } from "../components/SearchBar";
 import { SkeletonList } from "../components/Skeleton";
 import { EmptyState } from "../components/EmptyState";
+import { BookCover, Badge, Chip } from "../components/ui";
+import { useProfile } from "../context/ProfileContext";
+import { PAGE_SIZE, type PaginatedResponse } from "../types/pagination";
+import { useTheme } from "../theme";
 
 type CatalogBook = {
   isbn: string;
   title: string;
   authors?: string[];
+  thumbnailUrl?: string;
   availableCount?: number;
   totalCopies?: number;
   availability?: string;
   isActive?: boolean;
 };
 
+type SortOption = "title_asc" | "title_desc" | "newest";
+type AvailabilityFilter = "all" | "available" | "reserved" | "issued" | "unavailable";
+type ViewMode = "list" | "grid";
+
 type Props = {
   navigation: NativeStackNavigationProp<any>;
   embedded?: boolean;
+  initialQuery?: string;
 };
 
-export default function CatalogScreen({ navigation, embedded = false }: Props) {
+export default function CatalogScreen({
+  navigation,
+  embedded = false,
+  initialQuery = "",
+}: Props) {
   const insets = useSafeAreaInsets();
+  const { colors, fontFamily, radius, space, type } = useTheme();
   const { isStaff } = useProfile();
-  const [query, setQuery] = useState("");
+
+  const [query, setQuery] = useState(initialQuery);
   const [books, setBooks] = useState<CatalogBook[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [sort, setSort] = useState<SortOption>("title_asc");
+  const [availability, setAvailability] = useState<AvailabilityFilter>("all");
 
-  const loadBooks = async (search = query, staff = isStaff) => {
-    try {
-      const response = await api.get("/api/catalog/books", {
-        params: {
-          ...(search.trim() ? { q: search.trim() } : {}),
-          ...(staff ? { includeInactive: "1" } : {}),
-        },
-      });
-      setBooks(response.data.results || []);
-    } catch {
-      setBooks([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  useEffect(() => {
+    if (initialQuery) setQuery(initialQuery);
+  }, [initialQuery]);
+
+  const loadBooks = useCallback(
+    async (opts?: {
+      search?: string;
+      pageNum?: number;
+      staff?: boolean;
+      sortBy?: SortOption;
+      availabilityFilter?: AvailabilityFilter;
+    }) => {
+      const search = opts?.search ?? query;
+      const pageNum = opts?.pageNum ?? page;
+      const staff = opts?.staff ?? isStaff;
+      const sortBy = opts?.sortBy ?? sort;
+      const availabilityFilter = opts?.availabilityFilter ?? availability;
+
+      try {
+        const response = await api.get<PaginatedResponse<CatalogBook>>("/api/catalog/books", {
+          params: {
+            page: pageNum,
+            pageSize: PAGE_SIZE,
+            sort: sortBy,
+            ...(search.trim() ? { q: search.trim() } : {}),
+            ...(availabilityFilter !== "all" ? { availability: availabilityFilter } : {}),
+            ...(staff ? { includeInactive: "1" } : {}),
+          },
+        });
+        setBooks(response.data.results || []);
+        setPage(response.data.page || pageNum);
+        setTotalPages(response.data.totalPages || 0);
+        setTotal(response.data.total || 0);
+      } catch {
+        setBooks([]);
+        setTotalPages(0);
+        setTotal(0);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [query, page, isStaff, sort, availability]
+  );
 
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
-      loadBooks(query, isStaff);
+      setPage(1);
+      loadBooks({ pageNum: 1 });
     }, [isStaff])
   );
 
-  const onSearch = () => {
+  const runSearch = (search: string) => {
     setLoading(true);
-    loadBooks(query);
+    setPage(1);
+    loadBooks({ search, pageNum: 1 });
   };
+
+  const changePage = (next: number) => {
+    if (next < 1 || (totalPages > 0 && next > totalPages)) return;
+    setLoading(true);
+    setPage(next);
+    loadBooks({ pageNum: next });
+  };
+
+  const applySort = (next: SortOption) => {
+    setSort(next);
+    setLoading(true);
+    setPage(1);
+    loadBooks({ sortBy: next, pageNum: 1 });
+  };
+
+  const applyAvailability = (next: AvailabilityFilter) => {
+    setAvailability(next);
+    setLoading(true);
+    setPage(1);
+    loadBooks({ availabilityFilter: next, pageNum: 1 });
+  };
+
+  const renderBook = ({ item }: { item: CatalogBook }) => {
+    const tone =
+      item.availability === "Available"
+        ? "success"
+        : item.availability === "Reserved"
+          ? "warning"
+          : "muted";
+
+    if (viewMode === "grid") {
+      return (
+        <Pressable
+          style={[styles.gridCard, { backgroundColor: colors.white, borderColor: colors.border }]}
+          onPress={() => navigation.navigate("BookDetail", { isbn: item.isbn })}
+        >
+          <BookCover uri={item.thumbnailUrl} width={120} height={120} style={{ alignSelf: "center" }} />
+          <Text
+            numberOfLines={2}
+            style={{
+              marginTop: space.sm,
+              fontFamily: fontFamily.bodySemiBold,
+              fontSize: type.small,
+              color: colors.navy,
+            }}
+          >
+            {item.title}
+          </Text>
+          <Badge label={item.availability || "Unavailable"} tone={tone} style={{ marginTop: space.xs }} />
+        </Pressable>
+      );
+    }
+
+    return (
+      <Pressable
+        style={[styles.card, { backgroundColor: colors.white, borderColor: colors.border }]}
+        onPress={() => navigation.navigate("BookDetail", { isbn: item.isbn })}
+      >
+        <BookCover uri={item.thumbnailUrl} width={56} height={84} />
+        <View style={styles.cardBody}>
+          <Text
+            style={{
+              fontFamily: fontFamily.bodySemiBold,
+              fontSize: type.body,
+              color: colors.navy,
+            }}
+          >
+            {item.title}
+          </Text>
+          <Text
+            style={{
+              marginTop: 4,
+              fontFamily: fontFamily.body,
+              fontSize: type.small,
+              color: colors.muted,
+            }}
+          >
+            {(item.authors || []).join(", ") || "Unknown author"}
+          </Text>
+          {item.isActive === false ? (
+            <Text style={{ marginTop: 6, color: colors.danger, fontSize: type.caption, fontFamily: fontFamily.bodySemiBold }}>
+              Inactive
+            </Text>
+          ) : null}
+        </View>
+        <View style={styles.badgeCol}>
+          <Badge label={item.availability || "Unavailable"} tone={tone} />
+          <Text
+            style={{
+              marginTop: 4,
+              fontFamily: fontFamily.body,
+              fontSize: type.caption,
+              color: colors.muted,
+            }}
+          >
+            {item.availableCount || 0}/{item.totalCopies || 0}
+          </Text>
+        </View>
+      </Pressable>
+    );
+  };
+
+  const sortChips: { id: SortOption; label: string }[] = [
+    { id: "title_asc", label: "A–Z" },
+    { id: "title_desc", label: "Z–A" },
+    { id: "newest", label: "Newest" },
+  ];
+
+  const availabilityChips: { id: AvailabilityFilter; label: string }[] = [
+    { id: "all", label: "All" },
+    { id: "available", label: "Available" },
+    { id: "reserved", label: "Reserved" },
+    { id: "issued", label: "Issued" },
+  ];
 
   return (
     <View
@@ -76,71 +241,125 @@ export default function CatalogScreen({ navigation, embedded = false }: Props) {
         embedded ? styles.embedded : { paddingTop: insets.top + 12 },
       ]}
     >
-      {!embedded ? <Text style={styles.heading}>Catalog</Text> : null}
+      {!embedded ? (
+        <Text
+          style={{
+            fontFamily: fontFamily.display,
+            fontSize: type.title,
+            color: colors.navy,
+            marginBottom: space.sm,
+          }}
+        >
+          Catalog
+        </Text>
+      ) : null}
 
-      <View style={styles.searchRow}>
-        <TextInput
-          style={styles.input}
-          placeholder="Search title, author, or ISBN"
-          placeholderTextColor={colors.muted}
-          value={query}
-          onChangeText={setQuery}
-          onSubmitEditing={onSearch}
-          returnKeyType="search"
-        />
-        <TouchableOpacity style={styles.searchButton} onPress={onSearch} activeOpacity={0.85}>
-          <Text style={styles.searchButtonText}>Search</Text>
-        </TouchableOpacity>
+      <SearchBar value={query} onChangeText={setQuery} onSearch={runSearch} />
+
+      <View style={styles.toolbar}>
+        <View style={styles.chipRow}>
+          {sortChips.map((c) => (
+            <Chip
+              key={c.id}
+              label={c.label}
+              selected={sort === c.id}
+              onPress={() => applySort(c.id)}
+              style={{ marginRight: 6 }}
+            />
+          ))}
+        </View>
+        <View style={styles.viewToggle}>
+          <Pressable onPress={() => setViewMode("list")} hitSlop={8}>
+            <Ionicons
+              name="list"
+              size={22}
+              color={viewMode === "list" ? colors.navy : colors.muted}
+            />
+          </Pressable>
+          <Pressable onPress={() => setViewMode("grid")} hitSlop={8}>
+            <Ionicons
+              name="grid"
+              size={22}
+              color={viewMode === "grid" ? colors.navy : colors.muted}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={[styles.chipRow, { marginBottom: space.sm }]}>
+        {availabilityChips.map((c) => (
+          <Chip
+            key={c.id}
+            label={c.label}
+            selected={availability === c.id}
+            onPress={() => applyAvailability(c.id)}
+            style={{ marginRight: 6, marginBottom: 6 }}
+          />
+        ))}
       </View>
 
       {loading ? (
         <SkeletonList rows={6} />
       ) : (
-        <FlatList
-          data={books}
-          keyExtractor={(item) => item.isbn}
-          contentContainerStyle={{ paddingBottom: 24 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                loadBooks();
-              }}
-              tintColor={colors.navy}
-            />
-          }
-          ListEmptyComponent={
-            <EmptyState
-              title="No books found"
-              message="Try another search, or ask a librarian to add titles."
-            />
-          }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => navigation.navigate("BookDetail", { isbn: item.isbn })}
-              activeOpacity={0.85}
-            >
-              <View style={styles.cardBody}>
-                <Text style={styles.title}>{item.title}</Text>
-                <Text style={styles.meta}>
-                  {(item.authors || []).join(", ") || "Unknown author"}
+        <>
+          <FlatList
+            key={viewMode}
+            data={books}
+            numColumns={viewMode === "grid" ? 2 : 1}
+            keyExtractor={(item) => item.isbn}
+            columnWrapperStyle={viewMode === "grid" ? styles.gridRow : undefined}
+            contentContainerStyle={{ paddingBottom: 12 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  setRefreshing(true);
+                  loadBooks({ pageNum: page });
+                }}
+                tintColor={colors.navy}
+              />
+            }
+            ListEmptyComponent={
+              <EmptyState
+                title="No copies found"
+                message="Try another search, or ask a librarian to add titles."
+              />
+            }
+            renderItem={renderBook}
+          />
+
+          {totalPages > 1 ? (
+            <View style={[styles.pagination, { borderTopColor: colors.border }]}>
+              <Pressable
+                onPress={() => changePage(page - 1)}
+                disabled={page <= 1}
+                style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+              >
+                <Text style={{ fontFamily: fontFamily.bodySemiBold, color: colors.navy }}>
+                  Previous
                 </Text>
-                <Text style={styles.meta}>ISBN: {item.isbn}</Text>
-                {item.isActive === false ? (
-                  <Text style={styles.inactiveLabel}>Inactive (hidden from students)</Text>
-                ) : null}
-              </View>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{item.availability || "Unavailable"}</Text>
-                <Text style={styles.countText}>
-                  {item.availableCount || 0}/{item.totalCopies || 0} free
+              </Pressable>
+              <Text
+                style={{
+                  fontFamily: fontFamily.body,
+                  fontSize: type.small,
+                  color: colors.muted,
+                }}
+              >
+                Page {page} of {totalPages} · {total} titles
+              </Text>
+              <Pressable
+                onPress={() => changePage(page + 1)}
+                disabled={page >= totalPages}
+                style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
+              >
+                <Text style={{ fontFamily: fontFamily.bodySemiBold, color: colors.navy }}>
+                  Next
                 </Text>
-              </View>
-            </TouchableOpacity>
-          )}
-        />
+              </Pressable>
+            </View>
+          ) : null}
+        </>
       )}
     </View>
   );
@@ -149,84 +368,55 @@ export default function CatalogScreen({ navigation, embedded = false }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.cream,
+    backgroundColor: "#F8F7F4",
     paddingHorizontal: 20,
   },
-  embedded: {
-    paddingTop: 0,
-  },
-  heading: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: colors.navy,
-    marginBottom: 14,
-  },
-  searchRow: {
+  embedded: { paddingTop: 0 },
+  toolbar: {
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 14,
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
   },
-  input: {
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     flex: 1,
-    backgroundColor: colors.white,
-    borderRadius: radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-    fontSize: type.body,
   },
-  searchButton: {
-    backgroundColor: colors.navy,
-    borderRadius: radius.md,
-    paddingHorizontal: 16,
-    justifyContent: "center",
-  },
-  searchButtonText: {
-    color: colors.white,
-    fontWeight: "700",
+  viewToggle: {
+    flexDirection: "row",
+    gap: 10,
+    marginLeft: 8,
   },
   card: {
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    padding: 16,
+    borderRadius: 16,
+    padding: 12,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: colors.border,
     flexDirection: "row",
     gap: 12,
   },
   cardBody: { flex: 1 },
-  title: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.navy,
+  badgeCol: { alignItems: "flex-end", justifyContent: "center" },
+  gridRow: { gap: 10 },
+  gridCard: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    maxWidth: "48%",
   },
-  meta: {
-    marginTop: 4,
-    color: colors.muted,
-    fontSize: type.small,
+  pagination: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderTopWidth: 1,
   },
-  inactiveLabel: {
-    marginTop: 6,
-    color: "#B91C1C",
-    fontSize: 12,
-    fontWeight: "700",
+  pageBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
   },
-  badge: {
-    alignItems: "flex-end",
-    justifyContent: "center",
-    minWidth: 88,
-  },
-  badgeText: {
-    color: colors.amberDark,
-    fontWeight: "700",
-    fontSize: 12,
-  },
-  countText: {
-    marginTop: 4,
-    color: colors.muted,
-    fontSize: 12,
-  },
+  pageBtnDisabled: { opacity: 0.35 },
 });

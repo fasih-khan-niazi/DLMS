@@ -3,21 +3,29 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
+import {
+  CATALOG_TABS,
+  DEFAULT_CATALOG_TAB,
+  type CatalogTab,
+} from "../constants/catalogTabs";
 import { useTheme } from "../theme";
 import CatalogScreen from "./CatalogScreen";
 import DigitalLibraryScreen from "./DigitalLibraryScreen";
 
-type CatalogTab = "physical" | "ebooks";
-
 type Props = {
   navigation: NativeStackNavigationProp<any>;
-  route: RouteProp<{ CatalogMain: { initialTab?: CatalogTab } }, "CatalogMain">;
+  route: RouteProp<
+    { CatalogMain: { initialTab?: CatalogTab; searchQuery?: string } },
+    "CatalogMain"
+  >;
 };
+
+const TAB_ORDER: CatalogTab[] = ["physicalCopies", "digitalCopies"];
 
 export default function CatalogHubScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, fontFamily, radius, space, type } = useTheme();
-  const [tab, setTab] = useState<CatalogTab>(route.params?.initialTab || "physical");
+  const [tab, setTab] = useState<CatalogTab>(route.params?.initialTab || DEFAULT_CATALOG_TAB);
 
   useEffect(() => {
     if (route.params?.initialTab) {
@@ -45,17 +53,12 @@ export default function CatalogHubScreen({ navigation, route }: Props) {
       </Text>
 
       <View style={[styles.segments, { paddingHorizontal: 20, marginBottom: space.sm }]}>
-        {(
-          [
-            { id: "physical" as const, label: "Physical books" },
-            { id: "ebooks" as const, label: "E-books" },
-          ] as const
-        ).map((item) => {
-          const selected = tab === item.id;
+        {TAB_ORDER.map((id) => {
+          const selected = tab === id;
           return (
             <Pressable
-              key={item.id}
-              onPress={() => setTab(item.id)}
+              key={id}
+              onPress={() => setTab(id)}
               style={[
                 styles.segment,
                 {
@@ -72,7 +75,7 @@ export default function CatalogHubScreen({ navigation, route }: Props) {
                   fontSize: type.small,
                 }}
               >
-                {item.label}
+                {CATALOG_TABS[id].label}
               </Text>
             </Pressable>
           );
@@ -80,8 +83,12 @@ export default function CatalogHubScreen({ navigation, route }: Props) {
       </View>
 
       <View style={styles.panel}>
-        {tab === "physical" ? (
-          <CatalogScreen navigation={navigation} embedded />
+        {tab === "physicalCopies" ? (
+          <CatalogScreen
+            navigation={navigation}
+            embedded
+            initialQuery={route.params?.searchQuery || ""}
+          />
         ) : (
           <DigitalLibraryScreen navigation={navigation} embedded />
         )}

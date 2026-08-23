@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import api from "../config/api";
 import { firebaseAuth } from "../config/firebase";
 import { useProfile } from "../context/ProfileContext";
+import { SearchBar } from "../components/SearchBar";
 import { Card, Screen } from "../components/ui";
 import { useTheme } from "../theme";
 
@@ -52,6 +53,7 @@ export default function HomeScreen({ navigation }: Props) {
   const { colors, fontFamily, radius, space, type } = useTheme();
   const { profile } = useProfile();
   const [unread, setUnread] = useState(0);
+  const [quickSearch, setQuickSearch] = useState("");
 
   useFocusEffect(
     useCallback(() => {
@@ -64,6 +66,16 @@ export default function HomeScreen({ navigation }: Props) {
 
   const displayName =
     profile?.displayName || firebaseAuth.currentUser?.displayName || "there";
+
+  const openCatalogSearch = (query: string) => {
+    navigation.getParent()?.navigate("Catalog", {
+      screen: "CatalogMain",
+      params: {
+        initialTab: "physicalCopies",
+        searchQuery: query.trim(),
+      },
+    });
+  };
 
   return (
     <Screen scroll contentStyle={{ paddingHorizontal: 20 }}>
@@ -137,6 +149,15 @@ export default function HomeScreen({ navigation }: Props) {
         Hello, {displayName}
       </Text>
 
+      <View style={{ marginBottom: space.lg }}>
+        <SearchBar
+          value={quickSearch}
+          onChangeText={setQuickSearch}
+          onSearch={openCatalogSearch}
+          showRecent
+        />
+      </View>
+
       <PlaceholderSection
         title="At a glance"
         message="Active loans, overdue warnings, fines, and reservation alerts will show here."
@@ -147,7 +168,7 @@ export default function HomeScreen({ navigation }: Props) {
       />
       <PlaceholderSection
         title="Continue reading"
-        message="E-books you have started will appear here."
+        message="Digital copies you have started will appear here."
       />
     </Screen>
   );
