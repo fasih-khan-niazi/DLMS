@@ -313,12 +313,13 @@ router.get("/:digitalBookId/reviews", authenticate, async (req: AuthRequest, res
     }
 
     const reviews = await listDigitalBookReviews(digitalBookId);
-    const summary = summarizeReviews(reviews);
+    const published = reviews.filter((row: any) => row.confirmed === true);
+    const summary = summarizeReviews(published);
     const mine = req.uid ? await getUserReview(digitalBookId, req.uid) : null;
 
     res.json({
       summary,
-      items: reviews.map((row: any) => ({
+      items: published.map((row: any) => ({
         reviewId: row.reviewId || row.userId,
         displayName: row.displayName || "Student",
         rating: row.rating,
@@ -369,6 +370,7 @@ router.put("/:digitalBookId/reviews", authenticate, async (req: AuthRequest, res
       rating,
       recommendScore,
       comment: req.body.comment,
+      confirm: true,
     });
 
     // Keep bookshelf rating in sync when present

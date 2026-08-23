@@ -32,9 +32,16 @@ export async function upsertDigitalBookReview(input: {
   rating: number;
   recommendScore?: number | null;
   comment?: string;
+  confirm?: boolean;
 }) {
   const ref = reviewsRef(input.digitalBookId).doc(input.userId);
   const existing = await ref.get();
+  const existingData = existing.exists ? (existing.data() as Record<string, unknown>) : null;
+
+  if (existingData?.confirmed) {
+    throw new Error("Review already submitted and cannot be changed");
+  }
+
   const now = new Date();
   const payload = {
     userId: input.userId,
@@ -45,6 +52,7 @@ export async function upsertDigitalBookReview(input: {
         ? null
         : Math.min(10, Math.max(1, Math.round(input.recommendScore))),
     comment: String(input.comment || "").trim().slice(0, 500),
+    confirmed: input.confirm === true,
     updatedAt: now,
     ...(existing.exists ? {} : { createdAt: now }),
   };
