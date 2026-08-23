@@ -14,8 +14,10 @@ function clampCatalogPageSize(value: unknown): number {
 router.get("/app", authenticate, async (_req: AuthRequest, res: Response) => {
   try {
     const config = await getSystemConfig();
+    const maxPdfSizeMb = Number(config.maxPdfSizeMb);
     res.json({
       catalogPageSize: clampCatalogPageSize(config.catalogPageSize),
+      maxPdfSizeMb: Number.isFinite(maxPdfSizeMb) && maxPdfSizeMb > 0 ? maxPdfSizeMb : 25,
     });
   } catch (error) {
     console.error("App config read error:", error);
