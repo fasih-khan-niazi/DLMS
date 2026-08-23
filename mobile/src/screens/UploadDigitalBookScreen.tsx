@@ -71,8 +71,11 @@ export default function UploadDigitalBookScreen({ navigation }: Props) {
         throw new Error(data.error || "Upload failed");
       }
 
-      Alert.alert("Uploaded", "PDF added to E-Library");
-      navigation.navigate("DigitalLibrary");
+      Alert.alert("Uploaded", "PDF added to the catalog.");
+      navigation.getParent()?.navigate("Catalog", {
+        screen: "CatalogMain",
+        params: { initialTab: "ebooks" },
+      });
     } catch (error: any) {
       Alert.alert("Upload failed", error.message || "Request failed");
     } finally {

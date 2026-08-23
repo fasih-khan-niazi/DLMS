@@ -1,27 +1,60 @@
 import React, { useCallback, useState } from "react";
-import { Text, StyleSheet, TouchableOpacity, ScrollView, View } from "react-native";
+import { Text, View, Pressable } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import api, { API_BASE_URL } from "../config/api";
+import { Ionicons } from "@expo/vector-icons";
+import api from "../config/api";
 import { firebaseAuth } from "../config/firebase";
-import { colors, radius, space, type } from "../theme";
+import { useProfile } from "../context/ProfileContext";
+import { Card, Screen } from "../components/ui";
+import { useTheme } from "../theme";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
 };
 
+function PlaceholderSection({
+  title,
+  message,
+}: {
+  title: string;
+  message: string;
+}) {
+  const { colors, fontFamily, type, space } = useTheme();
+
+  return (
+    <Card style={{ marginBottom: space.md }}>
+      <Text
+        style={{
+          fontFamily: fontFamily.bodyBold,
+          fontSize: type.body,
+          color: colors.navy,
+          marginBottom: space.sm,
+        }}
+      >
+        {title}
+      </Text>
+      <Text
+        style={{
+          fontFamily: fontFamily.body,
+          fontSize: type.small,
+          color: colors.muted,
+          lineHeight: 20,
+        }}
+      >
+        {message}
+      </Text>
+    </Card>
+  );
+}
+
 export default function HomeScreen({ navigation }: Props) {
-  const insets = useSafeAreaInsets();
-  const [profile, setProfile] = useState<any>(null);
+  const { colors, fontFamily, radius, space, type } = useTheme();
+  const { profile } = useProfile();
   const [unread, setUnread] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
-      api
-        .get("/api/auth/me")
-        .then((res) => setProfile(res.data))
-        .catch(() => {});
       api
         .get("/api/notifications/unread-count")
         .then((res) => setUnread(Number(res.data.unreadCount) || 0))
@@ -29,162 +62,93 @@ export default function HomeScreen({ navigation }: Props) {
     }, [])
   );
 
-  const isStaff = profile?.role === "librarian" || profile?.role === "admin";
+  const displayName =
+    profile?.displayName || firebaseAuth.currentUser?.displayName || "there";
 
   return (
-    <ScrollView
-      contentContainerStyle={[
-        styles.container,
-        { paddingTop: Math.max(insets.top, 24) + 12 },
-      ]}
-    >
-      <View style={styles.topRow}>
-        <Text style={styles.brand}>DLMS</Text>
-        <TouchableOpacity
-          style={styles.bell}
-          onPress={() => navigation.navigate("Notifications")}
-          activeOpacity={0.85}
+    <Screen scroll contentStyle={{ paddingHorizontal: 20 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: space.md,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: fontFamily.display,
+            fontSize: type.title,
+            color: colors.navy,
+          }}
         >
-          <Text style={styles.bellText}>Alerts</Text>
+          DLMS
+        </Text>
+        <Pressable
+          onPress={() => navigation.navigate("Notifications")}
+          hitSlop={8}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            backgroundColor: colors.white,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: radius.pill,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
+          <Ionicons name="notifications-outline" size={18} color={colors.navy} />
           {unread > 0 ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unread > 9 ? "9+" : unread}</Text>
+            <View
+              style={{
+                minWidth: 18,
+                height: 18,
+                borderRadius: 9,
+                backgroundColor: colors.amber,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingHorizontal: 4,
+              }}
+            >
+              <Text
+                style={{
+                  color: colors.navyDark,
+                  fontSize: 10,
+                  fontFamily: fontFamily.bodyBold,
+                }}
+              >
+                {unread > 9 ? "9+" : unread}
+              </Text>
             </View>
           ) : null}
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
-      <Text style={styles.greeting}>
-        Hello, {profile?.displayName || firebaseAuth.currentUser?.displayName || "User"}
+      <Text
+        style={{
+          fontFamily: fontFamily.display,
+          fontSize: type.titleSm,
+          color: colors.navy,
+          marginBottom: space.lg,
+        }}
+      >
+        Hello, {displayName}
       </Text>
-      <Text style={styles.role}>Role: {profile?.role || "loading..."}</Text>
-      <Text style={styles.apiHint}>API: {API_BASE_URL}</Text>
 
-      <Text style={styles.section}>Digital</Text>
-
-      <TouchableOpacity
-        style={styles.actionButton}
-        onPress={() => navigation.navigate("DigitalLibrary")}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.actionText}>E-Library</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.actionButton}
-        onPress={() => navigation.navigate("Bookshelf")}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.actionText}>My Bookshelf</Text>
-      </TouchableOpacity>
-
-      {isStaff && (
-        <>
-          <Text style={styles.section}>Staff</Text>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate("AddBook")}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.actionText}>Add Physical Book</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate("UploadDigitalBook")}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.actionText}>Upload PDF</Text>
-          </TouchableOpacity>
-        </>
-      )}
-    </ScrollView>
+      <PlaceholderSection
+        title="At a glance"
+        message="Active loans, overdue warnings, fines, and reservation alerts will show here."
+      />
+      <PlaceholderSection
+        title="Quick actions"
+        message="Shortcuts to scan, search the catalog, and pick up where you left off."
+      />
+      <PlaceholderSection
+        title="Continue reading"
+        message="E-books you have started will appear here."
+      />
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: colors.cream,
-    paddingHorizontal: 28,
-    paddingBottom: 48,
-    flexGrow: 1,
-  },
-  topRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  brand: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: colors.navy,
-  },
-  bell: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  bellText: {
-    color: colors.navy,
-    fontWeight: "700",
-    fontSize: type.small,
-  },
-  badge: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: colors.amber,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: colors.navyDark,
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  greeting: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: colors.navy,
-  },
-  role: {
-    fontSize: 15,
-    color: colors.muted,
-    marginTop: 6,
-  },
-  apiHint: {
-    fontSize: 12,
-    color: "#9CA3AF",
-    marginTop: 4,
-    marginBottom: 20,
-  },
-  section: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.navy,
-    marginBottom: 10,
-    marginTop: 8,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  actionButton: {
-    width: "100%",
-    backgroundColor: colors.navy,
-    borderRadius: radius.md,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  actionText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});

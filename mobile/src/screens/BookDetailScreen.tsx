@@ -13,6 +13,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import api from "../config/api";
+import { useProfile } from "../context/ProfileContext";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -25,25 +26,21 @@ function qrImageUrl(value: string) {
 
 export default function BookDetailScreen({ navigation, route }: Props) {
   const { isbn } = route.params;
+  const { isStaff } = useProfile();
   const [book, setBook] = useState<any>(null);
   const [myActiveCopyIds, setMyActiveCopyIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [reserving, setReserving] = useState(false);
   const [actionCopyId, setActionCopyId] = useState<string | null>(null);
-  const [isStaff, setIsStaff] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
 
   const load = async () => {
     try {
-      const [bookRes, loansRes, meRes] = await Promise.all([
+      const [bookRes, loansRes] = await Promise.all([
         api.get(`/api/catalog/books/${isbn}`),
         api.get("/api/loans/mine", { params: { status: "active" } }),
-        api.get("/api/auth/me").catch(() => null),
       ]);
       setBook(bookRes.data);
-      setIsStaff(
-        meRes?.data?.role === "librarian" || meRes?.data?.role === "admin"
-      );
 
       const mine = new Set<string>();
       (loansRes.data.loans || []).forEach((loan: any) => {

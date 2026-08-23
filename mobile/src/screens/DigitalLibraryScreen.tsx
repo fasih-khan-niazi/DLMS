@@ -15,9 +15,10 @@ import api from "../config/api";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
+  embedded?: boolean;
 };
 
-export default function DigitalLibraryScreen({ navigation }: Props) {
+export default function DigitalLibraryScreen({ navigation, embedded = false }: Props) {
   const [query, setQuery] = useState("");
   const [books, setBooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,11 +46,15 @@ export default function DigitalLibraryScreen({ navigation }: Props) {
   );
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()}>
-        <Text style={styles.back}>← Back</Text>
-      </TouchableOpacity>
-      <Text style={styles.heading}>E-Library</Text>
+    <View style={[styles.container, embedded && styles.embedded]}>
+      {!embedded ? (
+        <>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.back}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.heading}>E-Library</Text>
+        </>
+      ) : null}
 
       <View style={styles.searchRow}>
         <TextInput
@@ -123,6 +128,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8F7F4",
     paddingTop: 56,
     paddingHorizontal: 20,
+  },
+  embedded: {
+    paddingTop: 0,
   },
   back: {
     color: "#E8A838",

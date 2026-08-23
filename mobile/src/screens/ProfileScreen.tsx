@@ -1,154 +1,120 @@
-import React, { useEffect, useState } from "react";
-import {
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-} from "react-native";
+import React from "react";
+import { Text, Pressable, View } from "react-native";
 import { signOut } from "firebase/auth";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { firebaseAuth } from "../config/firebase";
-import api, { API_BASE_URL } from "../config/api";
+import { useProfile } from "../context/ProfileContext";
+import { Button, Card, Screen } from "../components/ui";
+import { useTheme } from "../theme";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
 };
 
-export default function ProfileScreen({ navigation }: Props) {
-  const insets = useSafeAreaInsets();
-  const [profile, setProfile] = useState<any>(null);
-
-  useEffect(() => {
-    api
-      .get("/api/auth/me")
-      .then((res) => setProfile(res.data))
-      .catch(() => {});
-  }, []);
-
-  const isStaff = profile?.role === "librarian" || profile?.role === "admin";
+function MenuRow({ label, onPress }: { label: string; onPress: () => void }) {
+  const { colors, fontFamily, type, space } = useTheme();
 
   return (
-    <ScrollView
-      contentContainerStyle={[
-        styles.container,
-        { paddingTop: Math.max(insets.top, 24) + 12 },
-      ]}
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+        opacity: pressed ? 0.85 : 1,
+      })}
     >
-      <Text style={styles.title}>Profile</Text>
-      <Text style={styles.name}>
-        {profile?.displayName || firebaseAuth.currentUser?.displayName || "User"}
+      <Text
+        style={{
+          fontFamily: fontFamily.bodySemiBold,
+          fontSize: type.body,
+          color: colors.navy,
+        }}
+      >
+        {label}
       </Text>
-      <Text style={styles.meta}>{profile?.email || firebaseAuth.currentUser?.email}</Text>
-      <Text style={styles.meta}>Role: {profile?.role || "..."}</Text>
-      <Text style={styles.meta}>
-        Active loans: {profile?.activeBorrowCount ?? 0}
-      </Text>
-      <Text style={styles.meta}>
-        Outstanding fines: Rs {profile?.totalOutstandingFines ?? 0}
-      </Text>
-      <Text style={styles.apiHint}>API: {API_BASE_URL}</Text>
-
-      <TouchableOpacity
-        style={styles.linkButton}
-        onPress={() => navigation.navigate("Notifications")}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.linkText}>Notifications</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.linkButton}
-        onPress={() => navigation.navigate("DigitalLibrary")}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.linkText}>E-Library</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.linkButton}
-        onPress={() => navigation.navigate("Bookshelf")}
-      >
-        <Text style={styles.linkText}>My Bookshelf</Text>
-      </TouchableOpacity>
-
-      {isStaff && (
-        <>
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => navigation.navigate("AddBook")}
-          >
-            <Text style={styles.linkText}>Add Physical Book</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => navigation.navigate("UploadDigitalBook")}
-          >
-            <Text style={styles.linkText}>Upload PDF</Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-      <TouchableOpacity
-        style={styles.logoutButton}
-        onPress={() => signOut(firebaseAuth)}
-      >
-        <Text style={styles.logoutText}>Sign Out</Text>
-      </TouchableOpacity>
-    </ScrollView>
+    </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#F8F7F4",
-    paddingHorizontal: 28,
-    paddingBottom: 48,
-    flexGrow: 1,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#2E4A62",
-    marginBottom: 12,
-  },
-  name: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#2E4A62",
-  },
-  meta: {
-    fontSize: 15,
-    color: "#6B7280",
-    marginTop: 6,
-  },
-  apiHint: {
-    fontSize: 12,
-    color: "#9CA3AF",
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  linkButton: {
-    backgroundColor: "#2E4A62",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  linkText: {
-    color: "#FFF",
-    fontWeight: "600",
-    fontSize: 16,
-  },
-  logoutButton: {
-    marginTop: 16,
-    backgroundColor: "#E8A838",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  logoutText: {
-    color: "#FFF",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-});
+export default function ProfileScreen({ navigation }: Props) {
+  const { colors, fontFamily, space, type } = useTheme();
+  const { profile, isStaff } = useProfile();
+
+  const displayName =
+    profile?.displayName || firebaseAuth.currentUser?.displayName || "User";
+  const email = profile?.email || firebaseAuth.currentUser?.email || "";
+
+  return (
+    <Screen scroll contentStyle={{ paddingHorizontal: 20 }}>
+      <Text
+        style={{
+          fontFamily: fontFamily.display,
+          fontSize: type.title,
+          color: colors.navy,
+          marginBottom: space.md,
+        }}
+      >
+        Profile
+      </Text>
+
+      <Card style={{ marginBottom: space.md }}>
+        <Text
+          style={{
+            fontFamily: fontFamily.bodyBold,
+            fontSize: type.titleSm,
+            color: colors.navy,
+          }}
+        >
+          {displayName}
+        </Text>
+        <Text
+          style={{
+            marginTop: 4,
+            fontFamily: fontFamily.body,
+            fontSize: type.small,
+            color: colors.muted,
+          }}
+        >
+          {email}
+        </Text>
+        <Text
+          style={{
+            marginTop: space.sm,
+            fontFamily: fontFamily.body,
+            fontSize: type.small,
+            color: colors.text,
+          }}
+        >
+          Active loans: {profile?.activeBorrowCount ?? 0}
+        </Text>
+        <Text
+          style={{
+            marginTop: 4,
+            fontFamily: fontFamily.body,
+            fontSize: type.small,
+            color: colors.text,
+          }}
+        >
+          Outstanding fines: Rs {profile?.totalOutstandingFines ?? 0}
+        </Text>
+      </Card>
+
+      <Card padded={false} style={{ marginBottom: space.md, paddingHorizontal: space.md }}>
+        <MenuRow label="Notifications" onPress={() => navigation.navigate("Notifications")} />
+        <MenuRow label="My Bookshelf" onPress={() => navigation.navigate("Bookshelf")} />
+        {isStaff ? (
+          <>
+            <MenuRow label="Add physical book" onPress={() => navigation.navigate("AddBook")} />
+            <MenuRow
+              label="Upload PDF"
+              onPress={() => navigation.navigate("UploadDigitalBook")}
+            />
+          </>
+        ) : null}
+      </Card>
+
+      <Button title="Sign out" variant="secondary" onPress={() => signOut(firebaseAuth)} />
+    </Screen>
+  );
+}

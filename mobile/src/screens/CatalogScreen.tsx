@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
 import { colors, radius, space, type } from "../theme";
+import { useProfile } from "../context/ProfileContext";
 import { SkeletonList } from "../components/Skeleton";
 import { EmptyState } from "../components/EmptyState";
 
@@ -28,15 +29,16 @@ type CatalogBook = {
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
+  embedded?: boolean;
 };
 
-export default function CatalogScreen({ navigation }: Props) {
+export default function CatalogScreen({ navigation, embedded = false }: Props) {
   const insets = useSafeAreaInsets();
+  const { isStaff } = useProfile();
   const [query, setQuery] = useState("");
   const [books, setBooks] = useState<CatalogBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isStaff, setIsStaff] = useState(false);
 
   const loadBooks = async (search = query, staff = isStaff) => {
     try {
@@ -58,18 +60,8 @@ export default function CatalogScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
-      (async () => {
-        let staff = false;
-        try {
-          const me = await api.get("/api/auth/me");
-          staff = me.data?.role === "librarian" || me.data?.role === "admin";
-          setIsStaff(staff);
-        } catch {
-          setIsStaff(false);
-        }
-        await loadBooks(query, staff);
-      })();
-    }, [])
+      loadBooks(query, isStaff);
+    }, [isStaff])
   );
 
   const onSearch = () => {
@@ -78,8 +70,13 @@ export default function CatalogScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
-      <Text style={styles.heading}>Catalog</Text>
+    <View
+      style={[
+        styles.container,
+        embedded ? styles.embedded : { paddingTop: insets.top + 12 },
+      ]}
+    >
+      {!embedded ? <Text style={styles.heading}>Catalog</Text> : null}
 
       <View style={styles.searchRow}>
         <TextInput
@@ -154,6 +151,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.cream,
     paddingHorizontal: 20,
+  },
+  embedded: {
+    paddingTop: 0,
   },
   heading: {
     fontSize: 28,

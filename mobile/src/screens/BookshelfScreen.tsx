@@ -64,15 +64,16 @@ export default function BookshelfScreen({ navigation }: Props) {
           }
           ListEmptyComponent={
             <Text style={styles.empty}>
-              No saved digital books yet. Open E-Library and save one.
+              No saved digital books yet. Browse E-books in Catalog and save one.
             </Text>
           }
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
               onPress={() =>
-                navigation.navigate("DigitalBookDetail", {
-                  digitalBookId: item.digitalBookId,
+                navigation.getParent()?.navigate("Catalog", {
+                  screen: "DigitalBookDetail",
+                  params: { digitalBookId: item.digitalBookId },
                 })
               }
             >
