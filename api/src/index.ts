@@ -16,6 +16,7 @@ import digitalBookRoutes from "./routes/digitalBooks";
 import notificationRoutes from "./routes/notifications";
 import cronRoutes from "./routes/cron";
 import configRoutes from "./routes/config";
+import { requestLogger } from "./middleware/requestLogger";
 import { ensureUploadDirs } from "./config/storage";
 
 ensureUploadDirs();
@@ -39,6 +40,7 @@ app.use(
   })
 );
 app.use(express.json({ limit: "1mb" }));
+app.use(requestLogger);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
