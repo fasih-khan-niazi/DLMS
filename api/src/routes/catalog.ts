@@ -9,7 +9,13 @@ import {
   fetchBookByIsbn,
   BookMetadata,
 } from "../services/googleBooks";
-import { uploadBookCover } from "../services/bookCoverStorage";
+import {
+  coverObjectPathForIsbn,
+  downloadBookCover,
+  guessContentTypeFromPath,
+  uploadBookCover,
+} from "../services/bookCoverStorage";
+import { cancelReservationsForDeactivatedTitle } from "../services/reservations";
 import { clampCatalogPageSize, getSystemConfig } from "../services/loans";
 import { createId } from "../utils/ids";
 import {
@@ -35,13 +41,44 @@ function sortCatalogResults(items: Record<string, unknown>[], sort: string) {
 }
 
 function matchesAvailabilityFilter(doc: Record<string, unknown>, availability: string) {
-  if (!availability || availability === "all") return true;
+  if (!availability || availability === "all" || availability === "inactive") return true;
   const label = getAvailabilityLabel({
     availableCount: Number(doc.availableCount) || 0,
     issuedCount: Number(doc.issuedCount) || 0,
     reservedCount: Number(doc.reservedCount) || 0,
   }).toLowerCase();
   return label === availability.toLowerCase();
+}
+
+function resolveCatalogStatusFilter(
+  query: Record<string, unknown>,
+  isStaff: boolean
+): "active" | "inactive" {
+  const requested = String(query.catalogStatus || "active").trim().toLowerCase();
+  if (isStaff && requested === "inactive") return "inactive";
+  return "active";
+}
+
+function matchesCatalogStatus(doc: Record<string, unknown>, catalogStatus: "active" | "inactive") {
+  const active = doc.isActive !== false;
+  return catalogStatus === "inactive" ? !active : active;
+}
+
+function buildCoverImageUrl(req: AuthRequest, isbn: string): string {
+  const host = req.get("host") || "localhost:5000";
+  const protocol = req.protocol || "http";
+  return `${protocol}://${host}/api/catalog/books/${encodeURIComponent(isbn)}/cover-image`;
+}
+
+function resolveCoverThumbnail(doc: Record<string, unknown>, req: AuthRequest, isbn: string) {
+  const url = String(doc.thumbnailUrl || "");
+  if (
+    doc.coverStoragePath ||
+    (doc.coverImageSource === "manual" && url.includes("supabase"))
+  ) {
+    return buildCoverImageUrl(req, isbn);
+  }
+  return url;
 }
 
 function normalizeIsbn(isbn: string): string {
@@ -328,15 +365,14 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
       defaultPageSize
     );
     const isStaff = req.role === "librarian" || req.role === "admin";
-    const includeInactive =
-      isStaff && String(req.query.includeInactive || "") === "1";
+    const catalogStatus = resolveCatalogStatusFilter(req.query as Record<string, unknown>, isStaff);
 
     if (q) {
       const isbnCandidate = normalizeIsbn(q);
       const byIsbn = await db.collection("catalog").doc(isbnCandidate).get();
       if (byIsbn.exists) {
         const data = byIsbn.data()!;
-        if (!includeInactive && data.isActive === false) {
+        if (!matchesCatalogStatus(data, catalogStatus)) {
           res.json(paginateArray([], page, pageSize));
           return;
         }
@@ -344,6 +380,7 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
           ...data,
           isActive: data.isActive !== false,
           availability: getAvailabilityLabel(data),
+          thumbnailUrl: resolveCoverThumbnail(data, req, isbnCandidate),
         };
         if (!matchesAvailabilityFilter(data, availability)) {
           res.json(paginateArray([], page, pageSize));
@@ -374,13 +411,15 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
       const results = snapshot.docs
         .map((doc) => {
           const data = doc.data();
+          const isbnValue = String(data.isbn || doc.id);
           return {
             ...data,
             isActive: data.isActive !== false,
             availability: getAvailabilityLabel(data),
+            thumbnailUrl: resolveCoverThumbnail(data, req, isbnValue),
           } as Record<string, unknown>;
         })
-        .filter((row) => includeInactive || row.isActive !== false)
+        .filter((row) => matchesCatalogStatus(row, catalogStatus))
         .filter((row) => matchesAvailabilityFilter(row, availability))
         .filter((row) =>
           matchesTextQuery(
@@ -409,13 +448,15 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
     const results = snapshot.docs
       .map((doc) => {
         const data = doc.data();
+        const isbnValue = String(data.isbn || doc.id);
         return {
           ...data,
           isActive: data.isActive !== false,
           availability: getAvailabilityLabel(data),
+          thumbnailUrl: resolveCoverThumbnail(data, req, isbnValue),
         };
       })
-      .filter((row) => includeInactive || row.isActive !== false)
+      .filter((row) => matchesCatalogStatus(row, catalogStatus))
       .filter((row) => matchesAvailabilityFilter(row, availability));
 
     res.json(paginateArray(sortCatalogResults(results, sort), page, pageSize));
@@ -456,6 +497,7 @@ router.patch(
       await catalogRef.update({
         thumbnailUrl,
         coverImageSource: "manual",
+        coverStoragePath: null,
         updatedAt: now,
       });
 
@@ -509,19 +551,18 @@ router.post(
         return;
       }
 
-      const ext = (req.file.originalname || "cover.jpg").split(".").pop()?.toLowerCase() || "jpg";
-      const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
-      const objectPath = `covers/${isbn}.${safeExt === "jpeg" ? "jpg" : safeExt}`;
-
+      const objectPath = coverObjectPathForIsbn(isbn);
       const uploaded = await uploadBookCover({
         objectPath,
         buffer: req.file.buffer,
         contentType: req.file.mimetype,
       });
 
+      const coverImageUrl = buildCoverImageUrl(req, isbn);
       const now = new Date();
       await catalogRef.update({
-        thumbnailUrl: uploaded.publicUrl,
+        thumbnailUrl: coverImageUrl,
+        coverStoragePath: objectPath,
         coverImageSource: "manual",
         updatedAt: now,
       });
@@ -529,7 +570,7 @@ router.post(
       res.json({
         success: true,
         isbn,
-        thumbnailUrl: uploaded.publicUrl,
+        thumbnailUrl: coverImageUrl,
         coverImageSource: "manual",
       });
     } catch (error: any) {
@@ -538,6 +579,51 @@ router.post(
     }
   }
 );
+
+// Stream uploaded cover image (authenticated — private Supabase bucket)
+router.get("/books/:isbn/cover-image", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const isbn = normalizeIsbn(req.params.isbn as string);
+    const catalogDoc = await db.collection("catalog").doc(isbn).get();
+    if (!catalogDoc.exists) {
+      res.status(404).json({ error: "Book not found" });
+      return;
+    }
+
+    const data = catalogDoc.data()!;
+    const candidates = [
+      String(data.coverStoragePath || ""),
+      coverObjectPathForIsbn(isbn),
+      `covers/${isbn}.png`,
+      `covers/${isbn}.webp`,
+    ].filter(Boolean);
+    const uniquePaths = [...new Set(candidates)];
+
+    let file: { buffer: Buffer; contentType: string } | null = null;
+    let servedPath = "";
+    for (const objectPath of uniquePaths) {
+      try {
+        file = await downloadBookCover(objectPath);
+        servedPath = objectPath;
+        break;
+      } catch {
+        // try next legacy path
+      }
+    }
+
+    if (!file) {
+      res.status(404).json({ error: "Cover image not found" });
+      return;
+    }
+
+    res.setHeader("Content-Type", file.contentType || guessContentTypeFromPath(servedPath));
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    res.send(file.buffer);
+  } catch (error) {
+    console.error("Cover image stream error:", error);
+    res.status(404).json({ error: "Cover image not found" });
+  }
+});
 
 // Soft-activate / soft-deactivate a catalog title (keeps loan/reservation history)
 router.patch(
@@ -561,14 +647,52 @@ router.patch(
         return;
       }
 
+      const catalog = catalogDoc.data()!;
+      const title = String(catalog.title || isbn);
+
+      if (isActive === false) {
+        const issuedCount = Number(catalog.issuedCount) || 0;
+        if (issuedCount > 0) {
+          res.status(409).json({
+            error:
+              "Cannot deactivate this title while a copy is on loan. Wait until all copies are returned.",
+            code: "COPIES_ON_LOAN",
+          });
+          return;
+        }
+
+        const copiesSnap = await db
+          .collection("bookCopies")
+          .where("isbn", "==", isbn)
+          .where("status", "==", "issued")
+          .limit(1)
+          .get();
+        if (!copiesSnap.empty) {
+          res.status(409).json({
+            error:
+              "Cannot deactivate this title while a copy is on loan. Wait until all copies are returned.",
+            code: "COPIES_ON_LOAN",
+          });
+          return;
+        }
+      }
+
       const now = new Date();
       await catalogRef.update({ isActive, updatedAt: now });
+
+      let cancelledReservations = 0;
+      if (isActive === false) {
+        cancelledReservations = await cancelReservationsForDeactivatedTitle({ isbn, title });
+      }
 
       await db.collection("auditLog").add({
         action: isActive ? "catalog_activated" : "catalog_deactivated",
         actorId: req.uid,
         targetId: isbn,
-        metadata: { title: catalogDoc.data()?.title || "" },
+        metadata: {
+          title,
+          cancelledReservations,
+        },
         timestamp: now,
       });
 
@@ -576,9 +700,12 @@ router.patch(
         success: true,
         isbn,
         isActive,
+        cancelledReservations,
         message: isActive
           ? "Book is active in the catalog again"
-          : "Book deactivated (hidden from students; history kept)",
+          : cancelledReservations > 0
+            ? `Book deactivated. ${cancelledReservations} reservation(s) were cancelled and students were notified.`
+            : "Book deactivated (hidden from students; history kept)",
       });
     } catch (error) {
       console.error("Catalog status error:", error);
@@ -612,11 +739,23 @@ router.get("/books/:isbn", authenticate, async (req: AuthRequest, res: Response)
 
     const copies = copiesSnap.docs.map((doc) => doc.data());
 
+    let pendingReservationCount = 0;
+    if (isStaff) {
+      const reservationsSnap = await db
+        .collection("reservations")
+        .where("isbn", "==", isbn)
+        .where("status", "in", ["waiting", "ready"])
+        .get();
+      pendingReservationCount = reservationsSnap.size;
+    }
+
     res.json({
       ...data,
       isActive: data.isActive !== false,
       availability: getAvailabilityLabel(data),
+      thumbnailUrl: resolveCoverThumbnail(data, req, isbn),
       copies,
+      ...(isStaff ? { pendingReservationCount } : {}),
     });
   } catch (error) {
     console.error("Get book error:", error);

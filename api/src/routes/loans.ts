@@ -38,7 +38,9 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
   try {
     const copyId = await resolveCopyId(req.body);
     if (!copyId) {
-      res.status(400).json({ error: "copyId or qrPayload is required" });
+      res.status(400).json({
+        error: "That QR code is not a valid library book label. Try again with a clearer scan.",
+      });
       return;
     }
 
@@ -236,7 +238,9 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
   try {
     const copyId = await resolveCopyId(req.body);
     if (!copyId) {
-      res.status(400).json({ error: "copyId or qrPayload is required" });
+      res.status(400).json({
+        error: "That QR code is not a valid library book label. Try again with a clearer scan.",
+      });
       return;
     }
 

@@ -173,6 +173,83 @@ export async function assignCopyToNextReservation(input: {
   };
 }
 
+/** Cancel waiting/ready reservations when a title is deactivated; notify students. */
+export async function cancelReservationsForDeactivatedTitle(input: {
+  isbn: string;
+  title: string;
+}) {
+  const snap = await db
+    .collection("reservations")
+    .where("isbn", "==", input.isbn)
+    .where("status", "in", ["waiting", "ready"])
+    .get();
+
+  const now = new Date();
+  let cancelled = 0;
+
+  for (const doc of snap.docs) {
+    const reservation = doc.data();
+    const reservationRef = doc.ref;
+    const userId = String(reservation.userId || "");
+    const copyId = reservation.assignedCopyId as string | undefined;
+    const catalogRef = db.collection("catalog").doc(input.isbn);
+
+    await db.runTransaction(async (tx) => {
+      const fresh = await tx.get(reservationRef);
+      if (!fresh.exists) return;
+      const data = fresh.data()!;
+      if (data.status !== "waiting" && data.status !== "ready") return;
+
+      const catalogSnap = await tx.get(catalogRef);
+
+      tx.update(reservationRef, {
+        status: "cancelled",
+        cancelReason: "catalog_deactivated",
+        updatedAt: now,
+      });
+
+      if (data.status === "ready" && copyId) {
+        const copyRef = db.collection("bookCopies").doc(copyId);
+        const copySnap = await tx.get(copyRef);
+        if (copySnap.exists) {
+          const copy = copySnap.data()!;
+          if (copy.status === "reserved" && copy.reservedForUserId === data.userId) {
+            tx.update(copyRef, {
+              status: "available",
+              reservedForUserId: null,
+              readyAt: null,
+              expiresAt: null,
+              updatedAt: now,
+            });
+          }
+        }
+        if (catalogSnap.exists) {
+          const catalog = catalogSnap.data()!;
+          tx.update(catalogRef, {
+            reservedCount: Math.max((catalog.reservedCount || 0) - 1, 0),
+            availableCount: (catalog.availableCount || 0) + 1,
+            updatedAt: now,
+          });
+        }
+      }
+    });
+
+    if (userId) {
+      await notifyUser({
+        userId,
+        type: "reservation_cancelled",
+        title: "Reservation cancelled",
+        body: `Your reservation for "${input.title}" was cancelled because this title is no longer available in the catalog.`,
+        metadata: { isbn: input.isbn, reservationId: doc.id },
+      });
+    }
+
+    cancelled += 1;
+  }
+
+  return cancelled;
+}
+
 /** If copies are available while people are waiting, hold for the next waiter. */
 export async function fulfillWaitingWithAvailableCopies(isbn: string) {
   let assignedCount = 0;
