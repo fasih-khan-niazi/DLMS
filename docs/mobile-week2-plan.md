@@ -233,18 +233,20 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 
 ## Phase 9: E-books tab and reader polish (13, 14)
 
+**Status:** Parked / complete enough (2026-08-24). In-app reader + bookshelf-first flow + zoom polish done. Further reader tweaks only if needed later.
+
 **Goal:** E-books tab matches physical catalog quality.
 
 **E-books list**
-- [ ] Same design language: `BookCover` placeholder, pagination 15, search shared, grid/list.
-- [ ] Staff: upload entry in tab header or FAB (role gated, no badge).
+- [x] Same design language: `BookCover` placeholder, pagination 15, search shared, grid/list.
+- [x] Staff upload entry: **Profile only** (catalog "Upload PDF" pill hidden; add physical/digital from Profile).
 
 **Reader / detail (14)**
-- [ ] Digital detail: cover, metadata, open/download with progress indicator.
-- [ ] Resume reading; progress bar; rating UI refresh (1-5).
-- [ ] Bookshelf: continue section aligned with Home.
+- [x] Digital detail: cover, metadata, open with progress; bookshelf-first (Add before Read).
+- [x] Resume reading; progress; reviews/NPS (see 9c).
+- [x] Bookshelf / continue reading aligned with Home.
 
-**Regression:** Upload (staff), open PDF, progress save, rating.
+**Regression:** Upload (staff via Profile), open PDF in reader, progress save, rating/reviews.
 
 **Git:** `feat(mobile): ebooks tab parity and reader polish`
 
@@ -252,7 +254,7 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 
 ## Phase 9b: In-app reader and smart progress (14 extended)
 
-**Status:** Implementation complete — QA on device recommended before Phase 10.
+**Status:** Parked (2026-08-24) — vertical + page modes, pinch zoom, landscape settings, quality, pan. Revisit only if new issues appear.
 
 **Goal:** Read PDFs inside the app; progress reflects actual reading, not scroll position.
 
@@ -273,12 +275,14 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 
 ## Phase 9c: Digital reviews and NPS (14 extended)
 
+**Status:** Largely done with digital detail work; confirm on device if anything left before Phase 10.
+
 **Goal:** Students rate and recommend books; peers can read reviews (collapsed by default).
 
 **Tasks**
-- [ ] API: reviews subcollection, aggregate summary, PUT own review (rating + NPS 0–10 + comment).
-- [ ] Mobile: review form on digital detail; expandable "Student reviews" list (names only).
-- [ ] Upload screen: themed, config-driven max PDF size, AppModal success/error.
+- [x] API: reviews subcollection, aggregate summary, PUT own review (rating + NPS + comment).
+- [x] Mobile: review form on digital detail; expandable reviews list.
+- [x] Upload screen: themed, config-driven max PDF size, AppModal success/error.
 
 **Regression:** Save review, expand list, other students see name + rating + recommend score.
 
@@ -287,6 +291,8 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 ---
 
 ## Phase 10: Profile and settings (15, 7, 5 toggle)
+
+**Status:** **Next** when you say start Phase 10. Do not begin until then.
 
 **Goal:** Profile is a settings hub, not a debug screen.
 

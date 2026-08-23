@@ -298,6 +298,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
               ) : null}
             </Pressable>
 
+            {/* Upload PDF lives under Profile for staff — keep catalog free of add-book CTAs
             {isStaff ? (
               <Pressable
                 onPress={() => navigation.navigate("UploadDigitalBook")}
@@ -319,6 +320,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
                 </Text>
               </Pressable>
             ) : null}
+            */}
           </View>
 
           <View style={styles.viewToggle}>
@@ -368,11 +370,12 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
                 title="No digital copies yet"
                 message={
                   isStaff
-                    ? "Upload a PDF to add the first digital copy."
+                    ? "Add digital books from Profile when you are ready."
                     : "Check back later for new uploads."
                 }
-                actionLabel={isStaff ? "Upload PDF" : undefined}
-                onAction={isStaff ? () => navigation.navigate("UploadDigitalBook") : undefined}
+                // Upload CTA removed from catalog — staff uploads from Profile
+                // actionLabel={isStaff ? "Upload PDF" : undefined}
+                // onAction={isStaff ? () => navigation.navigate("UploadDigitalBook") : undefined}
               />
             }
             renderItem={renderBook}
