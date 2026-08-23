@@ -14,6 +14,7 @@ import {
   parseListQuery,
   toMillis,
 } from "../utils/pagination";
+import { matchesTextQuery } from "../utils/textSearch";
 
 const router = Router();
 
@@ -317,9 +318,10 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
         return;
       }
 
+      // Load a broad set, then substring-match so "mock" finds "Mockingbird"
       const snapshot = await db
         .collection("catalog")
-        .where("searchKeywords", "array-contains-any", tokens)
+        .orderBy("title")
         .limit(LIST_FETCH_CAP)
         .get();
 
@@ -330,10 +332,23 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
             ...data,
             isActive: data.isActive !== false,
             availability: getAvailabilityLabel(data),
-          };
+          } as Record<string, unknown>;
         })
         .filter((row) => includeInactive || row.isActive !== false)
-        .filter((row) => matchesAvailabilityFilter(row, availability));
+        .filter((row) => matchesAvailabilityFilter(row, availability))
+        .filter((row) =>
+          matchesTextQuery(
+            {
+              title: String(row.title || ""),
+              authors: Array.isArray(row.authors) ? row.authors.map(String) : [],
+              isbn: String(row.isbn || ""),
+              searchKeywords: Array.isArray(row.searchKeywords)
+                ? row.searchKeywords.map(String)
+                : [],
+            },
+            q
+          )
+        );
 
       res.json(paginateArray(sortCatalogResults(results, sort), page, pageSize));
       return;

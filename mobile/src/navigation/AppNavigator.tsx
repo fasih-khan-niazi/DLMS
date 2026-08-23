@@ -24,6 +24,7 @@ import DigitalBookDetailScreen from "../screens/DigitalBookDetailScreen";
 import BookshelfScreen from "../screens/BookshelfScreen";
 import UploadDigitalBookScreen from "../screens/UploadDigitalBookScreen";
 import NotificationsScreen from "../screens/NotificationsScreen";
+import UnifiedSearchScreen from "../screens/UnifiedSearchScreen";
 
 const AuthStackNav = createNativeStackNavigator();
 const HomeStackNav = createNativeStackNavigator();
@@ -36,6 +37,10 @@ function HomeStackNavigator() {
     <HomeStackNav.Navigator screenOptions={{ headerShown: false }}>
       <HomeStackNav.Screen name="HomeMain" component={HomeScreen} />
       <HomeStackNav.Screen name="Notifications" component={NotificationsScreen} />
+      <HomeStackNav.Screen
+        name="UnifiedSearch"
+        component={UnifiedSearchScreen as React.ComponentType<any>}
+      />
     </HomeStackNav.Navigator>
   );
 }

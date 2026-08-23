@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   RefreshControl,
+  ScrollView,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -47,7 +48,7 @@ export default function CatalogScreen({
   initialQuery = "",
 }: Props) {
   const insets = useSafeAreaInsets();
-  const { colors, fontFamily, radius, space, type } = useTheme();
+  const { colors, fontFamily, space, type } = useTheme();
   const { isStaff } = useProfile();
 
   const [query, setQuery] = useState(initialQuery);
@@ -185,6 +186,7 @@ export default function CatalogScreen({
               fontSize: type.body,
               color: colors.navy,
             }}
+            numberOfLines={2}
           >
             {item.title}
           </Text>
@@ -195,11 +197,19 @@ export default function CatalogScreen({
               fontSize: type.small,
               color: colors.muted,
             }}
+            numberOfLines={1}
           >
             {(item.authors || []).join(", ") || "Unknown author"}
           </Text>
           {item.isActive === false ? (
-            <Text style={{ marginTop: 6, color: colors.danger, fontSize: type.caption, fontFamily: fontFamily.bodySemiBold }}>
+            <Text
+              style={{
+                marginTop: 6,
+                color: colors.danger,
+                fontSize: type.caption,
+                fontFamily: fontFamily.bodySemiBold,
+              }}
+            >
               Inactive
             </Text>
           ) : null}
@@ -239,76 +249,88 @@ export default function CatalogScreen({
       style={[
         styles.container,
         embedded ? styles.embedded : { paddingTop: insets.top + 12 },
+        { backgroundColor: colors.cream },
       ]}
     >
-      {!embedded ? (
-        <Text
-          style={{
-            fontFamily: fontFamily.display,
-            fontSize: type.title,
-            color: colors.navy,
-            marginBottom: space.sm,
-          }}
+      <View style={styles.controls}>
+        {!embedded ? (
+          <Text
+            style={{
+              fontFamily: fontFamily.display,
+              fontSize: type.title,
+              color: colors.navy,
+              marginBottom: space.sm,
+            }}
+          >
+            Catalog
+          </Text>
+        ) : null}
+
+        <SearchBar value={query} onChangeText={setQuery} onSearch={runSearch} />
+
+        <View style={styles.toolbar}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipScroll}
+          >
+            {sortChips.map((c) => (
+              <Chip
+                key={c.id}
+                label={c.label}
+                selected={sort === c.id}
+                onPress={() => applySort(c.id)}
+                style={{ marginRight: 8 }}
+              />
+            ))}
+          </ScrollView>
+          <View style={styles.viewToggle}>
+            <Pressable onPress={() => setViewMode("list")} hitSlop={8}>
+              <Ionicons
+                name="list"
+                size={22}
+                color={viewMode === "list" ? colors.navy : colors.muted}
+              />
+            </Pressable>
+            <Pressable onPress={() => setViewMode("grid")} hitSlop={8}>
+              <Ionicons
+                name="grid"
+                size={22}
+                color={viewMode === "grid" ? colors.navy : colors.muted}
+              />
+            </Pressable>
+          </View>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[styles.chipScroll, { paddingBottom: space.sm }]}
         >
-          Catalog
-        </Text>
-      ) : null}
-
-      <SearchBar value={query} onChangeText={setQuery} onSearch={runSearch} />
-
-      <View style={styles.toolbar}>
-        <View style={styles.chipRow}>
-          {sortChips.map((c) => (
+          {availabilityChips.map((c) => (
             <Chip
               key={c.id}
               label={c.label}
-              selected={sort === c.id}
-              onPress={() => applySort(c.id)}
-              style={{ marginRight: 6 }}
+              selected={availability === c.id}
+              onPress={() => applyAvailability(c.id)}
+              style={{ marginRight: 8 }}
             />
           ))}
-        </View>
-        <View style={styles.viewToggle}>
-          <Pressable onPress={() => setViewMode("list")} hitSlop={8}>
-            <Ionicons
-              name="list"
-              size={22}
-              color={viewMode === "list" ? colors.navy : colors.muted}
-            />
-          </Pressable>
-          <Pressable onPress={() => setViewMode("grid")} hitSlop={8}>
-            <Ionicons
-              name="grid"
-              size={22}
-              color={viewMode === "grid" ? colors.navy : colors.muted}
-            />
-          </Pressable>
-        </View>
+        </ScrollView>
       </View>
 
-      <View style={[styles.chipRow, { marginBottom: space.sm }]}>
-        {availabilityChips.map((c) => (
-          <Chip
-            key={c.id}
-            label={c.label}
-            selected={availability === c.id}
-            onPress={() => applyAvailability(c.id)}
-            style={{ marginRight: 6, marginBottom: 6 }}
-          />
-        ))}
-      </View>
-
-      {loading ? (
-        <SkeletonList rows={6} />
-      ) : (
-        <>
+      <View style={styles.listArea}>
+        {loading ? (
+          <SkeletonList rows={6} />
+        ) : (
           <FlatList
             key={viewMode}
+            style={styles.list}
             data={books}
             numColumns={viewMode === "grid" ? 2 : 1}
             keyExtractor={(item) => item.isbn}
             columnWrapperStyle={viewMode === "grid" ? styles.gridRow : undefined}
-            contentContainerStyle={{ paddingBottom: 12 }}
+            contentContainerStyle={{ paddingBottom: 16, flexGrow: 1 }}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -327,40 +349,40 @@ export default function CatalogScreen({
             }
             renderItem={renderBook}
           />
+        )}
+      </View>
 
-          {totalPages > 1 ? (
-            <View style={[styles.pagination, { borderTopColor: colors.border }]}>
-              <Pressable
-                onPress={() => changePage(page - 1)}
-                disabled={page <= 1}
-                style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
-              >
-                <Text style={{ fontFamily: fontFamily.bodySemiBold, color: colors.navy }}>
-                  Previous
-                </Text>
-              </Pressable>
-              <Text
-                style={{
-                  fontFamily: fontFamily.body,
-                  fontSize: type.small,
-                  color: colors.muted,
-                }}
-              >
-                Page {page} of {totalPages} · {total} titles
-              </Text>
-              <Pressable
-                onPress={() => changePage(page + 1)}
-                disabled={page >= totalPages}
-                style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
-              >
-                <Text style={{ fontFamily: fontFamily.bodySemiBold, color: colors.navy }}>
-                  Next
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </>
-      )}
+      {!loading && totalPages > 1 ? (
+        <View style={[styles.pagination, { borderTopColor: colors.border }]}>
+          <Pressable
+            onPress={() => changePage(page - 1)}
+            disabled={page <= 1}
+            style={[styles.pageBtn, page <= 1 && styles.pageBtnDisabled]}
+          >
+            <Text style={{ fontFamily: fontFamily.bodySemiBold, color: colors.navy }}>
+              Previous
+            </Text>
+          </Pressable>
+          <Text
+            style={{
+              fontFamily: fontFamily.body,
+              fontSize: type.small,
+              color: colors.muted,
+            }}
+          >
+            Page {page} of {totalPages} · {total} titles
+          </Text>
+          <Pressable
+            onPress={() => changePage(page + 1)}
+            disabled={page >= totalPages}
+            style={[styles.pageBtn, page >= totalPages && styles.pageBtnDisabled]}
+          >
+            <Text style={{ fontFamily: fontFamily.bodySemiBold, color: colors.navy }}>
+              Next
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -368,25 +390,34 @@ export default function CatalogScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F7F4",
     paddingHorizontal: 20,
   },
   embedded: { paddingTop: 0 },
+  controls: {
+    flexShrink: 0,
+    zIndex: 2,
+  },
   toolbar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4,
+    marginBottom: 8,
+    gap: 8,
   },
-  chipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    flex: 1,
+  chipScroll: {
+    alignItems: "center",
+    paddingRight: 4,
   },
   viewToggle: {
     flexDirection: "row",
-    gap: 10,
-    marginLeft: 8,
+    gap: 12,
+    flexShrink: 0,
+  },
+  listArea: {
+    flex: 1,
+    minHeight: 0,
+  },
+  list: {
+    flex: 1,
   },
   card: {
     borderRadius: 16,
@@ -396,8 +427,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
   },
-  cardBody: { flex: 1 },
-  badgeCol: { alignItems: "flex-end", justifyContent: "center" },
+  cardBody: { flex: 1, minWidth: 0 },
+  badgeCol: { alignItems: "flex-end", justifyContent: "center", flexShrink: 0 },
   gridRow: { gap: 10 },
   gridCard: {
     flex: 1,
@@ -408,6 +439,7 @@ const styles = StyleSheet.create({
     maxWidth: "48%",
   },
   pagination: {
+    flexShrink: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

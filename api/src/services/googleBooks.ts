@@ -71,5 +71,15 @@ export function buildSearchKeywords(input: {
     .split(/\s+/)
     .filter(Boolean);
 
-  return Array.from(new Set(raw));
+  const expanded = new Set<string>(raw);
+  for (const word of raw) {
+    // Prefixes so "mock" can hit "mockingbird" on keyword index too
+    if (word.length >= 4) {
+      for (let i = 3; i < word.length; i += 1) {
+        expanded.add(word.slice(0, i));
+      }
+    }
+  }
+
+  return Array.from(expanded);
 }

@@ -84,42 +84,57 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
   };
 
   return (
-    <View style={[styles.container, embedded && styles.embedded]}>
-      {!embedded ? (
-        <>
-          <Pressable onPress={() => navigation.goBack()}>
-            <Text style={{ color: colors.amberDark, marginBottom: 12, fontFamily: fontFamily.body }}>
-              ← Back
+    <View
+      style={[
+        styles.container,
+        embedded && styles.embedded,
+        { backgroundColor: colors.cream },
+      ]}
+    >
+      <View style={styles.controls}>
+        {!embedded ? (
+          <>
+            <Pressable onPress={() => navigation.goBack()}>
+              <Text
+                style={{
+                  color: colors.amberDark,
+                  marginBottom: 12,
+                  fontFamily: fontFamily.body,
+                }}
+              >
+                ← Back
+              </Text>
+            </Pressable>
+            <Text
+              style={{
+                fontFamily: fontFamily.display,
+                fontSize: type.title,
+                color: colors.navy,
+                marginBottom: space.md,
+              }}
+            >
+              Digital Copies
             </Text>
-          </Pressable>
-          <Text
-            style={{
-              fontFamily: fontFamily.display,
-              fontSize: type.title,
-              color: colors.navy,
-              marginBottom: space.md,
-            }}
-          >
-            Digital Copies
-          </Text>
-        </>
-      ) : null}
+          </>
+        ) : null}
 
-      <SearchBar
-        value={query}
-        onChangeText={setQuery}
-        onSearch={runSearch}
-        placeholder="Search digital copies"
-      />
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          onSearch={runSearch}
+          placeholder="Search digital copies"
+        />
+      </View>
 
-      {loading ? (
-        <SkeletonList rows={5} />
-      ) : (
-        <>
+      <View style={styles.listArea}>
+        {loading ? (
+          <SkeletonList rows={5} />
+        ) : (
           <FlatList
+            style={styles.list}
             data={books}
             keyExtractor={(item) => item.digitalBookId}
-            contentContainerStyle={{ paddingBottom: 12 }}
+            contentContainerStyle={{ paddingBottom: 12, flexGrow: 1 }}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -131,7 +146,10 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
               />
             }
             ListEmptyComponent={
-              <EmptyState title="No digital copies yet" message="Check back later for new uploads." />
+              <EmptyState
+                title="No digital copies yet"
+                message="Check back later for new uploads."
+              />
             }
             renderItem={({ item }) => (
               <Pressable
@@ -143,13 +161,14 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
                 }
               >
                 <BookCover width={52} height={72} />
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text
                     style={{
                       fontFamily: fontFamily.bodySemiBold,
                       fontSize: type.body,
                       color: colors.navy,
                     }}
+                    numberOfLines={2}
                   >
                     {item.title}
                   </Text>
@@ -179,34 +198,34 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
               </Pressable>
             )}
           />
+        )}
+      </View>
 
-          {totalPages > 1 ? (
-            <View style={[styles.pagination, { borderTopColor: colors.border }]}>
-              <Pressable
-                onPress={() => changePage(page - 1)}
-                disabled={page <= 1}
-                style={{ opacity: page <= 1 ? 0.35 : 1 }}
-              >
-                <Text style={{ fontFamily: fontFamily.bodySemiBold, color: colors.navy }}>
-                  Previous
-                </Text>
-              </Pressable>
-              <Text style={{ fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
-                Page {page} of {totalPages}
-              </Text>
-              <Pressable
-                onPress={() => changePage(page + 1)}
-                disabled={page >= totalPages}
-                style={{ opacity: page >= totalPages ? 0.35 : 1 }}
-              >
-                <Text style={{ fontFamily: fontFamily.bodySemiBold, color: colors.navy }}>
-                  Next
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </>
-      )}
+      {!loading && totalPages > 1 ? (
+        <View style={[styles.pagination, { borderTopColor: colors.border }]}>
+          <Pressable
+            onPress={() => changePage(page - 1)}
+            disabled={page <= 1}
+            style={{ opacity: page <= 1 ? 0.35 : 1 }}
+          >
+            <Text style={{ fontFamily: fontFamily.bodySemiBold, color: colors.navy }}>
+              Previous
+            </Text>
+          </Pressable>
+          <Text style={{ fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
+            Page {page} of {totalPages}
+          </Text>
+          <Pressable
+            onPress={() => changePage(page + 1)}
+            disabled={page >= totalPages}
+            style={{ opacity: page >= totalPages ? 0.35 : 1 }}
+          >
+            <Text style={{ fontFamily: fontFamily.bodySemiBold, color: colors.navy }}>
+              Next
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -214,11 +233,13 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F7F4",
     paddingTop: 56,
     paddingHorizontal: 20,
   },
   embedded: { paddingTop: 0 },
+  controls: { flexShrink: 0 },
+  listArea: { flex: 1, minHeight: 0 },
+  list: { flex: 1 },
   card: {
     flexDirection: "row",
     gap: 12,
@@ -228,6 +249,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   pagination: {
+    flexShrink: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

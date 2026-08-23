@@ -15,7 +15,10 @@ type Props = {
   onChangeText: (text: string) => void;
   onSearch: (query: string) => void;
   placeholder?: string;
+  hint?: string;
   debounceMs?: number;
+  /** When false, only search on submit (good for Home navigate). Default true. */
+  searchOnDebounce?: boolean;
   showRecent?: boolean;
   showHint?: boolean;
 };
@@ -25,7 +28,9 @@ export function SearchBar({
   onChangeText,
   onSearch,
   placeholder = "Search title, author, or ISBN",
+  hint,
   debounceMs = 400,
+  searchOnDebounce = true,
   showRecent = true,
   showHint = true,
 }: Props) {
@@ -45,6 +50,7 @@ export function SearchBar({
   }, [showRecent, loadRecent]);
 
   useEffect(() => {
+    if (!searchOnDebounce) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       onSearchRef.current(value.trim());
@@ -52,7 +58,7 @@ export function SearchBar({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [value, debounceMs]);
+  }, [value, debounceMs, searchOnDebounce]);
 
   const submit = async (q: string) => {
     const trimmed = q.trim();
@@ -64,6 +70,11 @@ export function SearchBar({
   };
 
   const isbnHint = value.trim() && looksLikeIsbn(value);
+  const hintText =
+    hint ||
+    (isbnHint
+      ? "ISBN detected. Matching exact code."
+      : "Search by title, author, or ISBN.");
 
   return (
     <View style={styles.wrap}>
@@ -85,9 +96,7 @@ export function SearchBar({
             color: colors.muted,
           }}
         >
-          {isbnHint
-            ? "ISBN detected. We will match this code exactly."
-            : "One search for title, author, or ISBN."}
+          {hintText}
         </Text>
       ) : null}
 

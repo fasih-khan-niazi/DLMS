@@ -20,6 +20,7 @@ import {
   parseListQuery,
   toMillis,
 } from "../utils/pagination";
+import { matchesTextQuery } from "../utils/textSearch";
 
 const router = Router();
 
@@ -61,10 +62,10 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
         res.json(paginateArray([], page, pageSize));
         return;
       }
+      // Broad fetch + substring match ("mock" → "Mockingbird")
       snap = await db
         .collection("digitalBooks")
         .where("isPublished", "==", true)
-        .where("searchKeywords", "array-contains-any", tokens)
         .limit(LIST_FETCH_CAP)
         .get();
     } else {
@@ -75,7 +76,7 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
         .get();
     }
 
-    const results = snap.docs.map((doc) => {
+    let results: Record<string, unknown>[] = snap.docs.map((doc) => {
       const data = doc.data();
       return {
         ...data,
@@ -83,6 +84,21 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
         fileUrl: publicFileUrl(req, data.digitalBookId || doc.id),
       };
     });
+
+    if (q) {
+      results = results.filter((row) =>
+        matchesTextQuery(
+          {
+            title: String(row.title || ""),
+            author: String(row.author || ""),
+            searchKeywords: Array.isArray(row.searchKeywords)
+              ? row.searchKeywords.map(String)
+              : [],
+          },
+          q
+        )
+      );
+    }
 
     res.json(paginateArray(sortDigitalBooks(results, sort), page, pageSize));
   } catch (error) {

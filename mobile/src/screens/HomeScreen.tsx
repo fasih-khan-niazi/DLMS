@@ -68,13 +68,9 @@ export default function HomeScreen({ navigation }: Props) {
     profile?.displayName || firebaseAuth.currentUser?.displayName || "there";
 
   const openCatalogSearch = (query: string) => {
-    navigation.getParent()?.navigate("Catalog", {
-      screen: "CatalogMain",
-      params: {
-        initialTab: "physicalCopies",
-        searchQuery: query.trim(),
-      },
-    });
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    navigation.navigate("UnifiedSearch", { query: trimmed });
   };
 
   return (
@@ -154,7 +150,10 @@ export default function HomeScreen({ navigation }: Props) {
           value={quickSearch}
           onChangeText={setQuickSearch}
           onSearch={openCatalogSearch}
+          searchOnDebounce={false}
           showRecent
+          hint="Searches physical and digital copies."
+          placeholder="Search the library"
         />
       </View>
 
