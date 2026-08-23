@@ -40,7 +40,7 @@ type Props = {
 };
 
 const SAVE_INTERVAL_MS = 15000;
-const ZOOM_PILLS = [50, 75, 100, 110, 125, 150, 175, 200];
+const ZOOM_PILLS = [50, 75, 100, 110, 125, 150, 175, 200, 225, 250];
 
 async function applyOrientation(lock: ReaderPrefs["orientation"]) {
   if (lock === "landscape") {
@@ -405,14 +405,9 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
                       </View>
                     </View>
                   </View>
-                  <View style={{ justifyContent: "flex-end", paddingBottom: 2 }}>
-                    <Button
-                      title="Reset All"
-                      variant="secondary"
-                      fullWidth={false}
-                      onPress={resetAllDraft}
-                      style={{ paddingHorizontal: 14, paddingVertical: 8, minHeight: 36 }}
-                    />
+                  <View style={{ flexShrink: 0 }}>
+                    <Text style={labelStyle(fontFamily, type, colors, 0)}>Reset</Text>
+                    <Chip label="Reset All" onPress={resetAllDraft} />
                   </View>
                 </View>
                 {(landscapeDraft || pageModeDraft) && (
