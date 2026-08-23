@@ -6,7 +6,7 @@ import {
   Pressable,
   StyleSheet,
   RefreshControl,
-  ScrollView,
+  Modal,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,7 +16,7 @@ import api from "../config/api";
 import { SearchBar } from "../components/SearchBar";
 import { SkeletonList } from "../components/Skeleton";
 import { EmptyState } from "../components/EmptyState";
-import { BookCover, Badge, Chip } from "../components/ui";
+import { BookCover, Badge, Button, Chip } from "../components/ui";
 import { useProfile } from "../context/ProfileContext";
 import { PAGE_SIZE, type PaginatedResponse } from "../types/pagination";
 import { useTheme } from "../theme";
@@ -48,7 +48,7 @@ export default function CatalogScreen({
   initialQuery = "",
 }: Props) {
   const insets = useSafeAreaInsets();
-  const { colors, fontFamily, space, type } = useTheme();
+  const { colors, fontFamily, radius, space, type } = useTheme();
   const { isStaff } = useProfile();
 
   const [query, setQuery] = useState(initialQuery);
@@ -61,6 +61,11 @@ export default function CatalogScreen({
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [sort, setSort] = useState<SortOption>("title_asc");
   const [availability, setAvailability] = useState<AvailabilityFilter>("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [draftSort, setDraftSort] = useState<SortOption>("title_asc");
+  const [draftAvailability, setDraftAvailability] = useState<AvailabilityFilter>("all");
+
+  const filtersActive = sort !== "title_asc" || availability !== "all";
 
   useEffect(() => {
     if (initialQuery) setQuery(initialQuery);
@@ -128,18 +133,29 @@ export default function CatalogScreen({
     loadBooks({ pageNum: next });
   };
 
-  const applySort = (next: SortOption) => {
-    setSort(next);
-    setLoading(true);
-    setPage(1);
-    loadBooks({ sortBy: next, pageNum: 1 });
+  const openFilters = () => {
+    setDraftSort(sort);
+    setDraftAvailability(availability);
+    setFiltersOpen(true);
   };
 
-  const applyAvailability = (next: AvailabilityFilter) => {
-    setAvailability(next);
+  const applyFilters = () => {
+    setFiltersOpen(false);
+    if (draftSort === sort && draftAvailability === availability) return;
+    setSort(draftSort);
+    setAvailability(draftAvailability);
     setLoading(true);
     setPage(1);
-    loadBooks({ availabilityFilter: next, pageNum: 1 });
+    loadBooks({
+      sortBy: draftSort,
+      availabilityFilter: draftAvailability,
+      pageNum: 1,
+    });
+  };
+
+  const resetFilters = () => {
+    setDraftSort("title_asc");
+    setDraftAvailability("all");
   };
 
   const renderBook = ({ item }: { item: CatalogBook }) => {
@@ -269,21 +285,40 @@ export default function CatalogScreen({
         <SearchBar value={query} onChangeText={setQuery} onSearch={runSearch} />
 
         <View style={styles.toolbar}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chipScroll}
+          <Pressable
+            onPress={openFilters}
+            style={[
+              styles.filtersBtn,
+              {
+                backgroundColor: colors.white,
+                borderColor: filtersActive ? colors.navy : colors.border,
+              },
+            ]}
           >
-            {sortChips.map((c) => (
-              <Chip
-                key={c.id}
-                label={c.label}
-                selected={sort === c.id}
-                onPress={() => applySort(c.id)}
-                style={{ marginRight: 8 }}
+            <Ionicons name="options-outline" size={18} color={colors.navy} />
+            <Text
+              style={{
+                marginLeft: 6,
+                fontFamily: fontFamily.bodySemiBold,
+                fontSize: type.small,
+                color: colors.navy,
+              }}
+            >
+              Filters
+            </Text>
+            {filtersActive ? (
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: colors.amber,
+                  marginLeft: 6,
+                }}
               />
-            ))}
-          </ScrollView>
+            ) : null}
+          </Pressable>
+
           <View style={styles.viewToggle}>
             <Pressable onPress={() => setViewMode("list")} hitSlop={8}>
               <Ionicons
@@ -301,22 +336,6 @@ export default function CatalogScreen({
             </Pressable>
           </View>
         </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[styles.chipScroll, { paddingBottom: space.sm }]}
-        >
-          {availabilityChips.map((c) => (
-            <Chip
-              key={c.id}
-              label={c.label}
-              selected={availability === c.id}
-              onPress={() => applyAvailability(c.id)}
-              style={{ marginRight: 8 }}
-            />
-          ))}
-        </ScrollView>
       </View>
 
       <View style={styles.listArea}>
@@ -383,6 +402,83 @@ export default function CatalogScreen({
           </Pressable>
         </View>
       ) : null}
+
+      <Modal visible={filtersOpen} transparent animationType="fade" onRequestClose={() => setFiltersOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setFiltersOpen(false)}>
+          <Pressable
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: colors.cream,
+                borderRadius: radius.lg,
+                marginBottom: insets.bottom + 16,
+              },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text
+              style={{
+                fontFamily: fontFamily.display,
+                fontSize: type.titleSm,
+                color: colors.navy,
+                marginBottom: space.md,
+              }}
+            >
+              Filters
+            </Text>
+
+            <Text
+              style={{
+                fontFamily: fontFamily.bodySemiBold,
+                fontSize: type.small,
+                color: colors.navy,
+                marginBottom: space.sm,
+              }}
+            >
+              Sort by
+            </Text>
+            <View style={styles.chipWrap}>
+              {sortChips.map((c) => (
+                <Chip
+                  key={c.id}
+                  label={c.label}
+                  selected={draftSort === c.id}
+                  onPress={() => setDraftSort(c.id)}
+                  style={styles.chipItem}
+                />
+              ))}
+            </View>
+
+            <Text
+              style={{
+                fontFamily: fontFamily.bodySemiBold,
+                fontSize: type.small,
+                color: colors.navy,
+                marginTop: space.md,
+                marginBottom: space.sm,
+              }}
+            >
+              Availability
+            </Text>
+            <View style={styles.chipWrap}>
+              {availabilityChips.map((c) => (
+                <Chip
+                  key={c.id}
+                  label={c.label}
+                  selected={draftAvailability === c.id}
+                  onPress={() => setDraftAvailability(c.id)}
+                  style={styles.chipItem}
+                />
+              ))}
+            </View>
+
+            <View style={{ marginTop: space.lg, gap: space.sm }}>
+              <Button title="Apply filters" onPress={applyFilters} />
+              <Button title="Reset" variant="ghost" onPress={resetFilters} />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -400,12 +496,17 @@ const styles = StyleSheet.create({
   toolbar: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
-    gap: 8,
+    justifyContent: "space-between",
+    marginBottom: 12,
+    gap: 12,
   },
-  chipScroll: {
+  filtersBtn: {
+    flexDirection: "row",
     alignItems: "center",
-    paddingRight: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
   },
   viewToggle: {
     flexDirection: "row",
@@ -451,4 +552,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   pageBtnDisabled: { opacity: 0.35 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(46, 74, 98, 0.45)",
+    justifyContent: "flex-end",
+    paddingHorizontal: 20,
+  },
+  modalCard: {
+    padding: 20,
+  },
+  chipWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  chipItem: {
+    marginBottom: 0,
+  },
 });
