@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useMemo, type ReactNode } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import {
   useFonts,
@@ -9,10 +17,21 @@ import {
 } from "@expo-google-fonts/poppins";
 import * as SplashScreen from "expo-splash-screen";
 import { lightTheme, type AppTheme } from "./lightTheme";
+import { darkTheme } from "./darkTheme";
+import { getStoredThemeMode, setStoredThemeMode, type ThemeMode } from "../utils/themePrefs";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-const ThemeContext = createContext<AppTheme>(lightTheme);
+type ThemeContextValue = AppTheme & {
+  setMode: (mode: ThemeMode) => void;
+  toggleDark: () => void;
+};
+
+const ThemeContext = createContext<ThemeContextValue>({
+  ...lightTheme,
+  setMode: () => {},
+  toggleDark: () => {},
+});
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [loaded] = useFonts({
@@ -21,18 +40,44 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     Poppins_600SemiBold,
     Poppins_700Bold,
   });
+  const [mode, setModeState] = useState<ThemeMode>("light");
+  const [ready, setReady] = useState(false);
 
-  React.useEffect(() => {
-    if (loaded) {
+  useEffect(() => {
+    void (async () => {
+      const stored = await getStoredThemeMode();
+      setModeState(stored);
+      setReady(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (loaded && ready) {
       SplashScreen.hideAsync().catch(() => {});
     }
-  }, [loaded]);
+  }, [loaded, ready]);
 
-  const value = useMemo(() => lightTheme, []);
+  const setMode = useCallback((next: ThemeMode) => {
+    setModeState(next);
+    void setStoredThemeMode(next);
+  }, []);
 
-  if (!loaded) {
+  const toggleDark = useCallback(() => {
+    setModeState((prev) => {
+      const next: ThemeMode = prev === "dark" ? "light" : "dark";
+      void setStoredThemeMode(next);
+      return next;
+    });
+  }, []);
+
+  const value = useMemo<ThemeContextValue>(() => {
+    const base = mode === "dark" ? darkTheme : lightTheme;
+    return { ...base, setMode, toggleDark };
+  }, [mode, setMode, toggleDark]);
+
+  if (!loaded || !ready) {
     return (
-      <View style={styles.boot}>
+      <View style={[styles.boot, { backgroundColor: lightTheme.colors.cream }]}>
         <ActivityIndicator size="large" color={lightTheme.colors.navy} />
       </View>
     );
@@ -50,6 +95,5 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: lightTheme.colors.cream,
   },
 });

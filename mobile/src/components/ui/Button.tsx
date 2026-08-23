@@ -31,17 +31,24 @@ export function Button({
   style,
   ...rest
 }: Props) {
-  const { colors, radius, fontFamily, type } = useTheme();
+  const { colors, radius, fontFamily, type, mode } = useTheme();
   const isDisabled = disabled || loading;
+  const isDark = mode === "dark";
 
   const palette: Record<Variant, { bg: string; text: string; border?: string }> = {
-    primary: { bg: colors.navy, text: colors.white },
+    primary: isDark
+      ? { bg: colors.amber, text: "#1A2834" }
+      : { bg: colors.navy, text: "#FFFFFF" },
     secondary: { bg: colors.white, text: colors.navy, border: colors.border },
     ghost: { bg: "transparent", text: colors.navy },
-    danger: { bg: colors.danger, text: colors.white },
-    dangerSoft: { bg: "#FEE4E2", text: colors.danger, border: "#FECACA" },
-    successSoft: { bg: "#E8F5EC", text: colors.success, border: "#BBF7D0" },
-    amber: { bg: colors.amber, text: colors.navy },
+    danger: { bg: colors.danger, text: "#FFFFFF" },
+    dangerSoft: isDark
+      ? { bg: "#3A2424", text: colors.danger, border: "#5C3030" }
+      : { bg: "#FEE4E2", text: colors.danger, border: "#FECACA" },
+    successSoft: isDark
+      ? { bg: "#1F3A2A", text: colors.success, border: "#2F5A40" }
+      : { bg: "#E8F5EC", text: colors.success, border: "#BBF7D0" },
+    amber: { bg: colors.amber, text: isDark ? "#1A2834" : colors.navy },
   };
   const p = palette[variant];
 

@@ -292,19 +292,19 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 
 ## Phase 10: Profile and settings (15, 7, 5 toggle)
 
-**Status:** **Next** when you say start Phase 10. Do not begin until then.
+**Status:** Implemented (2026-08-24). Dark palette polish continues in Phase 14.
 
 **Goal:** Profile is a settings hub, not a debug screen.
 
 **Tasks**
-- [ ] Sections: Account (name, email), Library stats (loans, fines), Preferences, Support.
-- [ ] **Preferences:** Dark mode toggle (5), notification settings placeholder if needed.
-- [ ] Staff section: Add physical book, Upload PDF, Print labels help (links to flows).
-- [ ] Logout, app version.
-- [ ] **No** role line, **no** API URL.
-- [ ] **Deferred:** profile photo upload (future sub-phase).
+- [x] Sections: Account (name, email), Library stats (loans, fines), Preferences, Support.
+- [x] **Preferences:** Dark mode toggle (persisted), Notifications inbox link, Bookshelf.
+- [x] Staff section: Add physical book, Upload PDF, Print shelf labels help.
+- [x] Logout, app version.
+- [x] **No** role line, **no** API URL.
+- [x] **Deferred:** profile photo upload (future sub-phase).
 
-**Regression:** Logout/login; staff tools still reachable.
+**Regression:** Logout/login; staff tools still reachable; dark mode persists across relaunch.
 
 **Git:** `feat(mobile): profile settings hub and dark mode toggle`
 

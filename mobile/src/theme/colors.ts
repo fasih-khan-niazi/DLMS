@@ -18,4 +18,43 @@ export const lightColors = {
   bookPlaceholderIcon: "#8FA3B8",
 } as const;
 
-export type ThemeColors = typeof lightColors;
+/** Navy-tinted dark palette — refined further in Phase 14. */
+export const darkColors = {
+  navy: "#D7E4F0",
+  navyDark: "#A8BDD0",
+  cream: "#1A2834",
+  creamDark: "#141F28",
+  amber: "#E8A838",
+  amberDark: "#F0C05A",
+  text: "#E8EDF2",
+  muted: "#9AA8B5",
+  border: "#2F4050",
+  white: "#243444",
+  danger: "#F97066",
+  success: "#3DD68C",
+  warning: "#F5A524",
+  overlay: "rgba(0, 0, 0, 0.4)",
+  heroText: "rgba(255,255,255,0.82)",
+  bookPlaceholderBg: "#2A3A4A",
+  bookPlaceholderIcon: "#8FA3B8",
+} as const;
+
+export type ThemeColors = {
+  navy: string;
+  navyDark: string;
+  cream: string;
+  creamDark: string;
+  amber: string;
+  amberDark: string;
+  text: string;
+  muted: string;
+  border: string;
+  white: string;
+  danger: string;
+  success: string;
+  warning: string;
+  overlay: string;
+  heroText: string;
+  bookPlaceholderBg: string;
+  bookPlaceholderIcon: string;
+};

@@ -9,7 +9,7 @@ import { onAuthStateChanged, User } from "firebase/auth";
 import { firebaseAuth } from "../config/firebase";
 import { registerForPushNotifications } from "../utils/notifications";
 import { ProfileProvider } from "../context/ProfileContext";
-import { colors } from "../theme";
+import { useTheme } from "../theme";
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
@@ -89,6 +89,7 @@ function ProfileStackNavigator() {
 function MainTabs() {
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 8);
+  const { colors, mode } = useTheme();
 
   return (
     <ProfileProvider>
@@ -96,8 +97,8 @@ function MainTabs() {
         detachInactiveScreens={true}
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: colors.navy,
-          tabBarInactiveTintColor: "#9CA3AF",
+          tabBarActiveTintColor: mode === "dark" ? colors.amber : colors.navy,
+          tabBarInactiveTintColor: colors.muted,
           tabBarLabelStyle: {
             fontSize: 11,
             fontWeight: "700",
@@ -172,6 +173,7 @@ function MainTabs() {
 export default function AppNavigator() {
   const [user, setUser] = useState<User | null>(null);
   const [initializing, setInitializing] = useState(true);
+  const { colors } = useTheme();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(firebaseAuth, (u) => {
@@ -185,7 +187,7 @@ export default function AppNavigator() {
   }, []);
 
   if (initializing) {
-    return <View style={styles.boot} />;
+    return <View style={[styles.boot, { backgroundColor: colors.cream }]} />;
   }
 
   return (
@@ -207,5 +209,5 @@ export default function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  boot: { flex: 1, backgroundColor: colors.cream },
+  boot: { flex: 1 },
 });

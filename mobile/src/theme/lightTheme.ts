@@ -1,11 +1,21 @@
-import { lightColors } from "./colors";
+import { lightColors, type ThemeColors } from "./colors";
 import { radius } from "./radius";
 import { shadows } from "./shadows";
 import { space } from "./spacing";
 import { fontFamily, type } from "./typography";
 
-export const lightTheme = {
-  mode: "light" as const,
+export type AppTheme = {
+  mode: "light" | "dark";
+  colors: ThemeColors;
+  space: typeof space;
+  radius: typeof radius;
+  shadows: typeof shadows;
+  fontFamily: typeof fontFamily;
+  type: typeof type;
+};
+
+export const lightTheme: AppTheme = {
+  mode: "light",
   colors: lightColors,
   space,
   radius,
@@ -13,5 +23,3 @@ export const lightTheme = {
   fontFamily,
   type,
 };
-
-export type AppTheme = typeof lightTheme;
