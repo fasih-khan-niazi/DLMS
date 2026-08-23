@@ -190,7 +190,8 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
         const progress = Number(shelf?.progress ?? 0);
         switch (shelfFilter) {
           case "saved":
-            return !!shelf;
+            // On bookshelf but not started reading yet
+            return !!shelf && progress <= 0;
           case "reading":
             return !!shelf && progress > 0 && progress < 100;
           case "unread":
