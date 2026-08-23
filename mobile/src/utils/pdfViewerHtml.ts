@@ -37,28 +37,26 @@ export function buildPdfViewerHtml(input: {
   }
   body.page-mode #scrollWrap { bottom: 72px; }
   #pagesRoot {
-    padding: 12px 8px 40px;
+    padding: 12px 0 40px;
     min-height: 100%;
     min-width: 100%;
     width: max-content;
-    transform-origin: 0 0;
     will-change: transform;
   }
   body.page-mode #pagesRoot {
     padding: 0; height: 100%; min-height: 100%;
     width: 100%; min-width: 100%;
-    transform-origin: 0 0;
   }
   .pageSlot {
-    display: flex; align-items: flex-start; justify-content: flex-start;
-    padding: 10px 0;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 10px 8px;
     min-width: 100%;
     width: max-content;
     box-sizing: border-box;
   }
   body.page-mode .pageSlot {
     display: none; height: 100%; width: 100%; min-width: 100%;
-    align-items: flex-start; justify-content: flex-start;
+    align-items: center; justify-content: center;
     overflow: auto; -webkit-overflow-scrolling: touch;
     touch-action: pan-x pan-y;
     padding: 8px;
@@ -66,7 +64,6 @@ export function buildPdfViewerHtml(input: {
   body.page-mode .pageSlot.active { display: flex; }
   .pageInner {
     display: inline-block;
-    transform-origin: 0 0;
     will-change: transform;
   }
   canvas {
@@ -132,10 +129,12 @@ export function buildPdfViewerHtml(input: {
   var pinchStartDist = 0;
   var pinchStartZoom = 1;
   var pinchActive = false;
-  var pinchCX = 0;
-  var pinchCY = 0;
-  var pinchViewX = 0;
-  var pinchViewY = 0;
+  var focusPage = startPage;
+  var focusFracX = 0.5;
+  var focusFracY = 0.5;
+  var focusScreenX = 0;
+  var focusScreenY = 0;
+  var focusInner = null;
   var liveZoom = zoom;
   var scrollRaf = 0;
   var commitTimer = 0;
@@ -160,10 +159,9 @@ export function buildPdfViewerHtml(input: {
   }
 
   function clearLivePreview() {
-    var root = document.getElementById('pagesRoot');
-    root.style.transform = '';
     document.querySelectorAll('.pageInner').forEach(function (el) {
       el.style.transform = '';
+      el.style.transformOrigin = '';
     });
   }
 
@@ -172,20 +170,81 @@ export function buildPdfViewerHtml(input: {
     return document.getElementById('scrollWrap');
   }
 
+  function pageCanvas(num) {
+    return document.querySelector('.pageSlot[data-page="' + num + '"] canvas');
+  }
+
+  function canvasAtPoint(mx, my) {
+    var nodes = document.querySelectorAll('.pageSlot canvas');
+    for (var i = 0; i < nodes.length; i++) {
+      var r = nodes[i].getBoundingClientRect();
+      if (mx >= r.left && mx <= r.right && my >= r.top && my <= r.bottom) return nodes[i];
+    }
+    return pageCanvas(pageNum);
+  }
+
+  /** Remember a point on a page (0–1 fractions) that should stay under a screen position. */
+  function setFocusFromScreen(mx, my, canvas) {
+    if (!canvas) {
+      focusFracX = 0.5;
+      focusFracY = 0.5;
+      focusPage = pageNum;
+      focusScreenX = mx;
+      focusScreenY = my;
+      focusInner = null;
+      return;
+    }
+    var r = canvas.getBoundingClientRect();
+    var slot = canvas.closest('.pageSlot');
+    focusPage = slot ? Number(slot.dataset.page) || pageNum : pageNum;
+    focusFracX = r.width ? (mx - r.left) / r.width : 0.5;
+    focusFracY = r.height ? (my - r.top) / r.height : 0.5;
+    focusFracX = Math.min(1, Math.max(0, focusFracX));
+    focusFracY = Math.min(1, Math.max(0, focusFracY));
+    focusScreenX = mx;
+    focusScreenY = my;
+    focusInner = canvas.parentElement;
+  }
+
+  function setFocusPageCenter(num) {
+    var canvas = pageCanvas(num || pageNum);
+    focusPage = num || pageNum;
+    focusFracX = 0.5;
+    focusFracY = 0.5;
+    focusInner = canvas ? canvas.parentElement : null;
+    if (canvas) {
+      var r = canvas.getBoundingClientRect();
+      focusScreenX = r.left + r.width / 2;
+      focusScreenY = r.top + r.height / 2;
+    } else {
+      var el = scroller();
+      var rect = el ? el.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+      focusScreenX = rect.left + rect.width / 2;
+      focusScreenY = rect.top + rect.height / 2;
+    }
+  }
+
+  /** After re-render, move scroll so the focused page point sits under focusScreen. */
+  function pinFocusToScreen() {
+    var canvas = pageCanvas(focusPage);
+    var el = scroller();
+    if (!canvas || !el) return;
+    var r = canvas.getBoundingClientRect();
+    var atX = r.left + focusFracX * r.width;
+    var atY = r.top + focusFracY * r.height;
+    el.scrollLeft += (atX - focusScreenX);
+    el.scrollTop += (atY - focusScreenY);
+  }
+
   function applyLivePreview(z) {
     liveZoom = clampZoom(z);
     var factor = liveZoom / zoom;
-    if (readMode === 'scroll') {
-      var root = document.getElementById('pagesRoot');
-      root.style.transformOrigin = pinchCX + 'px ' + pinchCY + 'px';
-      root.style.transform = 'scale(' + factor + ')';
-    } else {
-      var slot = scroller();
-      var inner = slot && slot.querySelector('.pageInner');
-      if (!inner) return;
-      inner.style.transformOrigin = (pinchCX - inner.offsetLeft) + 'px ' + (pinchCY - inner.offsetTop) + 'px';
-      inner.style.transform = 'scale(' + factor + ')';
-    }
+    var inner = focusInner || (pageCanvas(focusPage) && pageCanvas(focusPage).parentElement);
+    if (!inner) return;
+    var w = inner.offsetWidth || 1;
+    var h = inner.offsetHeight || 1;
+    inner.style.transformOrigin = (focusFracX * w) + 'px ' + (focusFracY * h) + 'px';
+    inner.style.transform = 'scale(' + factor + ')';
   }
 
   function updateBar() {
@@ -201,9 +260,8 @@ export function buildPdfViewerHtml(input: {
     post('page', { page: pageNum, total: totalPages });
   }
 
-  function alignSlot(slot, cssW) {
-    // Always left-align so zoom/scroll math stays stable (no center→left jump)
-    slot.style.justifyContent = 'flex-start';
+  function alignSlot(slot) {
+    slot.style.justifyContent = 'center';
   }
 
   async function renderPage(num, force) {
@@ -212,7 +270,7 @@ export function buildPdfViewerHtml(input: {
     if (!slot) return;
     var zoomKey = Math.round(zoom * 100);
     if (!force && renderedAt[num] === zoomKey && slot.querySelector('canvas')) {
-      alignSlot(slot, slot.querySelector('canvas').clientWidth);
+      alignSlot(slot);
       return;
     }
 
@@ -221,7 +279,6 @@ export function buildPdfViewerHtml(input: {
       var page = await pdfDoc.getPage(num);
       var base = page.getViewport({ scale: 1 });
       var fit = fitBaseScale();
-      // Fit to screen at 100% zoom; allow higher ceiling so text stays sharp on phones
       var fitScale = Math.min(fit.maxW / base.width, fit.maxH / base.height, 3.5);
       fitScale = Math.max(fitScale, 0.55);
       var pixelRatio = dpr();
@@ -253,12 +310,12 @@ export function buildPdfViewerHtml(input: {
 
       await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
-      // Swap only after paint so we never flash an empty/black slot
       var prev = slot.querySelector('.pageInner');
       if (prev) slot.replaceChild(inner, prev);
       else slot.appendChild(inner);
-      alignSlot(slot, cssW);
+      alignSlot(slot);
       renderedAt[num] = zoomKey;
+      if (num === focusPage) focusInner = inner;
     } finally {
       rendering[num] = false;
     }
@@ -293,11 +350,11 @@ export function buildPdfViewerHtml(input: {
 
   function renderVisible(force) {
     if (readMode === 'page') {
-      renderPage(pageNum, force);
-      return;
+      return Promise.resolve(renderPage(pageNum, force));
     }
     var range = visibleRange();
-    for (var n = range.first; n <= range.last; n++) renderPage(n, force);
+    var jobs = [];
+    for (var n = range.first; n <= range.last; n++) jobs.push(renderPage(n, force));
     var h = cssPageHeight();
     var wrap = document.getElementById('scrollWrap');
     var mid = Math.min(totalPages, Math.max(1, Math.round((wrap.scrollTop + wrap.clientHeight * 0.35) / h) + 1));
@@ -305,6 +362,7 @@ export function buildPdfViewerHtml(input: {
       pageNum = mid;
       notifyPage();
     }
+    return Promise.all(jobs);
   }
 
   function enableFreePan(opts) {
@@ -313,31 +371,25 @@ export function buildPdfViewerHtml(input: {
     if (!el) return;
     if (opts.resetPage && readMode === 'scroll') {
       el.scrollTop = (pageNum - 1) * cssPageHeight();
-      el.scrollLeft = 0;
     }
-    if (opts.resetOrigin && readMode === 'page') {
-      el.scrollLeft = 0;
-      el.scrollTop = 0;
+    if (opts.resetOrigin) {
+      // Keep horizontal centering — only reset vertical for page mode
+      if (readMode === 'page') el.scrollTop = 0;
     }
-  }
-
-  /** Keep the same content point under the fingers after zoom changes size. */
-  function scrollToPinchFocus(oldZoom, newZoom, viewX, viewY) {
-    var el = scroller();
-    if (!el) return;
-    var ratio = newZoom / oldZoom;
-    el.scrollLeft = Math.max(0, pinchCX * ratio - viewX);
-    el.scrollTop = Math.max(0, pinchCY * ratio - viewY);
   }
 
   function commitZoom(next, opts) {
     opts = opts || {};
-    var oldZoom = zoom;
     var target = clampZoom(next);
-    if (Math.abs(target - oldZoom) < 0.001 && !opts.force) {
+    if (Math.abs(target - zoom) < 0.001 && !opts.force) {
       clearLivePreview();
       liveZoom = zoom;
       return;
+    }
+
+    // Pill / settings zoom: grow around the center of the current page
+    if (!opts.fromPinch) {
+      setFocusPageCenter(pageNum);
     }
 
     zoom = target;
@@ -350,19 +402,15 @@ export function buildPdfViewerHtml(input: {
       });
     }
 
-    clearLivePreview();
-
-    if (opts.fromPinch) {
-      scrollToPinchFocus(oldZoom, zoom, pinchViewX, pinchViewY);
-      renderVisible(true);
-    } else if (opts.keepPage) {
-      if (readMode === 'scroll') enableFreePan({ resetPage: true });
-      else enableFreePan({ resetOrigin: true });
-      renderVisible(true);
-    } else {
-      renderVisible(true);
-      if (opts.resetOrigin) enableFreePan({ resetOrigin: true, resetPage: true });
-    }
+    // Keep live transform until new canvases are ready, then pin focus
+    renderVisible(true).then(function () {
+      clearLivePreview();
+      requestAnimationFrame(function () {
+        pinFocusToScreen();
+        // Second frame: layout may settle after scroll
+        requestAnimationFrame(pinFocusToScreen);
+      });
+    });
   }
 
   function goToPage(num, resetPageZoom) {
@@ -391,15 +439,9 @@ export function buildPdfViewerHtml(input: {
   function onTouchStart(e) {
     if (e.touches.length === 2) {
       pinchActive = true;
-      var el = scroller();
-      if (!el) return;
-      var rect = el.getBoundingClientRect();
       var mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       var my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      pinchViewX = mx - rect.left;
-      pinchViewY = my - rect.top;
-      pinchCX = el.scrollLeft + pinchViewX;
-      pinchCY = el.scrollTop + pinchViewY;
+      setFocusFromScreen(mx, my, canvasAtPoint(mx, my));
       pinchStartDist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
