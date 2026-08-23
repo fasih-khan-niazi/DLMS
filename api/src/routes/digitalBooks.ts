@@ -187,16 +187,16 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
       results = results.filter((row) => {
         const id = String(row.digitalBookId || "");
         const shelf = shelfByBook.get(id);
-        const progress = Number(shelf?.progress ?? -1);
+        const progress = Number(shelf?.progress ?? 0);
         switch (shelfFilter) {
           case "saved":
             return !!shelf;
           case "reading":
-            return progress > 0 && progress < 100;
+            return !!shelf && progress > 0 && progress < 100;
           case "unread":
-            return !shelf || progress <= 0;
+            return !shelf;
           case "finished":
-            return progress >= 100;
+            return !!shelf && progress >= 100;
           default:
             return true;
         }
