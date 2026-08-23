@@ -221,6 +221,11 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
     });
   };
 
+  const resetAllDraft = () => {
+    setDraftPrefs({ readMode: "scroll", orientation: "portrait" });
+    setDraftZoom(100);
+  };
+
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.navy }]}>
@@ -353,8 +358,94 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
               </Pressable>
             </View>
 
-            <View style={isLandscape ? styles.landscapeRow : undefined}>
-              <View style={isLandscape ? { flex: 1, marginRight: 12 } : undefined}>
+            {isLandscape ? (
+              <>
+                <View style={styles.landRow}>
+                  <View style={{ flexShrink: 0, marginRight: 16 }}>
+                    <Text style={labelStyle(fontFamily, type, colors, 0)}>Reading layout</Text>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                      <Chip
+                        label="Vertical scroll"
+                        selected={draftPrefs.readMode === "scroll"}
+                        onPress={() => setDraftPrefs((p) => ({ ...p, readMode: "scroll" }))}
+                      />
+                      <View style={{ opacity: landscapeDraft ? 0.4 : 1 }}>
+                        <Chip
+                          label="Page by page"
+                          selected={draftPrefs.readMode === "page"}
+                          onPress={() => {
+                            if (landscapeDraft) return;
+                            setDraftPrefs((p) => ({ ...p, readMode: "page", orientation: "portrait" }));
+                          }}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                  <View style={{ flexShrink: 0, marginRight: 12 }}>
+                    <Text style={labelStyle(fontFamily, type, colors, 0)}>Screen orientation</Text>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                      <Chip
+                        label="Portrait"
+                        selected={draftPrefs.orientation === "portrait"}
+                        onPress={() => setDraftPrefs((p) => ({ ...p, orientation: "portrait" }))}
+                      />
+                      <View style={{ opacity: pageModeDraft ? 0.4 : 1 }}>
+                        <Chip
+                          label="Landscape"
+                          selected={draftPrefs.orientation === "landscape"}
+                          onPress={() => {
+                            if (pageModeDraft) return;
+                            setDraftPrefs((p) => ({
+                              ...p,
+                              orientation: "landscape",
+                              readMode: "scroll",
+                            }));
+                          }}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                  <View style={{ justifyContent: "flex-end", paddingBottom: 2 }}>
+                    <Button
+                      title="Reset All"
+                      variant="secondary"
+                      fullWidth={false}
+                      onPress={resetAllDraft}
+                      style={{ paddingHorizontal: 14, paddingVertical: 8, minHeight: 36 }}
+                    />
+                  </View>
+                </View>
+                {(landscapeDraft || pageModeDraft) && (
+                  <Text
+                    style={{
+                      marginTop: 4,
+                      fontFamily: fontFamily.body,
+                      fontSize: type.caption,
+                      color: colors.muted,
+                      lineHeight: 16,
+                    }}
+                  >
+                    {landscapeDraft
+                      ? "Page by page is only available in portrait."
+                      : "Landscape is only available with vertical scroll."}
+                  </Text>
+                )}
+                <View style={{ marginTop: 8 }}>
+                  <Text style={labelStyle(fontFamily, type, colors, 0)}>Zoom</Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                    {ZOOM_PILLS.map((z) => (
+                      <Chip
+                        key={z}
+                        label={`${z}%`}
+                        selected={draftZoom === z}
+                        onPress={() => setDraftZoom(z)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              </>
+            ) : (
+              <>
                 <Text style={labelStyle(fontFamily, type, colors, 0)}>Reading layout</Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                   <Chip
@@ -411,10 +502,8 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
                       : "Landscape is only available with vertical scroll."}
                   </Text>
                 ) : null}
-              </View>
 
-              <View style={isLandscape ? { flex: 1.2 } : { marginTop: 10 }}>
-                <Text style={labelStyle(fontFamily, type, colors, 0)}>Zoom</Text>
+                <Text style={labelStyle(fontFamily, type, colors, 10)}>Zoom</Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                   {ZOOM_PILLS.map((z) => (
                     <Chip
@@ -425,19 +514,14 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
                     />
                   ))}
                 </View>
-                <Pressable onPress={() => setDraftZoom(100)} style={{ marginTop: 8 }}>
-                  <Text
-                    style={{
-                      fontFamily: fontFamily.bodySemiBold,
-                      fontSize: type.small,
-                      color: colors.amberDark,
-                    }}
-                  >
-                    Reset zoom to 100%
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
+                <Button
+                  title="Reset All"
+                  variant="secondary"
+                  onPress={resetAllDraft}
+                  style={{ marginTop: 10 }}
+                />
+              </>
+            )}
 
             <Button title="Apply" onPress={() => void applySettings()} style={{ marginTop: 12 }} />
           </Pressable>
@@ -496,8 +580,10 @@ const styles = StyleSheet.create({
     padding: 14,
     paddingBottom: 16,
   },
-  landscapeRow: {
+  landRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "flex-end",
+    flexWrap: "wrap",
+    gap: 4,
   },
 });
