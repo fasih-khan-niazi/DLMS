@@ -252,25 +252,22 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 
 ## Phase 9b: In-app reader and smart progress (14 extended)
 
+**Status:** Implementation complete — QA on device recommended before Phase 10.
+
 **Goal:** Read PDFs inside the app; progress reflects actual reading, not scroll position.
 
 **Tasks**
-- [ ] In-app PDF reader screen (WebView + PDF.js), no share sheet for primary flow.
-- [ ] Smart progress: page counts only after ~4s dwell; saves `lastPage`, `totalPages`, `progress`.
-- [ ] Home + digital detail "Continue where you left off" opens reader at last page.
-- [ ] PDF first-page cover generated on upload; `cover-image` proxy for digital titles.
-- [ ] Lazy cover backfill for older uploads (generate on first cover request).
-- [ ] Reader loads PDF bytes from API/Supabase into WebView (not raw `file://` paths).
+- [x] In-app PDF reader (WebView + PDF.js), fetch from API/Supabase
+- [x] Vertical scroll + page-by-page modes (reader settings)
+- [x] Pinch zoom, orientation lock, page jump, centered nav in page mode
+- [x] Smart progress: ~4s dwell per page; saves only when on bookshelf
+- [x] Explicit **Add to Bookshelf** (no auto-save on open)
+- [x] Shelf filters: Saved / Reading / Unread / Finished
+- [x] Home continue reading opens reader with progress
 
-**Multi-user access model**
-- Source of truth: one PDF object in Supabase per digital book.
-- API authenticates each request and streams/proxies the file.
-- Each device may keep a private cache copy for offline reopen; caches never conflict.
-- Concurrent readers are independent downloads of the same object (normal CDN/storage pattern).
+**Regression:** Add to bookshelf → read several pages (4s+ each) → close → progress updates on detail + Reading filter.
 
-**Regression:** Open reader, read a few pages, close, reopen at same page; progress updates on Home.
-
-**Git:** `feat(mobile): in-app pdf reader and smart reading progress`
+**Git:** `feat(mobile): reader modes, bookshelf save, smart progress`
 
 ---
 

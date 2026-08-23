@@ -10,19 +10,28 @@ export type ReadingProgressSnapshot = {
 /**
  * Tracks meaningful reading — rapid scroll-to-end does not instantly hit 100%.
  * A page counts only after the reader stays on it for MIN_PAGE_DWELL_MS.
+ * Prior saved progress is preserved and can only increase.
  */
 export class ReadingProgressTracker {
   private currentPage = 1;
   private totalPages = 1;
   private pageEnteredAt = Date.now();
   private readPages = new Set<number>();
+  private floorProgress = 0;
 
-  constructor(initial?: Partial<ReadingProgressSnapshot>) {
+  constructor(initial?: Partial<ReadingProgressSnapshot> & { progress?: number }) {
     if (initial?.lastPage && initial.lastPage > 1) {
       this.currentPage = initial.lastPage;
     }
     if (initial?.totalPages && initial.totalPages > 0) {
       this.totalPages = initial.totalPages;
+    }
+    this.floorProgress = Math.min(100, Math.max(0, Number(initial?.progress ?? 0)));
+    if (this.totalPages > 1 && this.floorProgress > 0) {
+      const seeded = Math.floor((this.floorProgress / 100) * this.totalPages);
+      for (let i = 1; i <= seeded; i++) {
+        this.readPages.add(i);
+      }
     }
   }
 
@@ -50,10 +59,11 @@ export class ReadingProgressTracker {
     if (Date.now() - this.pageEnteredAt >= MIN_PAGE_DWELL_MS) {
       pagesRead.add(this.currentPage);
     }
-    const progress = Math.min(
+    const calculated = Math.min(
       100,
       Math.round((pagesRead.size / Math.max(this.totalPages, 1)) * 100)
     );
+    const progress = Math.max(this.floorProgress, calculated);
     return {
       progress,
       lastPage: this.currentPage,

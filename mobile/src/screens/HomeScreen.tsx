@@ -350,6 +350,7 @@ export default function HomeScreen({ navigation }: Props) {
                       initialPage: item.lastPage || 1,
                       initialProgress: item.progress,
                       totalPages: item.totalPages,
+                      onBookshelf: true,
                     },
                   })
                 }

@@ -263,49 +263,18 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
         />
 
         <View style={styles.toolbar}>
-          <Pressable
-            onPress={openFilters}
-            style={[
-              styles.filtersBtn,
-              {
-                backgroundColor: colors.white,
-                borderColor: filtersActive ? colors.navy : colors.border,
-              },
-            ]}
-          >
-            <Ionicons name="options-outline" size={18} color={colors.navy} />
-            <Text
-              style={{
-                marginLeft: 6,
-                fontFamily: fontFamily.bodySemiBold,
-                fontSize: type.small,
-                color: colors.navy,
-              }}
-            >
-              Filters
-            </Text>
-            {filtersActive ? (
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: colors.amber,
-                  marginLeft: 6,
-                }}
-              />
-            ) : null}
-          </Pressable>
-
-          {isStaff ? (
+          <View style={styles.toolbarLeft}>
             <Pressable
-              onPress={() => navigation.navigate("UploadDigitalBook")}
+              onPress={openFilters}
               style={[
-                styles.uploadBtn,
-                { backgroundColor: colors.amber, borderRadius: 999 },
+                styles.filtersBtn,
+                {
+                  backgroundColor: colors.white,
+                  borderColor: filtersActive ? colors.navy : colors.border,
+                },
               ]}
             >
-              <Ionicons name="cloud-upload-outline" size={18} color={colors.navy} />
+              <Ionicons name="options-outline" size={18} color={colors.navy} />
               <Text
                 style={{
                   marginLeft: 6,
@@ -314,12 +283,43 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
                   color: colors.navy,
                 }}
               >
-                Upload PDF
+                Filters
               </Text>
+              {filtersActive ? (
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: colors.amber,
+                    marginLeft: 6,
+                  }}
+                />
+              ) : null}
             </Pressable>
-          ) : (
-            <View style={{ width: 8 }} />
-          )}
+
+            {isStaff ? (
+              <Pressable
+                onPress={() => navigation.navigate("UploadDigitalBook")}
+                style={[
+                  styles.uploadBtn,
+                  { backgroundColor: colors.amber, borderRadius: 999 },
+                ]}
+              >
+                <Ionicons name="cloud-upload-outline" size={18} color={colors.navy} />
+                <Text
+                  style={{
+                    marginLeft: 6,
+                    fontFamily: fontFamily.bodySemiBold,
+                    fontSize: type.small,
+                    color: colors.navy,
+                  }}
+                >
+                  Upload PDF
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
 
           <View style={styles.viewToggle}>
             <Pressable onPress={() => setViewMode("list")} hitSlop={8}>
@@ -491,7 +491,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 12,
-    gap: 12,
+  },
+  toolbarLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 1,
   },
   uploadBtn: {
     flexDirection: "row",

@@ -199,26 +199,29 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
     }, [digitalBookId])
   );
 
-  const ensureOnBookshelf = async () => {
-    if (shelf) return shelf;
-    const res = await api.post(`/api/digital-books/${digitalBookId}/bookshelf`);
-    setShelf(res.data);
-    return res.data;
+
+  const openReader = () => {
+    navigation.navigate("PdfReader", {
+      digitalBookId,
+      title: book?.title || "Book",
+      initialPage: Number(shelf?.lastPage) || 1,
+      initialProgress: Number(shelf?.progress) || 0,
+      totalPages: Number(shelf?.totalPages) || undefined,
+      onBookshelf: !!shelf,
+    });
   };
 
-  const openReader = async () => {
+  const addToBookshelf = async () => {
+    if (shelf) return;
     setBusy(true);
     try {
-      await ensureOnBookshelf();
-      navigation.navigate("PdfReader", {
-        digitalBookId,
-        title: book?.title || "Book",
-        initialPage: Number(shelf?.lastPage) || 1,
-        initialProgress: Number(shelf?.progress) || 0,
-        totalPages: Number(shelf?.totalPages) || undefined,
-      });
+      const res = await api.post(`/api/digital-books/${digitalBookId}/bookshelf`);
+      setShelf(res.data);
     } catch (error: any) {
-      setModal({ visible: true, message: error.message || "Could not open reader" });
+      setModal({
+        visible: true,
+        message: error.response?.data?.error || "Could not add to bookshelf",
+      });
     } finally {
       setBusy(false);
     }
@@ -228,7 +231,6 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
     setConfirmReviewOpen(false);
     setBusy(true);
     try {
-      await ensureOnBookshelf();
       await api.put(`/api/digital-books/${digitalBookId}/reviews`, {
         rating: draftRating,
         recommendScore: draftRecommend,
@@ -341,8 +343,28 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
           <Button
             title={hasProgress ? "Continue reading" : "Read Book"}
             onPress={openReader}
-            loading={busy}
           />
+          {shelf ? (
+            <Text
+              style={{
+                marginTop: space.sm,
+                textAlign: "center",
+                fontFamily: fontFamily.body,
+                fontSize: type.caption,
+                color: colors.success,
+              }}
+            >
+              On your bookshelf
+            </Text>
+          ) : (
+            <Button
+              title="Add to Bookshelf"
+              variant="secondary"
+              onPress={() => void addToBookshelf()}
+              loading={busy}
+              style={{ marginTop: space.sm }}
+            />
+          )}
         </Card>
 
         <Card style={{ marginBottom: space.md }}>
@@ -359,7 +381,9 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
           <Text style={{ fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
             {hasProgress
               ? `Page ${shelf?.lastPage || "?"} · ${progress}% read`
-              : "Open the book to start tracking your progress."}
+              : shelf
+                ? "Saved to your bookshelf. Open the book to start reading."
+                : "Add to your bookshelf to save progress while you read."}
           </Text>
           <View
             style={{
