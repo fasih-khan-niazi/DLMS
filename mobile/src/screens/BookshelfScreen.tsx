@@ -3,21 +3,68 @@ import {
   View,
   Text,
   FlatList,
-  StyleSheet,
-  ActivityIndicator,
-  TouchableOpacity,
+  Pressable,
   RefreshControl,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
+import { BookCover, Card } from "../components/ui";
+import { EmptyState } from "../components/EmptyState";
+import { SkeletonList } from "../components/Skeleton";
+import { useTheme } from "../theme";
+
+type BookshelfItem = {
+  digitalBookId: string;
+  title: string;
+  author?: string;
+  progress?: number;
+  rating?: number;
+};
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
 };
 
+function ProgressPill({ value }: { value: number }) {
+  const { colors, radius, fontFamily, type } = useTheme();
+  const pct = Math.min(Math.max(value, 0), 100);
+
+  return (
+    <View style={{ marginTop: 8 }}>
+      <View
+        style={{
+          height: 6,
+          borderRadius: radius.pill,
+          backgroundColor: colors.creamDark,
+          overflow: "hidden",
+        }}
+      >
+        <View
+          style={{
+            width: `${pct}%`,
+            height: "100%",
+            backgroundColor: colors.navy,
+          }}
+        />
+      </View>
+      <Text
+        style={{
+          marginTop: 4,
+          fontFamily: fontFamily.body,
+          fontSize: type.caption,
+          color: colors.muted,
+        }}
+      >
+        {pct}% read
+      </Text>
+    </View>
+  );
+}
+
 export default function BookshelfScreen({ navigation }: Props) {
-  const [items, setItems] = useState<any[]>([]);
+  const { colors, fontFamily, space, type } = useTheme();
+  const [items, setItems] = useState<BookshelfItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -36,82 +83,174 @@ export default function BookshelfScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
-      load();
+      void load();
     }, [])
   );
 
+  const openDetail = (digitalBookId: string) => {
+    navigation.getParent()?.navigate("Catalog", {
+      screen: "DigitalBookDetail",
+      params: { digitalBookId },
+    });
+  };
+
+  const inProgress = items.filter((item) => (item.progress ?? 0) > 0 && (item.progress ?? 0) < 100);
+  const finished = items.filter((item) => (item.progress ?? 0) >= 100);
+  const notStarted = items.filter((item) => !item.progress);
+
+  const renderItem = (item: BookshelfItem) => (
+    <Pressable
+      key={item.digitalBookId}
+      onPress={() => openDetail(item.digitalBookId)}
+      style={{ marginBottom: space.sm }}
+    >
+      <Card>
+        <View style={{ flexDirection: "row", gap: space.md }}>
+          <BookCover width={56} height={84} />
+          <View style={{ flex: 1 }}>
+            <Text
+              numberOfLines={2}
+              style={{
+                fontFamily: fontFamily.bodyBold,
+                fontSize: type.body,
+                color: colors.navy,
+              }}
+            >
+              {item.title}
+            </Text>
+            <Text
+              style={{
+                marginTop: 4,
+                fontFamily: fontFamily.body,
+                fontSize: type.small,
+                color: colors.muted,
+              }}
+            >
+              {item.author || "Unknown author"}
+            </Text>
+            {(item.progress ?? 0) > 0 ? (
+              <ProgressPill value={item.progress ?? 0} />
+            ) : (
+              <Text
+                style={{
+                  marginTop: 8,
+                  fontFamily: fontFamily.body,
+                  fontSize: type.caption,
+                  color: colors.muted,
+                }}
+              >
+                Not started
+              </Text>
+            )}
+            {item.rating ? (
+              <Text
+                style={{
+                  marginTop: 4,
+                  fontFamily: fontFamily.bodySemiBold,
+                  fontSize: type.caption,
+                  color: colors.amberDark,
+                }}
+              >
+                ★ {item.rating}/5
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      </Card>
+    </Pressable>
+  );
+
   return (
-    <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()}>
-        <Text style={styles.back}>← Back</Text>
-      </TouchableOpacity>
-      <Text style={styles.heading}>My Bookshelf</Text>
+    <View style={{ flex: 1, backgroundColor: colors.cream, paddingTop: 56, paddingHorizontal: 20 }}>
+      <Pressable onPress={() => navigation.goBack()} style={{ marginBottom: space.sm }}>
+        <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>← Back</Text>
+      </Pressable>
+      <Text
+        style={{
+          fontFamily: fontFamily.display,
+          fontSize: type.titleSm,
+          color: colors.navy,
+          marginBottom: space.md,
+        }}
+      >
+        My Bookshelf
+      </Text>
 
       {loading ? (
-        <ActivityIndicator color="#2E4A62" style={{ marginTop: 40 }} />
+        <SkeletonList rows={4} />
+      ) : items.length === 0 ? (
+        <EmptyState
+          title="Nothing saved yet"
+          message="Open a digital copy from Catalog and your progress will appear here."
+        />
       ) : (
         <FlatList
-          data={items}
-          keyExtractor={(item) => item.digitalBookId}
+          data={[{ key: "content" }]}
+          keyExtractor={(item) => item.key}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => {
                 setRefreshing(true);
-                load();
+                void load();
               }}
+              tintColor={colors.navy}
             />
           }
-          ListEmptyComponent={
-            <Text style={styles.empty}>
-              No saved digital copies yet. Browse Digital Copies in Catalog and save one.
-            </Text>
-          }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() =>
-                navigation.getParent()?.navigate("Catalog", {
-                  screen: "DigitalBookDetail",
-                  params: { digitalBookId: item.digitalBookId },
-                })
-              }
-            >
-              <Text style={styles.title}>{item.title}</Text>
-              <Text style={styles.meta}>{item.author || "Unknown author"}</Text>
-              <Text style={styles.meta}>Progress: {item.progress ?? 0}%</Text>
-              <Text style={styles.meta}>
-                Rating: {item.rating ? `${item.rating}/5` : "Not rated"}
-              </Text>
-            </TouchableOpacity>
+          renderItem={() => (
+            <View>
+              {inProgress.length > 0 ? (
+                <View style={{ marginBottom: space.lg }}>
+                  <Text
+                    style={{
+                      fontFamily: fontFamily.bodyBold,
+                      fontSize: type.body,
+                      color: colors.navy,
+                      marginBottom: space.sm,
+                    }}
+                  >
+                    Continue reading
+                  </Text>
+                  {inProgress.map(renderItem)}
+                </View>
+              ) : null}
+
+              {notStarted.length > 0 ? (
+                <View style={{ marginBottom: space.lg }}>
+                  <Text
+                    style={{
+                      fontFamily: fontFamily.bodyBold,
+                      fontSize: type.body,
+                      color: colors.navy,
+                      marginBottom: space.sm,
+                    }}
+                  >
+                    Saved
+                  </Text>
+                  {notStarted.map(renderItem)}
+                </View>
+              ) : null}
+
+              {finished.length > 0 ? (
+                <View style={{ marginBottom: space.lg }}>
+                  <Text
+                    style={{
+                      fontFamily: fontFamily.bodyBold,
+                      fontSize: type.body,
+                      color: colors.navy,
+                      marginBottom: space.sm,
+                    }}
+                  >
+                    Finished
+                  </Text>
+                  {finished.map(renderItem)}
+                </View>
+              ) : null}
+            </View>
           )}
+          contentContainerStyle={{ paddingBottom: 40 }}
         />
       )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8F7F4",
-    paddingTop: 56,
-    paddingHorizontal: 20,
-  },
-  back: { color: "#E8A838", marginBottom: 12, fontSize: 16 },
-  heading: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#2E4A62",
-    marginBottom: 16,
-  },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-  },
-  title: { fontSize: 16, fontWeight: "700", color: "#2E4A62" },
-  meta: { marginTop: 4, color: "#6B7280" },
-  empty: { textAlign: "center", color: "#6B7280", marginTop: 40 },
-});

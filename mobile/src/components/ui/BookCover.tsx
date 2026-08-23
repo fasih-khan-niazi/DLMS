@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Image, StyleSheet, View, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { resolveCoverDisplayUri } from "../../utils/coverImage";
+import { isApiCoverUrl, peekCoverCache, resolveCoverDisplayUri } from "../../utils/coverImage";
 import { useTheme } from "../../theme";
 
 type Props = {
@@ -29,20 +29,41 @@ export function BookCover({ uri, width = 72, height = 108, style, cacheKey }: Pr
       return;
     }
 
-    setLoading(true);
-    void resolveCoverDisplayUri(uri, cacheKey).then((resolved) => {
+    void (async () => {
+      if (isApiCoverUrl(uri)) {
+        const instant = await peekCoverCache(uri);
+        if (!cancelled && instant) {
+          setDisplayUri(instant);
+          setLoading(false);
+        } else if (!cancelled) {
+          setLoading(true);
+        }
+      } else {
+        const busted =
+          cacheKey !== undefined && cacheKey !== null
+            ? `${uri}${uri.includes("?") ? "&" : "?"}v=${cacheKey}`
+            : uri;
+        if (!cancelled) {
+          setDisplayUri(busted);
+          setLoading(false);
+        }
+        return;
+      }
+
+      const resolved = await resolveCoverDisplayUri(uri, cacheKey);
       if (cancelled) return;
       setDisplayUri(resolved);
       setFailed(!resolved);
       setLoading(false);
-    });
+    })();
 
     return () => {
       cancelled = true;
     };
   }, [uri, cacheKey]);
 
-  const showImage = !!displayUri && !failed && !loading;
+  const showImage = !!displayUri && !failed;
+  const showSpinner = loading && !displayUri;
 
   return (
     <View
@@ -58,7 +79,7 @@ export function BookCover({ uri, width = 72, height = 108, style, cacheKey }: Pr
         style,
       ]}
     >
-      {loading ? (
+      {showSpinner ? (
         <ActivityIndicator size="small" color={colors.navy} />
       ) : showImage ? (
         <Image

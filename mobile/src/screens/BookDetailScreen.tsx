@@ -22,6 +22,7 @@ import { SuccessModal } from "../components/SuccessModal";
 import { BookCover, Badge, Button, Card } from "../components/ui";
 import { formatIsbn } from "../utils/isbn";
 import { invalidateCatalogCache } from "../utils/catalogCache";
+import { invalidateCoverCache } from "../utils/coverImage";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -95,6 +96,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
     setCoverUrlDraft(thumbnailUrl);
     setCoverRevision((n) => n + 1);
     invalidateCatalogCache();
+    void invalidateCoverCache(isbn);
   };
 
   const canReserve =

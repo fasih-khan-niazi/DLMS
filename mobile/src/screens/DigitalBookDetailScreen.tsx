@@ -2,33 +2,118 @@ import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   ActivityIndicator,
-  TouchableOpacity,
   Alert,
-  TextInput,
+  Pressable,
+  RefreshControl,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import api from "../config/api";
+import { BookCover, Button, Card } from "../components/ui";
 import { downloadDigitalPdf, openOrSharePdf } from "../utils/digitalPdf";
+import { useTheme } from "../theme";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
   route: RouteProp<{ params: { digitalBookId: string } }, "params">;
 };
 
+function ProgressBar({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (next: number) => void;
+}) {
+  const { colors, radius, space, fontFamily, type } = useTheme();
+  const steps = [0, 25, 50, 75, 100];
+
+  return (
+    <View>
+      <View
+        style={{
+          height: 10,
+          borderRadius: radius.pill,
+          backgroundColor: colors.creamDark,
+          overflow: "hidden",
+          marginBottom: space.sm,
+        }}
+      >
+        <View
+          style={{
+            width: `${Math.min(Math.max(value, 0), 100)}%`,
+            height: "100%",
+            backgroundColor: colors.navy,
+            borderRadius: radius.pill,
+          }}
+        />
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        {steps.map((step) => (
+          <Pressable key={step} onPress={() => onChange(step)} hitSlop={8}>
+            <Text
+              style={{
+                fontFamily: fontFamily.bodySemiBold,
+                fontSize: type.caption,
+                color: value >= step ? colors.navy : colors.muted,
+              }}
+            >
+              {step}%
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function StarRating({
+  value,
+  onSelect,
+  disabled,
+}: {
+  value: number | null;
+  onSelect: (rating: number) => void;
+  disabled?: boolean;
+}) {
+  const { colors, space } = useTheme();
+
+  return (
+    <View style={{ flexDirection: "row", gap: space.sm }}>
+      {[1, 2, 3, 4, 5].map((star) => {
+        const filled = (value || 0) >= star;
+        return (
+          <Pressable key={star} onPress={() => onSelect(star)} disabled={disabled} hitSlop={8}>
+            <Ionicons
+              name={filled ? "star" : "star-outline"}
+              size={32}
+              color={filled ? colors.amber : colors.muted}
+            />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function DigitalBookDetailScreen({ navigation, route }: Props) {
   const { digitalBookId } = route.params;
+  const { colors, fontFamily, space, type, radius } = useTheme();
+
   const [book, setBook] = useState<any>(null);
   const [shelf, setShelf] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [progressText, setProgressText] = useState("0");
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [progress, setProgress] = useState(0);
 
-  const load = async () => {
+  const load = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
       const bookRes = await api.get(`/api/digital-books/${digitalBookId}`);
       setBook(bookRes.data);
@@ -38,68 +123,60 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
         (item: any) => item.digitalBookId === digitalBookId
       );
       setShelf(found || null);
-      setProgressText(String(found?.progress ?? 0));
+      setProgress(Number(found?.progress ?? 0));
     } catch {
       setBook(null);
+      setShelf(null);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      load();
+      void load();
     }, [digitalBookId])
   );
 
-  const saveToBookshelf = async () => {
-    setBusy(true);
-    try {
-      const res = await api.post(`/api/digital-books/${digitalBookId}/bookshelf`);
-      setShelf(res.data);
-      Alert.alert("Saved", "Added to your bookshelf");
-    } catch (error: any) {
-      Alert.alert("Error", error.response?.data?.error || "Failed to save");
-    } finally {
-      setBusy(false);
-    }
+  const ensureOnBookshelf = async () => {
+    if (shelf) return shelf;
+    const res = await api.post(`/api/digital-books/${digitalBookId}/bookshelf`);
+    setShelf(res.data);
+    return res.data;
   };
 
   const openPdf = async () => {
     setBusy(true);
+    setDownloadProgress(0);
     try {
-      if (!shelf) {
-        await api.post(`/api/digital-books/${digitalBookId}/bookshelf`);
-      }
-      const uri = await downloadDigitalPdf(digitalBookId, book?.title || "book");
+      await ensureOnBookshelf();
+      const uri = await downloadDigitalPdf(
+        digitalBookId,
+        book?.title || "book",
+        (p) => setDownloadProgress(p)
+      );
       await openOrSharePdf(uri);
-      await load();
+      await load({ silent: true });
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Could not open PDF");
+      Alert.alert("Could not open PDF", error.message || "Download failed");
     } finally {
       setBusy(false);
+      setDownloadProgress(null);
     }
   };
 
-  const saveProgress = async () => {
-    const progress = Number(progressText);
-    if (!Number.isFinite(progress) || progress < 0 || progress > 100) {
-      Alert.alert("Error", "Progress must be 0-100");
-      return;
-    }
+  const saveProgress = async (next: number) => {
+    setProgress(next);
     setBusy(true);
     try {
-      if (!shelf) {
-        await api.post(`/api/digital-books/${digitalBookId}/bookshelf`);
-      }
+      await ensureOnBookshelf();
       const res = await api.patch(`/api/digital-books/${digitalBookId}/bookshelf`, {
-        progress,
+        progress: next,
       });
       setShelf(res.data);
-      Alert.alert("Saved", `Progress set to ${progress}%`);
     } catch (error: any) {
-      Alert.alert("Error", error.response?.data?.error || "Failed to save progress");
+      Alert.alert("Save failed", error.response?.data?.error || "Could not save progress");
     } finally {
       setBusy(false);
     }
@@ -108,176 +185,226 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
   const setRating = async (rating: number) => {
     setBusy(true);
     try {
-      if (!shelf) {
-        await api.post(`/api/digital-books/${digitalBookId}/bookshelf`);
-      }
+      await ensureOnBookshelf();
       const res = await api.patch(`/api/digital-books/${digitalBookId}/bookshelf`, {
         rating,
       });
       setShelf(res.data);
     } catch (error: any) {
-      Alert.alert("Error", error.response?.data?.error || "Failed to save rating");
+      Alert.alert("Save failed", error.response?.data?.error || "Could not save rating");
     } finally {
       setBusy(false);
     }
   };
 
-  if (loading) {
+  if (loading && !book) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color="#2E4A62" />
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.cream }}>
+        <ActivityIndicator color={colors.navy} />
       </View>
     );
   }
 
   if (!book) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.error}>Book not found</Text>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.link}>Go back</Text>
-        </TouchableOpacity>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.cream }}>
+        <Text style={{ fontFamily: fontFamily.bodyBold, color: colors.danger }}>Book not found</Text>
+        <Pressable onPress={() => navigation.goBack()} style={{ marginTop: 12 }}>
+          <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>Go back</Text>
+        </Pressable>
       </View>
     );
   }
 
+  const hasProgress = (shelf?.progress ?? progress) > 0;
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <TouchableOpacity onPress={() => navigation.goBack()}>
-        <Text style={styles.back}>← Back</Text>
-      </TouchableOpacity>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.cream }}
+      contentContainerStyle={{ paddingTop: 56, paddingHorizontal: 20, paddingBottom: 40 }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            void load({ silent: true });
+          }}
+          tintColor={colors.navy}
+        />
+      }
+    >
+      <Pressable onPress={() => navigation.goBack()} style={{ marginBottom: space.md }}>
+        <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>← Back</Text>
+      </Pressable>
 
-      <Text style={styles.title}>{book.title}</Text>
-      <Text style={styles.meta}>{book.author || "Unknown author"}</Text>
-      {!!book.description && <Text style={styles.description}>{book.description}</Text>}
-
-      <TouchableOpacity style={styles.primaryButton} onPress={openPdf} disabled={busy}>
-        {busy ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.primaryButtonText}>Download / Open PDF</Text>
-        )}
-      </TouchableOpacity>
-
-      {!shelf && (
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={saveToBookshelf}
-          disabled={busy}
+      <View style={{ alignItems: "center", marginBottom: space.lg }}>
+        <BookCover width={140} height={200} />
+        <Text
+          style={{
+            marginTop: space.md,
+            textAlign: "center",
+            fontFamily: fontFamily.display,
+            fontSize: type.titleSm,
+            color: colors.navy,
+          }}
         >
-          <Text style={styles.secondaryButtonText}>Save to Bookshelf</Text>
-        </TouchableOpacity>
+          {book.title}
+        </Text>
+        <Text
+          style={{
+            marginTop: 6,
+            textAlign: "center",
+            fontFamily: fontFamily.body,
+            fontSize: type.body,
+            color: colors.muted,
+          }}
+        >
+          {book.author || "Unknown author"}
+        </Text>
+        {book.fileSizeBytes ? (
+          <Text
+            style={{
+              marginTop: 4,
+              fontFamily: fontFamily.body,
+              fontSize: type.small,
+              color: colors.muted,
+            }}
+          >
+            PDF · {Math.round(book.fileSizeBytes / 1024)} KB
+          </Text>
+        ) : null}
+      </View>
+
+      {hasProgress ? (
+        <Card style={{ marginBottom: space.md }}>
+          <Text
+            style={{
+              fontFamily: fontFamily.bodyBold,
+              fontSize: type.body,
+              color: colors.navy,
+              marginBottom: space.xs,
+            }}
+          >
+            Continue reading
+          </Text>
+          <Text style={{ fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
+            You are {shelf?.progress ?? progress}% through this book.
+          </Text>
+        </Card>
+      ) : null}
+
+      <Card style={{ marginBottom: space.md }}>
+        <Button
+          title={hasProgress ? "Continue reading" : "Open PDF"}
+          onPress={openPdf}
+          loading={busy && downloadProgress === null}
+        />
+        {downloadProgress !== null ? (
+          <View style={{ marginTop: space.sm }}>
+            <View
+              style={{
+                height: 8,
+                borderRadius: radius.pill,
+                backgroundColor: colors.creamDark,
+                overflow: "hidden",
+              }}
+            >
+              <View
+                style={{
+                  width: `${Math.round(downloadProgress * 100)}%`,
+                  height: "100%",
+                  backgroundColor: colors.amber,
+                }}
+              />
+            </View>
+            <Text
+              style={{
+                marginTop: 6,
+                textAlign: "center",
+                fontFamily: fontFamily.body,
+                fontSize: type.caption,
+                color: colors.muted,
+              }}
+            >
+              Downloading… {Math.round(downloadProgress * 100)}%
+            </Text>
+          </View>
+        ) : null}
+      </Card>
+
+      {!!book.description && (
+        <Card style={{ marginBottom: space.md }}>
+          <Text
+            style={{
+              fontFamily: fontFamily.bodyBold,
+              fontSize: type.body,
+              color: colors.navy,
+              marginBottom: space.sm,
+            }}
+          >
+            About
+          </Text>
+          <Text
+            style={{
+              fontFamily: fontFamily.body,
+              fontSize: type.small,
+              color: colors.text,
+              lineHeight: 22,
+            }}
+          >
+            {book.description}
+          </Text>
+        </Card>
       )}
 
-      <Text style={styles.section}>Reading progress (0-100%)</Text>
-      <View style={styles.row}>
-        <TextInput
-          style={styles.progressInput}
-          keyboardType="number-pad"
-          value={progressText}
-          onChangeText={setProgressText}
-          placeholder="0"
-          placeholderTextColor="#9CA3AF"
+      <Card style={{ marginBottom: space.md }}>
+        <Text
+          style={{
+            fontFamily: fontFamily.bodyBold,
+            fontSize: type.body,
+            color: colors.navy,
+            marginBottom: space.sm,
+          }}
+        >
+          Reading progress
+        </Text>
+        <ProgressBar value={progress} onChange={(next) => void saveProgress(next)} />
+        <Button
+          title="Save progress"
+          variant="secondary"
+          onPress={() => void saveProgress(progress)}
+          loading={busy}
+          style={{ marginTop: space.md }}
         />
-        <TouchableOpacity style={styles.saveButton} onPress={saveProgress} disabled={busy}>
-          <Text style={styles.saveButtonText}>Save</Text>
-        </TouchableOpacity>
-      </View>
-      <Text style={styles.meta}>Current: {shelf?.progress ?? 0}%</Text>
+      </Card>
 
-      <Text style={styles.section}>Rating</Text>
-      <View style={styles.ratingRow}>
-        {[1, 2, 3, 4, 5].map((star) => (
-          <TouchableOpacity
-            key={star}
-            style={[
-              styles.starButton,
-              shelf?.rating === star && styles.starActive,
-            ]}
-            onPress={() => setRating(star)}
-            disabled={busy}
-          >
-            <Text
-              style={[
-                styles.starText,
-                shelf?.rating === star && styles.starTextActive,
-              ]}
-            >
-              {star}★
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <Card style={{ marginBottom: space.md }}>
+        <Text
+          style={{
+            fontFamily: fontFamily.bodyBold,
+            fontSize: type.body,
+            color: colors.navy,
+            marginBottom: space.sm,
+          }}
+        >
+          Your rating
+        </Text>
+        <StarRating
+          value={shelf?.rating ?? null}
+          onSelect={(rating) => void setRating(rating)}
+          disabled={busy}
+        />
+        <Text
+          style={{
+            marginTop: space.sm,
+            fontFamily: fontFamily.body,
+            fontSize: type.caption,
+            color: colors.muted,
+          }}
+        >
+          {shelf?.rating ? `You rated this ${shelf.rating}/5` : "Tap a star to rate"}
+        </Text>
+      </Card>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8F7F4" },
-  content: { paddingTop: 56, paddingHorizontal: 20, paddingBottom: 40 },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F8F7F4",
-  },
-  back: { color: "#E8A838", marginBottom: 16, fontSize: 16 },
-  title: { fontSize: 26, fontWeight: "700", color: "#2E4A62" },
-  meta: { marginTop: 6, color: "#6B7280" },
-  description: { marginTop: 12, color: "#4B5563", lineHeight: 22 },
-  primaryButton: {
-    marginTop: 20,
-    backgroundColor: "#2E4A62",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  primaryButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  secondaryButton: {
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: "#2E4A62",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  secondaryButtonText: { color: "#2E4A62", fontWeight: "600" },
-  section: {
-    marginTop: 28,
-    marginBottom: 10,
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#2E4A62",
-  },
-  row: { flexDirection: "row", gap: 10 },
-  progressInput: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: "#1F2937",
-  },
-  saveButton: {
-    backgroundColor: "#E8A838",
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    justifyContent: "center",
-  },
-  saveButtonText: { color: "#fff", fontWeight: "700" },
-  ratingRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  starButton: {
-    borderWidth: 1,
-    borderColor: "#2E4A62",
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  starActive: { backgroundColor: "#2E4A62" },
-  starText: { color: "#2E4A62", fontWeight: "600" },
-  starTextActive: { color: "#fff" },
-  error: { color: "#B91C1C", marginBottom: 12 },
-  link: { color: "#E8A838" },
-});

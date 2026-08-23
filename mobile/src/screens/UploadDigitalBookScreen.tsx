@@ -13,6 +13,7 @@ import * as DocumentPicker from "expo-document-picker";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api, { API_BASE_URL } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
+import { invalidateDigitalCache } from "../utils/digitalCache";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -71,6 +72,7 @@ export default function UploadDigitalBookScreen({ navigation }: Props) {
         throw new Error(data.error || "Upload failed");
       }
 
+      invalidateDigitalCache();
       Alert.alert("Uploaded", "Digital copy added to the catalog.");
       navigation.getParent()?.navigate("Catalog", {
         screen: "CatalogMain",

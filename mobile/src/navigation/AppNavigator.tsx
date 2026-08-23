@@ -60,6 +60,10 @@ function CatalogStackNavigator() {
         name="DigitalBookDetail"
         component={DigitalBookDetailScreen as React.ComponentType<any>}
       />
+      <CatalogStackNav.Screen
+        name="UploadDigitalBook"
+        component={UploadDigitalBookScreen as React.ComponentType<any>}
+      />
     </CatalogStackNav.Navigator>
   );
 }
