@@ -12,6 +12,7 @@ type SystemConfig = {
   maxPdfSizeMb?: number;
   librariansCanBorrow?: boolean;
   timezone?: string;
+  catalogPageSize?: number;
 };
 
 const defaults: SystemConfig = {
@@ -25,6 +26,7 @@ const defaults: SystemConfig = {
   maxPdfSizeMb: 25,
   librariansCanBorrow: true,
   timezone: "Asia/Karachi",
+  catalogPageSize: 10,
 };
 
 export function ConfigPage() {
@@ -104,6 +106,7 @@ export function ConfigPage() {
         maxPdfSizeMb: form.maxPdfSizeMb,
         librariansCanBorrow: !!form.librariansCanBorrow,
         timezone: form.timezone || "Asia/Karachi",
+        catalogPageSize: form.catalogPageSize,
       };
 
       const { data } = await api.put<{ config: SystemConfig }>("/api/admin/config", payload);
@@ -263,6 +266,26 @@ export function ConfigPage() {
                 placeholder="Sunday"
               />
               <span className="field-hint">Comma-separated weekday names</span>
+            </label>
+          </div>
+        </section>
+
+        <section className="config-section">
+          <div className="config-section-head">
+            <h2>Catalog</h2>
+            <p className="muted small">How many titles appear per page in mobile and admin lists</p>
+          </div>
+          <div className="config-grid">
+            <label>
+              Books per page
+              <input
+                type="number"
+                min={5}
+                max={50}
+                value={form.catalogPageSize ?? 10}
+                onChange={(e) => updateNumber("catalogPageSize", e.target.value)}
+              />
+              <span className="field-hint">Between 5 and 50. Default is 10.</span>
             </label>
           </div>
         </section>

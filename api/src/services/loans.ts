@@ -32,8 +32,15 @@ export async function getSystemConfig() {
       librariansCanBorrow: true,
       maxPdfSizeMb: 25,
       reminderDaysBefore: [2, 1],
+      catalogPageSize: 10,
     }
   );
+}
+
+export function clampCatalogPageSize(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 10;
+  return Math.min(Math.max(Math.round(n), 5), 50);
 }
 
 export async function getHolidaySet(): Promise<Set<string>> {

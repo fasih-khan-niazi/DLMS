@@ -8,7 +8,7 @@ import { requireRole } from "../middleware/requireRole";
 import { uploadPdf } from "../middleware/uploadPdf";
 import { createId } from "../utils/ids";
 import { buildSearchKeywords } from "../services/googleBooks";
-import { getSystemConfig } from "../services/loans";
+import { clampCatalogPageSize, getSystemConfig } from "../services/loans";
 import {
   downloadDigitalBookPdf,
   removeDigitalBookPdf,
@@ -49,7 +49,12 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
       .trim()
       .toLowerCase();
     const sort = String(req.query.sort || "title_asc");
-    const { page, pageSize } = parseListQuery(req.query as Record<string, unknown>);
+    const config = await getSystemConfig();
+    const defaultPageSize = clampCatalogPageSize(config.catalogPageSize);
+    const { page, pageSize } = parseListQuery(
+      req.query as Record<string, unknown>,
+      defaultPageSize
+    );
 
     let snap;
     if (q) {

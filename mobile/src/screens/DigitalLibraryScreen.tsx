@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,8 @@ import { SearchBar } from "../components/SearchBar";
 import { BookCover } from "../components/ui";
 import { EmptyState } from "../components/EmptyState";
 import { SkeletonList } from "../components/Skeleton";
-import { PAGE_SIZE, type PaginatedResponse } from "../types/pagination";
+import { type PaginatedResponse } from "../types/pagination";
+import { getCatalogPageSize } from "../utils/appConfig";
 import { useTheme } from "../theme";
 
 type DigitalBook = {
@@ -37,14 +38,20 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    void getCatalogPageSize().then(setPageSize);
+  }, []);
 
   const load = useCallback(
     async (search = query, pageNum = page) => {
+      const size = pageSize || (await getCatalogPageSize());
       try {
         const response = await api.get<PaginatedResponse<DigitalBook>>("/api/digital-books", {
           params: {
             page: pageNum,
-            pageSize: PAGE_SIZE,
+            pageSize: size,
             ...(search.trim() ? { q: search.trim() } : {}),
           },
         });
@@ -59,7 +66,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
         setRefreshing(false);
       }
     },
-    [query, page]
+    [query, page, pageSize]
   );
 
   useFocusEffect(
@@ -67,7 +74,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
       setLoading(true);
       setPage(1);
       load("", 1);
-    }, [])
+    }, [pageSize])
   );
 
   const runSearch = (search: string) => {

@@ -6,19 +6,22 @@ export type PaginatedResponse<T> = {
   totalPages: number;
 };
 
-const DEFAULT_PAGE_SIZE = 15;
+const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
 const MAX_LEGACY_LIMIT = 100;
 
 /** Max documents loaded from Firestore before in-memory filter/sort/page. */
 export const LIST_FETCH_CAP = 500;
 
-export function parseListQuery(query: Record<string, unknown>) {
+export function parseListQuery(
+  query: Record<string, unknown>,
+  defaultPageSize: number = DEFAULT_PAGE_SIZE
+) {
   const page = Math.max(1, Number(query.page) || 1);
   const hasLegacyLimit = query.limit !== undefined && query.limit !== "";
   const hasPageSize = query.pageSize !== undefined && query.pageSize !== "";
 
-  let pageSize = DEFAULT_PAGE_SIZE;
+  let pageSize = defaultPageSize;
   if (hasPageSize) {
     pageSize = Number(query.pageSize) || DEFAULT_PAGE_SIZE;
     pageSize = Math.min(Math.max(1, pageSize), MAX_PAGE_SIZE);

@@ -1,12 +1,16 @@
 import { Router, Response } from "express";
 import { db } from "../config/firebase";
+import { isSupabaseConfigured } from "../config/supabase";
 import { authenticate, AuthRequest } from "../middleware/authenticate";
 import { requireRole } from "../middleware/requireRole";
+import { uploadCover } from "../middleware/uploadCover";
 import {
   buildSearchKeywords,
   fetchBookByIsbn,
   BookMetadata,
 } from "../services/googleBooks";
+import { uploadBookCover } from "../services/bookCoverStorage";
+import { clampCatalogPageSize, getSystemConfig } from "../services/loans";
 import { createId } from "../utils/ids";
 import {
   LIST_FETCH_CAP,
@@ -46,6 +50,36 @@ function normalizeIsbn(isbn: string): string {
 
 function buildQrPayload(copyId: string, isbn: string): string {
   return `${copyId}_${isbn}`;
+}
+
+function resolveThumbnail(input: {
+  thumbnailUrl?: string;
+  metadata?: BookMetadata | null;
+  existing?: Record<string, unknown>;
+}) {
+  const manualUrl = String(input.thumbnailUrl || "").trim();
+  if (manualUrl) {
+    return { thumbnailUrl: manualUrl, coverImageSource: "manual" as const };
+  }
+
+  if (input.existing?.coverImageSource === "manual" && input.existing.thumbnailUrl) {
+    return {
+      thumbnailUrl: input.existing.thumbnailUrl,
+      coverImageSource: "manual" as const,
+    };
+  }
+
+  if (input.metadata?.thumbnailUrl) {
+    return {
+      thumbnailUrl: input.metadata.thumbnailUrl,
+      coverImageSource: "google_books" as const,
+    };
+  }
+
+  return {
+    thumbnailUrl: input.existing?.thumbnailUrl || "",
+    coverImageSource: (input.existing?.coverImageSource as string) || "google_books",
+  };
 }
 
 function getAvailabilityLabel(doc: {
@@ -151,6 +185,12 @@ router.post(
 
       const existing = await db.collection("catalog").doc(cleanedIsbn).get();
       const now = new Date();
+      const existingData = existing.exists ? existing.data() : undefined;
+      const cover = resolveThumbnail({
+        thumbnailUrl,
+        metadata,
+        existing: existingData,
+      });
 
       const catalogData = {
         isbn: cleanedIsbn,
@@ -159,7 +199,8 @@ router.post(
         publisher: publisher || metadata?.publisher || "",
         publishedDate: publishedDate || metadata?.publishedDate || "",
         description: description || metadata?.description || "",
-        thumbnailUrl: thumbnailUrl || metadata?.thumbnailUrl || "",
+        thumbnailUrl: cover.thumbnailUrl,
+        coverImageSource: cover.coverImageSource,
         categories: categoryList,
         searchKeywords,
         source: metadata ? "google_books" : "manual",
@@ -280,7 +321,12 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
     const q = String(req.query.q || "").trim().toLowerCase();
     const sort = String(req.query.sort || "title_asc");
     const availability = String(req.query.availability || "").trim();
-    const { page, pageSize } = parseListQuery(req.query as Record<string, unknown>);
+    const config = await getSystemConfig();
+    const defaultPageSize = clampCatalogPageSize(config.catalogPageSize);
+    const { page, pageSize } = parseListQuery(
+      req.query as Record<string, unknown>,
+      defaultPageSize
+    );
     const isStaff = req.role === "librarian" || req.role === "admin";
     const includeInactive =
       isStaff && String(req.query.includeInactive || "") === "1";
@@ -378,6 +424,120 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: "Failed to search catalog" });
   }
 });
+
+// Set cover image URL manually (librarian/admin)
+router.patch(
+  "/books/:isbn/cover",
+  authenticate,
+  requireRole("librarian", "admin"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const isbn = normalizeIsbn(req.params.isbn as string);
+      const thumbnailUrl = String(req.body.thumbnailUrl || "").trim();
+
+      if (!thumbnailUrl) {
+        res.status(400).json({ error: "thumbnailUrl is required" });
+        return;
+      }
+
+      if (!/^https?:\/\//i.test(thumbnailUrl)) {
+        res.status(400).json({ error: "thumbnailUrl must be an http(s) URL" });
+        return;
+      }
+
+      const catalogRef = db.collection("catalog").doc(isbn);
+      const catalogDoc = await catalogRef.get();
+      if (!catalogDoc.exists) {
+        res.status(404).json({ error: "Book not found" });
+        return;
+      }
+
+      const now = new Date();
+      await catalogRef.update({
+        thumbnailUrl,
+        coverImageSource: "manual",
+        updatedAt: now,
+      });
+
+      res.json({
+        success: true,
+        isbn,
+        thumbnailUrl,
+        coverImageSource: "manual",
+      });
+    } catch (error) {
+      console.error("Set cover URL error:", error);
+      res.status(500).json({ error: "Failed to set cover image" });
+    }
+  }
+);
+
+// Upload cover image file (librarian/admin)
+router.post(
+  "/books/:isbn/cover",
+  authenticate,
+  requireRole("librarian", "admin"),
+  (req: AuthRequest, res: Response, next) => {
+    uploadCover.single("file")(req, res, (err: any) => {
+      if (err) {
+        res.status(400).json({ error: err.message || "Upload failed" });
+        return;
+      }
+      next();
+    });
+  },
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (!isSupabaseConfigured()) {
+        res.status(503).json({
+          error:
+            "Supabase Storage is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to api/.env, or set a cover URL instead.",
+        });
+        return;
+      }
+
+      if (!req.file?.buffer) {
+        res.status(400).json({ error: "Image file is required (field name: file)" });
+        return;
+      }
+
+      const isbn = normalizeIsbn(req.params.isbn as string);
+      const catalogRef = db.collection("catalog").doc(isbn);
+      const catalogDoc = await catalogRef.get();
+      if (!catalogDoc.exists) {
+        res.status(404).json({ error: "Book not found" });
+        return;
+      }
+
+      const ext = (req.file.originalname || "cover.jpg").split(".").pop()?.toLowerCase() || "jpg";
+      const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
+      const objectPath = `covers/${isbn}.${safeExt === "jpeg" ? "jpg" : safeExt}`;
+
+      const uploaded = await uploadBookCover({
+        objectPath,
+        buffer: req.file.buffer,
+        contentType: req.file.mimetype,
+      });
+
+      const now = new Date();
+      await catalogRef.update({
+        thumbnailUrl: uploaded.publicUrl,
+        coverImageSource: "manual",
+        updatedAt: now,
+      });
+
+      res.json({
+        success: true,
+        isbn,
+        thumbnailUrl: uploaded.publicUrl,
+        coverImageSource: "manual",
+      });
+    } catch (error: any) {
+      console.error("Upload cover error:", error);
+      res.status(500).json({ error: error?.message || "Failed to upload cover image" });
+    }
+  }
+);
 
 // Soft-activate / soft-deactivate a catalog title (keeps loan/reservation history)
 router.patch(

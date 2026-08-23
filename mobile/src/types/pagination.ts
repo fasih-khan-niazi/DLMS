@@ -6,4 +6,4 @@ export type PaginatedResponse<T> = {
   totalPages: number;
 };
 
-export const PAGE_SIZE = 15;
+export const DEFAULT_PAGE_SIZE = 10;

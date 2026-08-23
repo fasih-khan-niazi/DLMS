@@ -18,7 +18,14 @@ import { SkeletonList } from "../components/Skeleton";
 import { EmptyState } from "../components/EmptyState";
 import { BookCover, Badge, Button, Chip } from "../components/ui";
 import { useProfile } from "../context/ProfileContext";
-import { PAGE_SIZE, type PaginatedResponse } from "../types/pagination";
+import { type PaginatedResponse } from "../types/pagination";
+import { getCatalogPageSize } from "../utils/appConfig";
+import {
+  catalogCacheKey,
+  getCatalogCache,
+  invalidateCatalogCache,
+  setCatalogCache,
+} from "../utils/catalogCache";
 import { useTheme } from "../theme";
 
 type CatalogBook = {
@@ -64,8 +71,13 @@ export default function CatalogScreen({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [draftSort, setDraftSort] = useState<SortOption>("title_asc");
   const [draftAvailability, setDraftAvailability] = useState<AvailabilityFilter>("all");
+  const [pageSize, setPageSize] = useState(10);
 
   const filtersActive = sort !== "title_asc" || availability !== "all";
+
+  useEffect(() => {
+    void getCatalogPageSize().then(setPageSize);
+  }, []);
 
   useEffect(() => {
     if (initialQuery) setQuery(initialQuery);
@@ -78,18 +90,47 @@ export default function CatalogScreen({
       staff?: boolean;
       sortBy?: SortOption;
       availabilityFilter?: AvailabilityFilter;
+      skipCache?: boolean;
+      silent?: boolean;
     }) => {
       const search = opts?.search ?? query;
       const pageNum = opts?.pageNum ?? page;
       const staff = opts?.staff ?? isStaff;
       const sortBy = opts?.sortBy ?? sort;
       const availabilityFilter = opts?.availabilityFilter ?? availability;
+      const size = pageSize || (await getCatalogPageSize());
+
+      const cacheKey = catalogCacheKey({
+        q: search.trim(),
+        page: pageNum,
+        pageSize: size,
+        sort: sortBy,
+        availability: availabilityFilter !== "all" ? availabilityFilter : undefined,
+        includeInactive: staff ? "1" : undefined,
+      });
+
+      if (!opts?.skipCache) {
+        const cached = getCatalogCache<CatalogBook>(cacheKey);
+        if (cached) {
+          setBooks(cached.results || []);
+          setPage(cached.page || pageNum);
+          setTotalPages(cached.totalPages || 0);
+          setTotal(cached.total || 0);
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        }
+      }
+
+      if (!opts?.silent) {
+        setLoading(true);
+      }
 
       try {
         const response = await api.get<PaginatedResponse<CatalogBook>>("/api/catalog/books", {
           params: {
             page: pageNum,
-            pageSize: PAGE_SIZE,
+            pageSize: size,
             sort: sortBy,
             ...(search.trim() ? { q: search.trim() } : {}),
             ...(availabilityFilter !== "all" ? { availability: availabilityFilter } : {}),
@@ -100,6 +141,7 @@ export default function CatalogScreen({
         setPage(response.data.page || pageNum);
         setTotalPages(response.data.totalPages || 0);
         setTotal(response.data.total || 0);
+        setCatalogCache(cacheKey, response.data);
       } catch {
         setBooks([]);
         setTotalPages(0);
@@ -109,26 +151,23 @@ export default function CatalogScreen({
         setRefreshing(false);
       }
     },
-    [query, page, isStaff, sort, availability]
+    [query, page, isStaff, sort, availability, pageSize]
   );
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
       setPage(1);
-      loadBooks({ pageNum: 1 });
-    }, [isStaff])
+      loadBooks({ pageNum: 1, silent: false });
+    }, [isStaff, pageSize])
   );
 
   const runSearch = (search: string) => {
-    setLoading(true);
     setPage(1);
     loadBooks({ search, pageNum: 1 });
   };
 
   const changePage = (next: number) => {
     if (next < 1 || (totalPages > 0 && next > totalPages)) return;
-    setLoading(true);
     setPage(next);
     loadBooks({ pageNum: next });
   };
@@ -144,7 +183,6 @@ export default function CatalogScreen({
     if (draftSort === sort && draftAvailability === availability) return;
     setSort(draftSort);
     setAvailability(draftAvailability);
-    setLoading(true);
     setPage(1);
     loadBooks({
       sortBy: draftSort,
@@ -282,7 +320,12 @@ export default function CatalogScreen({
           </Text>
         ) : null}
 
-        <SearchBar value={query} onChangeText={setQuery} onSearch={runSearch} />
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          onSearch={runSearch}
+          searchOnDebounce={false}
+        />
 
         <View style={styles.toolbar}>
           <Pressable
@@ -355,7 +398,8 @@ export default function CatalogScreen({
                 refreshing={refreshing}
                 onRefresh={() => {
                   setRefreshing(true);
-                  loadBooks({ pageNum: page });
+                  invalidateCatalogCache();
+                  loadBooks({ pageNum: page, skipCache: true, silent: true });
                 }}
                 tintColor={colors.navy}
               />

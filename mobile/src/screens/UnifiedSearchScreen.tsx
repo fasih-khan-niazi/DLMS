@@ -8,7 +8,8 @@ import { BookCover, Badge, Screen } from "../components/ui";
 import { EmptyState } from "../components/EmptyState";
 import { SkeletonList } from "../components/Skeleton";
 import { CATALOG_TABS } from "../constants/catalogTabs";
-import { PAGE_SIZE, type PaginatedResponse } from "../types/pagination";
+import { getCatalogPageSize } from "../utils/appConfig";
+import { type PaginatedResponse } from "../types/pagination";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -48,12 +49,13 @@ export default function UnifiedSearchScreen({ navigation, route }: Props) {
     }
 
     try {
+      const size = await getCatalogPageSize();
       const [physRes, digRes] = await Promise.all([
         api.get<PaginatedResponse<PhysicalHit>>("/api/catalog/books", {
-          params: { q: query, page: 1, pageSize: PAGE_SIZE },
+          params: { q: query, page: 1, pageSize: size },
         }),
         api.get<PaginatedResponse<DigitalHit>>("/api/digital-books", {
-          params: { q: query, page: 1, pageSize: PAGE_SIZE },
+          params: { q: query, page: 1, pageSize: size },
         }),
       ]);
       setPhysical(physRes.data.results || []);

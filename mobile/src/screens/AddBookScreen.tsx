@@ -22,6 +22,7 @@ export default function AddBookScreen({ navigation }: Props) {
   const [title, setTitle] = useState("");
   const [authors, setAuthors] = useState("");
   const [category, setCategory] = useState("");
+  const [coverUrl, setCoverUrl] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [useGoogleBooks, setUseGoogleBooks] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -38,6 +39,7 @@ export default function AddBookScreen({ navigation }: Props) {
       setTitle(response.data.title || "");
       setAuthors((response.data.authors || []).join(", "));
       setCategory((response.data.categories || [])[0] || "");
+      if (response.data.thumbnailUrl) setCoverUrl(response.data.thumbnailUrl);
       Alert.alert("Found", "Metadata loaded from Google Books");
     } catch (error: any) {
       Alert.alert(
@@ -73,6 +75,7 @@ export default function AddBookScreen({ navigation }: Props) {
           .filter(Boolean),
         categories: category.trim() ? [category.trim()] : [],
         useGoogleBooks,
+        ...(coverUrl.trim() ? { thumbnailUrl: coverUrl.trim() } : {}),
       });
 
       const copiesResponse = await api.post("/api/catalog/copies", {
@@ -141,6 +144,18 @@ export default function AddBookScreen({ navigation }: Props) {
       />
       <TextInput
         style={styles.input}
+        placeholder="Cover image URL (optional)"
+        placeholderTextColor="#9CA3AF"
+        value={coverUrl}
+        onChangeText={setCoverUrl}
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      <Text style={styles.hint}>
+        Google Books fills the cover when available. Paste a URL here, or upload from the book detail screen after saving.
+      </Text>
+      <TextInput
+        style={styles.input}
         placeholder="Number of physical copies"
         placeholderTextColor="#9CA3AF"
         value={quantity}
@@ -201,6 +216,12 @@ const styles = StyleSheet.create({
     color: "#4B5563",
     flex: 1,
     paddingRight: 12,
+  },
+  hint: {
+    color: "#6B7280",
+    fontSize: 13,
+    marginBottom: 12,
+    lineHeight: 18,
   },
   secondaryButton: {
     borderWidth: 1,

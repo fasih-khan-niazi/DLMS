@@ -7,14 +7,18 @@ import {
   Alert,
   Image,
   Pressable,
+  TextInput,
 } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
-import api from "../config/api";
+import api, { API_BASE_URL } from "../config/api";
+import { firebaseAuth } from "../config/firebase";
 import { useProfile } from "../context/ProfileContext";
 import { BookCover, Badge, Button, Card } from "../components/ui";
 import { formatIsbn } from "../utils/isbn";
+import { invalidateCatalogCache } from "../utils/catalogCache";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -37,6 +41,9 @@ export default function BookDetailScreen({ navigation, route }: Props) {
   const [reserving, setReserving] = useState(false);
   const [actionCopyId, setActionCopyId] = useState<string | null>(null);
   const [togglingStatus, setTogglingStatus] = useState(false);
+  const [coverUrlDraft, setCoverUrlDraft] = useState("");
+  const [savingCover, setSavingCover] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   const load = async () => {
     try {
@@ -45,6 +52,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
         api.get("/api/loans/mine", { params: { status: "active" } }),
       ]);
       setBook(bookRes.data);
+      setCoverUrlDraft(bookRes.data.thumbnailUrl || "");
 
       const mine = new Set<string>();
       (loansRes.data.loans || []).forEach((loan: any) => {
@@ -149,6 +157,69 @@ export default function BookDetailScreen({ navigation, route }: Props) {
         },
       ]
     );
+  };
+
+  const saveCoverUrl = async () => {
+    const url = coverUrlDraft.trim();
+    if (!url) {
+      Alert.alert("Cover URL required", "Enter an image URL or upload a file.");
+      return;
+    }
+
+    setSavingCover(true);
+    try {
+      await api.patch(`/api/catalog/books/${encodeURIComponent(isbn)}/cover`, {
+        thumbnailUrl: url,
+      });
+      invalidateCatalogCache();
+      await load();
+      Alert.alert("Saved", "Cover image updated.");
+    } catch (error: any) {
+      Alert.alert("Save failed", error.response?.data?.error || "Could not save cover URL");
+    } finally {
+      setSavingCover(false);
+    }
+  };
+
+  const uploadCoverImage = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ["image/jpeg", "image/png", "image/webp"],
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0];
+    setUploadingCover(true);
+    try {
+      const token = await firebaseAuth.currentUser?.getIdToken();
+      const form = new FormData();
+      form.append("file", {
+        uri: asset.uri,
+        name: asset.name || "cover.jpg",
+        type: asset.mimeType || "image/jpeg",
+      } as any);
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/catalog/books/${encodeURIComponent(isbn)}/cover`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: form,
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Upload failed");
+      }
+
+      invalidateCatalogCache();
+      await load();
+      Alert.alert("Uploaded", "Cover image saved.");
+    } catch (error: any) {
+      Alert.alert("Upload failed", error.message || "Could not upload cover");
+    } finally {
+      setUploadingCover(false);
+    }
   };
 
   if (loading) {
@@ -288,6 +359,65 @@ export default function BookDetailScreen({ navigation, route }: Props) {
               No copies available right now. Reserve when all copies are checked out.
             </Text>
           ) : null}
+        </Card>
+      ) : null}
+
+      {isStaff ? (
+        <Card style={{ marginBottom: space.md }}>
+          <Text
+            style={{
+              fontFamily: fontFamily.bodyBold,
+              fontSize: type.body,
+              color: colors.navy,
+              marginBottom: space.sm,
+            }}
+          >
+            Book cover
+          </Text>
+          <Text
+            style={{
+              fontFamily: fontFamily.body,
+              fontSize: type.small,
+              color: colors.muted,
+              marginBottom: space.sm,
+              lineHeight: 20,
+            }}
+          >
+            Source: {book.coverImageSource === "manual" ? "Manual" : "Google Books (auto)"}
+          </Text>
+          <TextInput
+            value={coverUrlDraft}
+            onChangeText={setCoverUrlDraft}
+            placeholder="https://example.com/cover.jpg"
+            placeholderTextColor={colors.muted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={{
+              backgroundColor: colors.white,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: radius.md,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              fontFamily: fontFamily.body,
+              fontSize: type.small,
+              color: colors.text,
+              marginBottom: space.sm,
+            }}
+          />
+          <Button
+            title="Save cover URL"
+            variant="secondary"
+            onPress={saveCoverUrl}
+            loading={savingCover}
+            style={{ marginBottom: space.sm }}
+          />
+          <Button
+            title="Upload image file"
+            variant="ghost"
+            onPress={uploadCoverImage}
+            loading={uploadingCover}
+          />
         </Card>
       ) : null}
 

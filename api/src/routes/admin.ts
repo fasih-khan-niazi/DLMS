@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import { auth, db } from "../config/firebase";
 import { authenticate, AuthRequest } from "../middleware/authenticate";
 import { requireRole } from "../middleware/requireRole";
-import { getSystemConfig } from "../services/loans";
+import { clampCatalogPageSize, getSystemConfig } from "../services/loans";
 
 const router = Router();
 
@@ -19,6 +19,7 @@ const CONFIG_ALLOWED_FIELDS = [
   "maxPdfSizeMb",
   "librariansCanBorrow",
   "timezone",
+  "catalogPageSize",
 ] as const;
 
 type ConfigField = (typeof CONFIG_ALLOWED_FIELDS)[number];
@@ -141,6 +142,10 @@ router.put("/config", requireRole("admin"), async (req: AuthRequest, res: Respon
     if (Object.keys(updates).length === 0) {
       res.status(400).json({ error: "No allowed config fields provided" });
       return;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, "catalogPageSize")) {
+      updates.catalogPageSize = clampCatalogPageSize(updates.catalogPageSize);
     }
 
     updates.updatedAt = new Date();

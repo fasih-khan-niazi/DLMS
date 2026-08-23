@@ -7,11 +7,7 @@ import { Badge, Card } from "../components/ui";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
 import { SkeletonList } from "../components/Skeleton";
-import {
-  dueCountdown,
-  formatShortDate,
-  loanStatusChip,
-} from "../utils/loanDates";
+import { formatShortDate } from "../utils/loanDates";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -19,7 +15,7 @@ type Props = {
   embedded?: boolean;
 };
 
-export default function MyLoansScreen({ navigation, embedded }: Props) {
+export default function LoanHistoryScreen({ navigation, embedded }: Props) {
   const { colors, fontFamily, space, type } = useTheme();
   const [loans, setLoans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +25,7 @@ export default function MyLoansScreen({ navigation, embedded }: Props) {
   const load = async () => {
     setError(false);
     try {
-      const response = await api.get("/api/loans/mine", { params: { status: "active" } });
+      const response = await api.get("/api/loans/mine", { params: { status: "returned" } });
       setLoans(response.data.loans || []);
     } catch {
       setLoans([]);
@@ -48,13 +44,12 @@ export default function MyLoansScreen({ navigation, embedded }: Props) {
   );
 
   const goCatalog = () => navigation.getParent()?.navigate("Catalog");
-  const goScan = () => navigation.getParent()?.navigate("Scan");
 
   return (
     <View style={[styles.container, { backgroundColor: colors.cream }]}>
       {!embedded && (
         <Text style={[styles.heading, { color: colors.navy, fontFamily: fontFamily.display }]}>
-          My Loans
+          Loan history
         </Text>
       )}
 
@@ -79,93 +74,63 @@ export default function MyLoansScreen({ navigation, embedded }: Props) {
           }
           ListEmptyComponent={
             <EmptyState
-              title="No active loans"
-              message="Browse the catalog or scan a book QR to borrow."
+              title="No returned books yet"
+              message="Books you borrow and return will show up here."
               actionLabel="Browse catalog"
               onAction={goCatalog}
             />
           }
-          renderItem={({ item }) => {
-            const status = loanStatusChip(item.status, item.dueDate);
-            const due = dueCountdown(item.dueDate);
-
-            return (
-              <Card style={{ marginBottom: space.sm }}>
-                <View style={styles.row}>
-                  <Text
-                    style={{
-                      flex: 1,
-                      fontFamily: fontFamily.bodyBold,
-                      fontSize: type.body,
-                      color: colors.navy,
-                    }}
-                  >
-                    {item.title}
-                  </Text>
-                  <Badge label={status.label} tone={status.tone} />
-                </View>
+          renderItem={({ item }) => (
+            <Card style={{ marginBottom: space.sm }}>
+              <View style={styles.row}>
                 <Text
                   style={{
-                    marginTop: space.xs,
-                    fontFamily: fontFamily.body,
+                    flex: 1,
+                    fontFamily: fontFamily.bodyBold,
+                    fontSize: type.body,
+                    color: colors.navy,
+                  }}
+                >
+                  {item.title}
+                </Text>
+                <Badge label="Returned" tone="muted" />
+              </View>
+              <Text
+                style={{
+                  marginTop: space.xs,
+                  fontFamily: fontFamily.body,
+                  fontSize: type.small,
+                  color: colors.muted,
+                }}
+              >
+                Borrowed {formatShortDate(item.borrowedAt)}
+              </Text>
+              <Text
+                style={{
+                  marginTop: 4,
+                  fontFamily: fontFamily.body,
+                  fontSize: type.small,
+                  color: colors.muted,
+                }}
+              >
+                Returned {formatShortDate(item.returnedAt)}
+              </Text>
+              {item.fineAmount > 0 && (
+                <Text
+                  style={{
+                    marginTop: space.sm,
+                    fontFamily: fontFamily.bodyBold,
                     fontSize: type.small,
-                    color: colors.muted,
+                    color: colors.warning,
                   }}
                 >
-                  Borrowed {formatShortDate(item.borrowedAt)}
+                  Fine: Rs {item.fineAmount} {item.finePaid ? "(paid)" : "(unpaid)"}
                 </Text>
-                <Text
-                  style={{
-                    marginTop: 4,
-                    fontFamily: fontFamily.bodySemiBold,
-                    fontSize: type.small,
-                    color: due.overdue ? colors.danger : colors.text,
-                  }}
-                >
-                  {due.label}
-                </Text>
-                <Text
-                  style={{
-                    marginTop: 4,
-                    fontFamily: fontFamily.body,
-                    fontSize: type.caption,
-                    color: colors.muted,
-                  }}
-                >
-                  Due {formatShortDate(item.dueDate)}
-                </Text>
-                {item.fineAmount > 0 && (
-                  <Text
-                    style={{
-                      marginTop: space.sm,
-                      fontFamily: fontFamily.bodyBold,
-                      fontSize: type.small,
-                      color: colors.warning,
-                    }}
-                  >
-                    Fine: Rs {item.fineAmount} {item.finePaid ? "(paid)" : "(unpaid)"}
-                  </Text>
-                )}
-              </Card>
-            );
-          }}
+              )}
+            </Card>
+          )}
         />
       )}
-
-      {!loading && !error && loans.length > 0 ? (
-        <Text
-          style={{
-            textAlign: "center",
-            fontFamily: fontFamily.body,
-            fontSize: type.caption,
-            color: colors.muted,
-            marginBottom: space.sm,
-          }}
-          onPress={goScan}
-        >
-          Tap Scan tab to return a book
-        </Text>
-      ) : null}
     </View>
   );
 }
