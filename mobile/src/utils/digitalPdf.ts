@@ -30,8 +30,16 @@ export async function downloadDigitalPdf(
   const dest = pdfCachePath(digitalBookId, title);
   const cached = await getCachedPdfUri(digitalBookId, title);
   if (cached) {
-    onProgress?.(1);
-    return cached;
+    const info = await FileSystem.getInfoAsync(cached);
+    if (info.exists && "size" in info && Number(info.size) > 0) {
+      onProgress?.(1);
+      return cached;
+    }
+    try {
+      await FileSystem.deleteAsync(cached, { idempotent: true });
+    } catch {
+      // ignore
+    }
   }
 
   const token = await user.getIdToken();

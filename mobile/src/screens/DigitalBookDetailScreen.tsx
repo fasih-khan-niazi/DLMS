@@ -74,9 +74,10 @@ function NpsPicker({
   disabled?: boolean;
 }) {
   const { colors, fontFamily, space, type, radius } = useTheme();
-  return (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
-      {Array.from({ length: 11 }, (_, i) => i).map((score) => {
+
+  const renderRow = (scores: number[]) => (
+    <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.xs }}>
+      {scores.map((score) => {
         const selected = value === score;
         return (
           <Pressable
@@ -84,9 +85,8 @@ function NpsPicker({
             disabled={disabled}
             onPress={() => onSelect(score)}
             style={{
-              minWidth: 36,
-              paddingVertical: 8,
-              paddingHorizontal: 6,
+              flex: 1,
+              paddingVertical: 10,
               borderRadius: radius.sm,
               borderWidth: 1,
               borderColor: selected ? colors.navy : colors.border,
@@ -97,7 +97,7 @@ function NpsPicker({
             <Text
               style={{
                 fontFamily: fontFamily.bodySemiBold,
-                fontSize: type.caption,
+                fontSize: type.small,
                 color: selected ? colors.white : colors.navy,
               }}
             >
@@ -106,6 +106,13 @@ function NpsPicker({
           </Pressable>
         );
       })}
+    </View>
+  );
+
+  return (
+    <View style={{ gap: space.sm }}>
+      {renderRow([1, 2, 3, 4, 5])}
+      {renderRow([6, 7, 8, 9, 10])}
     </View>
   );
 }
@@ -411,22 +418,10 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
               fontFamily: fontFamily.bodyBold,
               fontSize: type.body,
               color: colors.navy,
-              marginBottom: space.sm,
+              marginBottom: space.xs,
             }}
           >
-            Your review
-          </Text>
-          <StarRating value={draftRating} onSelect={setDraftRating} disabled={busy} />
-          <Text
-            style={{
-              marginTop: space.md,
-              marginBottom: space.sm,
-              fontFamily: fontFamily.bodySemiBold,
-              fontSize: type.small,
-              color: colors.navy,
-            }}
-          >
-            Would you recommend this book to your friends?
+            How would you rate this book?
           </Text>
           <Text
             style={{
@@ -436,8 +431,34 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
               color: colors.muted,
             }}
           >
-            0 = not at all · 10 = definitely
+            Tap a star from 1 to 5
           </Text>
+          <StarRating value={draftRating} onSelect={setDraftRating} disabled={busy} />
+          <Text
+            style={{
+              marginTop: space.lg,
+              marginBottom: space.xs,
+              fontFamily: fontFamily.bodySemiBold,
+              fontSize: type.small,
+              color: colors.navy,
+            }}
+          >
+            Would you recommend this book to your friends?
+          </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginBottom: space.sm,
+            }}
+          >
+            <Text style={{ fontFamily: fontFamily.body, fontSize: type.caption, color: colors.muted }}>
+              1 · Not at all
+            </Text>
+            <Text style={{ fontFamily: fontFamily.body, fontSize: type.caption, color: colors.muted }}>
+              10 · Definitely
+            </Text>
+          </View>
           <NpsPicker value={draftRecommend} onSelect={setDraftRecommend} disabled={busy} />
           <Button
             title="Save review"

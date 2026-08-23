@@ -63,7 +63,8 @@ export function BookCover({ uri, width = 72, height = 108, style, cacheKey }: Pr
   }, [uri, cacheKey]);
 
   const showImage = !!displayUri && !failed;
-  const showSpinner = loading && !displayUri;
+  // Prefer branded placeholder over a spinner so catalog stays calm while covers fetch.
+  const showSpinner = false;
 
   return (
     <View

@@ -1,11 +1,17 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, ScrollView, Pressable } from "react-native";
+import React, { useState } from "react";
+import {
+  Text,
+  ScrollView,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { API_BASE_URL } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
-import { Button, Input, Card } from "../components/ui";
+import { Button, Input } from "../components/ui";
 import { AppModal } from "../components/AppModal";
 import { invalidateDigitalCache } from "../utils/digitalCache";
 import { getAppConfig, invalidateAppConfigCache } from "../utils/appConfig";
@@ -59,7 +65,7 @@ export default function UploadDigitalBookScreen({ navigation }: Props) {
     if (file.size && file.size > maxMb * 1024 * 1024) {
       setModal({
         kind: "error",
-        message: `This PDF is too large. Maximum size is ${maxMb} MB (change in admin Config).`,
+        message: `This PDF is too large. Maximum size is ${maxMb} MB.`,
       });
       return;
     }
@@ -91,7 +97,7 @@ export default function UploadDigitalBookScreen({ navigation }: Props) {
       invalidateDigitalCache();
       setModal({
         kind: "success",
-        message: "Your PDF is in the catalog. A cover was generated from the first page.",
+        message: "Your PDF is in the catalog. The cover is generated from the first page.",
       });
     } catch (error: any) {
       setModal({ kind: "error", message: error.message || "Upload failed. Try again." });
@@ -112,58 +118,70 @@ export default function UploadDigitalBookScreen({ navigation }: Props) {
 
   return (
     <>
-      <ScrollView
+      <KeyboardAvoidingView
         style={{ flex: 1, backgroundColor: colors.cream }}
-        contentContainerStyle={{ paddingTop: 56, paddingHorizontal: 20, paddingBottom: 40 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
       >
-        <Pressable onPress={() => navigation.goBack()} style={{ marginBottom: space.md }}>
-          <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>← Back</Text>
-        </Pressable>
-
-        <Text
-          style={{
-            fontFamily: fontFamily.display,
-            fontSize: type.titleSm,
-            color: colors.navy,
-            marginBottom: space.xs,
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            paddingTop: 56,
+            paddingHorizontal: 20,
+            paddingBottom: 48,
           }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
-          Upload digital copy
-        </Text>
-        <Text
-          style={{
-            fontFamily: fontFamily.body,
-            fontSize: type.small,
-            color: colors.muted,
-            marginBottom: space.lg,
-            lineHeight: 22,
-          }}
-        >
-          PDFs are stored securely in the library cloud. Maximum file size: {maxMb} MB (set in admin
-          Config).
-        </Text>
+          <Pressable onPress={() => navigation.goBack()} style={{ marginBottom: space.md }}>
+            <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>
+              ← Back
+            </Text>
+          </Pressable>
 
-        <Input label="Title" value={title} onChangeText={setTitle} placeholder="Book title" />
-        <Input label="Author" value={author} onChangeText={setAuthor} placeholder="Author name" />
-        <Input
-          label="Description (optional)"
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Short summary"
-          multiline
-          style={{ minHeight: 90, textAlignVertical: "top" }}
-        />
+          <Text
+            style={{
+              fontFamily: fontFamily.display,
+              fontSize: type.titleSm,
+              color: colors.navy,
+              marginBottom: space.xs,
+            }}
+          >
+            Upload digital copy
+          </Text>
+          <Text
+            style={{
+              fontFamily: fontFamily.body,
+              fontSize: type.small,
+              color: colors.muted,
+              marginBottom: space.lg,
+              lineHeight: 22,
+            }}
+          >
+            PDFs are stored securely in the library cloud. Maximum file size: {maxMb} MB.
+          </Text>
 
-        <Card style={{ marginBottom: space.md }}>
+          <Input label="Title" value={title} onChangeText={setTitle} placeholder="Book title" />
+          <Input label="Author" value={author} onChangeText={setAuthor} placeholder="Author name" />
+          <Input
+            label="Description (optional)"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Short summary"
+            multiline
+            style={{ minHeight: 110, textAlignVertical: "top", marginBottom: 4 }}
+          />
+
           <Button
             title={file ? `Selected: ${file.name}` : "Choose PDF"}
             variant="secondary"
             onPress={pickPdf}
+            style={{ marginTop: space.md, marginBottom: space.md }}
           />
-        </Card>
 
-        <Button title="Upload digital copy" onPress={upload} loading={loading} variant="amber" />
-      </ScrollView>
+          <Button title="Upload digital copy" onPress={upload} loading={loading} variant="amber" />
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <AppModal
         visible={modal.kind === "success"}
