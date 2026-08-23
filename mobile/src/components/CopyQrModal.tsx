@@ -11,13 +11,14 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Button } from "./ui/Button";
-import { exportCopyQrLabelPdf, qrImageUrl } from "../utils/qrLabelPdf";
+import { exportCopyQrLabelPdf, formatAuthors, qrImageUrl } from "../utils/qrLabelPdf";
 import { useTheme } from "../theme";
 
 type Props = {
   visible: boolean;
   onClose: () => void;
   title: string;
+  authors?: string[];
   isbn: string;
   copyLabel: string;
   qrPayload: string;
@@ -27,17 +28,19 @@ export function CopyQrModal({
   visible,
   onClose,
   title,
+  authors,
   isbn,
   copyLabel,
   qrPayload,
 }: Props) {
   const { colors, fontFamily, space, type, radius } = useTheme();
   const [exporting, setExporting] = useState(false);
+  const authorLine = formatAuthors(authors);
 
   const savePdf = async () => {
     setExporting(true);
     try {
-      await exportCopyQrLabelPdf({ title, isbn, copyLabel, qrPayload });
+      await exportCopyQrLabelPdf({ title, authors, isbn, copyLabel, qrPayload });
     } catch (error: any) {
       Alert.alert("Export failed", error.message || "Could not create PDF");
     } finally {
@@ -74,28 +77,6 @@ export function CopyQrModal({
             </Pressable>
           </View>
 
-          <Text
-            style={{
-              fontFamily: fontFamily.bodyBold,
-              fontSize: type.body,
-              color: colors.navy,
-              textAlign: "center",
-            }}
-          >
-            {title}
-          </Text>
-          <Text
-            style={{
-              marginTop: 4,
-              fontFamily: fontFamily.body,
-              fontSize: type.small,
-              color: colors.muted,
-              textAlign: "center",
-            }}
-          >
-            ISBN {isbn}
-          </Text>
-
           <View
             style={[
               styles.qrWrap,
@@ -114,6 +95,52 @@ export function CopyQrModal({
 
           <Text
             style={{
+              fontFamily: fontFamily.bodyBold,
+              fontSize: type.body,
+              color: colors.navy,
+              textAlign: "center",
+              marginTop: space.sm,
+            }}
+          >
+            {title}
+          </Text>
+          <Text
+            style={{
+              marginTop: 4,
+              fontFamily: fontFamily.body,
+              fontSize: type.small,
+              color: colors.muted,
+              textAlign: "center",
+            }}
+          >
+            {authorLine}
+          </Text>
+          <Text
+            style={{
+              marginTop: space.sm,
+              fontFamily: fontFamily.bodySemiBold,
+              fontSize: type.small,
+              color: colors.navy,
+              textAlign: "center",
+            }}
+          >
+            {copyLabel}
+          </Text>
+          <Text
+            style={{
+              marginTop: 4,
+              fontFamily: fontFamily.body,
+              fontSize: type.caption,
+              color: colors.muted,
+              textAlign: "center",
+            }}
+          >
+            ISBN {isbn}
+          </Text>
+
+          <Text
+            style={{
+              marginTop: space.md,
               fontFamily: fontFamily.body,
               fontSize: type.caption,
               color: colors.muted,
@@ -157,8 +184,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   qrWrap: {
-    marginTop: 16,
-    marginBottom: 12,
     alignSelf: "center",
     padding: 16,
     borderWidth: 1,

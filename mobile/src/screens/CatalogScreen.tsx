@@ -40,7 +40,7 @@ type CatalogBook = {
 };
 
 type SortOption = "title_asc" | "title_desc" | "newest";
-type AvailabilityFilter = "all" | "available" | "reserved" | "issued" | "unavailable";
+type AvailabilityFilter = "all" | "available" | "reserved" | "issued" | "unavailable" | "inactive";
 type ViewMode = "list" | "grid";
 
 type Props = {
@@ -100,13 +100,19 @@ export default function CatalogScreen({
       const availabilityFilter = opts?.availabilityFilter ?? availability;
       const size = pageSize || (await getCatalogPageSize());
 
+      const catalogStatus =
+        staff && availabilityFilter === "inactive" ? "inactive" : "active";
+
       const cacheKey = catalogCacheKey({
         q: search.trim(),
         page: pageNum,
         pageSize: size,
         sort: sortBy,
-        availability: availabilityFilter !== "all" ? availabilityFilter : undefined,
-        includeInactive: staff ? "1" : undefined,
+        availability:
+          availabilityFilter !== "all" && availabilityFilter !== "inactive"
+            ? availabilityFilter
+            : undefined,
+        catalogStatus: catalogStatus === "inactive" ? "inactive" : undefined,
       });
 
       if (!opts?.skipCache) {
@@ -133,8 +139,10 @@ export default function CatalogScreen({
             pageSize: size,
             sort: sortBy,
             ...(search.trim() ? { q: search.trim() } : {}),
-            ...(availabilityFilter !== "all" ? { availability: availabilityFilter } : {}),
-            ...(staff ? { includeInactive: "1" } : {}),
+            ...(availabilityFilter !== "all" && availabilityFilter !== "inactive"
+              ? { availability: availabilityFilter }
+              : {}),
+            ...(catalogStatus === "inactive" ? { catalogStatus: "inactive" } : {}),
           },
         });
         setBooks(response.data.results || []);
@@ -197,6 +205,7 @@ export default function CatalogScreen({
   };
 
   const renderBook = ({ item }: { item: CatalogBook }) => {
+    const inactive = item.isActive === false;
     const tone =
       item.availability === "Available"
         ? "success"
@@ -222,7 +231,11 @@ export default function CatalogScreen({
           >
             {item.title}
           </Text>
-          <Badge label={item.availability || "Unavailable"} tone={tone} style={{ marginTop: space.xs }} />
+          {inactive ? (
+            <Badge label="Inactive" tone="danger" style={{ marginTop: space.xs }} />
+          ) : (
+            <Badge label={item.availability || "Unavailable"} tone={tone} style={{ marginTop: space.xs }} />
+          )}
         </Pressable>
       );
     }
@@ -255,7 +268,7 @@ export default function CatalogScreen({
           >
             {(item.authors || []).join(", ") || "Unknown author"}
           </Text>
-          {item.isActive === false ? (
+          {inactive ? (
             <Text
               style={{
                 marginTop: 6,
@@ -269,17 +282,23 @@ export default function CatalogScreen({
           ) : null}
         </View>
         <View style={styles.badgeCol}>
-          <Badge label={item.availability || "Unavailable"} tone={tone} />
-          <Text
-            style={{
-              marginTop: 4,
-              fontFamily: fontFamily.body,
-              fontSize: type.caption,
-              color: colors.muted,
-            }}
-          >
-            {item.availableCount || 0}/{item.totalCopies || 0}
-          </Text>
+          {inactive ? (
+            <Badge label="Inactive" tone="danger" />
+          ) : (
+            <Badge label={item.availability || "Unavailable"} tone={tone} />
+          )}
+          {!inactive ? (
+            <Text
+              style={{
+                marginTop: 4,
+                fontFamily: fontFamily.body,
+                fontSize: type.caption,
+                color: colors.muted,
+              }}
+            >
+              {item.availableCount || 0}/{item.totalCopies || 0}
+            </Text>
+          ) : null}
         </View>
       </Pressable>
     );
@@ -296,6 +315,7 @@ export default function CatalogScreen({
     { id: "available", label: "Available" },
     { id: "reserved", label: "Reserved" },
     { id: "issued", label: "Issued" },
+    ...(isStaff ? [{ id: "inactive" as const, label: "Inactive" }] : []),
   ];
 
   return (

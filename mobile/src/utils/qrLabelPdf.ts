@@ -13,12 +13,20 @@ function escapeHtml(value: string) {
     .replace(/"/g, "&quot;");
 }
 
+function formatAuthors(authors?: string[]) {
+  const list = (authors || []).map((a) => a.trim()).filter(Boolean);
+  if (list.length === 0) return "Unknown author";
+  return list.join(", ");
+}
+
 export async function exportCopyQrLabelPdf(input: {
   title: string;
+  authors?: string[];
   isbn: string;
   copyLabel: string;
   qrPayload: string;
 }) {
+  const authorLine = formatAuthors(input.authors);
   const qrUrl = qrImageUrl(input.qrPayload, 400);
   const html = `<!DOCTYPE html>
 <html>
@@ -31,38 +39,40 @@ export async function exportCopyQrLabelPdf(input: {
         padding: 24px;
         color: #2E4A62;
       }
-      h1 {
-        font-size: 18px;
-        margin: 0 0 8px;
-      }
-      .meta {
-        font-size: 12px;
-        color: #6B7280;
-        margin-bottom: 16px;
-      }
       img {
         width: 220px;
         height: 220px;
+        margin-bottom: 12px;
       }
-      .copy {
-        margin-top: 16px;
+      .below-qr-title {
         font-size: 16px;
         font-weight: 700;
+        margin: 0 0 4px;
+        line-height: 1.3;
       }
-      .payload {
-        margin-top: 10px;
-        font-size: 10px;
-        color: #9CA3AF;
-        word-break: break-all;
+      .below-qr-author {
+        font-size: 13px;
+        color: #4B5563;
+        margin: 0 0 12px;
+        line-height: 1.3;
+      }
+      .copy {
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+      .isbn {
+        font-size: 11px;
+        color: #6B7280;
       }
     </style>
   </head>
   <body>
-    <h1>${escapeHtml(input.title)}</h1>
-    <div class="meta">ISBN ${escapeHtml(input.isbn)}</div>
     <img src="${qrUrl}" alt="QR code" />
+    <div class="below-qr-title">${escapeHtml(input.title)}</div>
+    <div class="below-qr-author">${escapeHtml(authorLine)}</div>
     <div class="copy">${escapeHtml(input.copyLabel)}</div>
-    <div class="payload">${escapeHtml(input.qrPayload)}</div>
+    <div class="isbn">ISBN ${escapeHtml(input.isbn)}</div>
   </body>
 </html>`;
 
@@ -81,4 +91,4 @@ export async function exportCopyQrLabelPdf(input: {
   return uri;
 }
 
-export { qrImageUrl };
+export { qrImageUrl, formatAuthors };

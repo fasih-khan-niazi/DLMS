@@ -18,6 +18,7 @@ import api, { API_BASE_URL } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
 import { useProfile } from "../context/ProfileContext";
 import { CopyQrModal } from "../components/CopyQrModal";
+import { SuccessModal } from "../components/SuccessModal";
 import { BookCover, Badge, Button, Card } from "../components/ui";
 import { formatIsbn } from "../utils/isbn";
 import { invalidateCatalogCache } from "../utils/catalogCache";
@@ -31,6 +32,7 @@ type Props = {
 type QrModalState = {
   copyLabel: string;
   qrPayload: string;
+  authors?: string[];
 };
 
 export default function BookDetailScreen({ navigation, route }: Props) {
@@ -51,6 +53,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [qrModal, setQrModal] = useState<QrModalState | null>(null);
   const [expandedCopyId, setExpandedCopyId] = useState<string | null>(null);
+  const [coverSuccess, setCoverSuccess] = useState<{ title: string; message: string } | null>(null);
 
   const load = async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) {
@@ -146,37 +149,66 @@ export default function BookDetailScreen({ navigation, route }: Props) {
 
   const toggleCatalogActive = () => {
     if (!book) return;
-    const next = book.isActive === false;
-    const label = next ? "Reactivate" : "Deactivate";
-    Alert.alert(
-      `${label} title?`,
-      next
-        ? "Students will see this book in the catalog again."
-        : "Students will not see this book. Loan and reservation history is kept.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: label,
-          style: next ? "default" : "destructive",
-          onPress: async () => {
-            setTogglingStatus(true);
-            try {
-              await api.patch(`/api/catalog/books/${encodeURIComponent(isbn)}/status`, {
-                isActive: next,
-              });
-              await load({ silent: true });
-            } catch (error: any) {
-              Alert.alert(
-                "Update failed",
-                error.response?.data?.error || "Could not update book status"
-              );
-            } finally {
-              setTogglingStatus(false);
-            }
+    const reactivating = book.isActive === false;
+
+    if (reactivating) {
+      Alert.alert(
+        "Reactivate title?",
+        "Students will see this book in the catalog again.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Reactivate",
+            onPress: () => void performStatusChange(true),
           },
-        },
-      ]
-    );
+        ]
+      );
+      return;
+    }
+
+    const pending = Number(book.pendingReservationCount) || 0;
+    const onLoan = Number(book.issuedCount) || 0;
+
+    if (onLoan > 0) {
+      Alert.alert(
+        "Cannot deactivate",
+        "A copy of this title is currently on loan. Wait until all copies are returned.",
+      );
+      return;
+    }
+
+    const reservationNote =
+      pending > 0
+        ? `${pending} student reservation${pending === 1 ? " is" : "s are"} waiting or ready for pickup. Deactivating will cancel ${pending === 1 ? "it" : "them"} and notify the student${pending === 1 ? "" : "s"}.`
+        : "Students will no longer see this title in the catalog.";
+
+    Alert.alert("Deactivate title?", reservationNote, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Deactivate",
+        style: "destructive",
+        onPress: () => void performStatusChange(false),
+      },
+    ]);
+  };
+
+  const performStatusChange = async (isActive: boolean) => {
+    setTogglingStatus(true);
+    try {
+      const response = await api.patch(`/api/catalog/books/${encodeURIComponent(isbn)}/status`, {
+        isActive,
+      });
+      invalidateCatalogCache();
+      await load({ silent: true });
+      Alert.alert(isActive ? "Reactivated" : "Deactivated", response.data.message || "Updated");
+    } catch (error: any) {
+      Alert.alert(
+        "Update failed",
+        error.response?.data?.error || "Could not update book status"
+      );
+    } finally {
+      setTogglingStatus(false);
+    }
   };
 
   const saveCoverUrl = async () => {
@@ -192,6 +224,10 @@ export default function BookDetailScreen({ navigation, route }: Props) {
         thumbnailUrl: url,
       });
       applyCoverUpdate(url, "manual");
+      setCoverSuccess({
+        title: "Cover saved",
+        message: "The book cover was updated. It should appear right away across the catalog.",
+      });
     } catch (error: any) {
       Alert.alert("Save failed", error.response?.data?.error || "Could not save cover URL");
     } finally {
@@ -231,6 +267,10 @@ export default function BookDetailScreen({ navigation, route }: Props) {
       }
 
       applyCoverUpdate(data.thumbnailUrl, "manual");
+      setCoverSuccess({
+        title: "Cover uploaded",
+        message: "Your image was saved and linked to this book. It should appear right away across the catalog.",
+      });
     } catch (error: any) {
       Alert.alert("Upload failed", error.message || "Could not upload cover");
     } finally {
@@ -324,11 +364,12 @@ export default function BookDetailScreen({ navigation, route }: Props) {
           >
             ISBN {formatIsbn(book.isbn)}
           </Text>
-          <Badge
-            label={book.availability || "Unavailable"}
-            tone={availabilityTone}
-            style={{ marginTop: space.sm }}
-          />
+        <Badge
+          label={book.isActive === false ? "Inactive" : book.availability || "Unavailable"}
+          tone={book.isActive === false ? "danger" : availabilityTone}
+          style={{ marginTop: space.sm }}
+        />
+        {book.isActive !== false ? (
           <Text
             style={{
               marginTop: space.sm,
@@ -339,6 +380,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
           >
             {book.availableCount || 0} available · {book.totalCopies || 0} total copies
           </Text>
+        ) : null}
           {book.isActive === false ? (
             <Text
               style={{
@@ -458,7 +500,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
           <Card style={{ marginBottom: space.md }}>
             <Button
               title={book.isActive === false ? "Reactivate title" : "Deactivate title"}
-              variant={book.isActive === false ? "secondary" : "dangerSoft"}
+              variant={book.isActive === false ? "successSoft" : "dangerSoft"}
               onPress={toggleCatalogActive}
               loading={togglingStatus}
             />
@@ -589,6 +631,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
                               setQrModal({
                                 copyLabel,
                                 qrPayload: copy.qrPayload,
+                                authors: book.authors,
                               })
                             }
                           />
@@ -633,11 +676,19 @@ export default function BookDetailScreen({ navigation, route }: Props) {
           visible
           onClose={() => setQrModal(null)}
           title={book.title}
+          authors={book.authors}
           isbn={formatIsbn(book.isbn)}
           copyLabel={qrModal.copyLabel}
           qrPayload={qrModal.qrPayload}
         />
       ) : null}
+
+      <SuccessModal
+        visible={!!coverSuccess}
+        title={coverSuccess?.title || ""}
+        message={coverSuccess?.message || ""}
+        onClose={() => setCoverSuccess(null)}
+      />
     </>
   );
 }

@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useTheme } from "../../theme";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger" | "dangerSoft" | "amber";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "dangerSoft" | "successSoft" | "amber";
 
 type Props = PressableProps & {
   title: string;
@@ -40,6 +40,7 @@ export function Button({
     ghost: { bg: "transparent", text: colors.navy },
     danger: { bg: colors.danger, text: colors.white },
     dangerSoft: { bg: "#FEE4E2", text: colors.danger, border: "#FECACA" },
+    successSoft: { bg: "#E8F5EC", text: colors.success, border: "#BBF7D0" },
     amber: { bg: colors.amber, text: colors.navy },
   };
   const p = palette[variant];

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Image, StyleSheet, View, type ViewStyle } from "react-native";
+import { ActivityIndicator, Image, StyleSheet, View, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { resolveCoverDisplayUri } from "../../utils/coverImage";
 import { useTheme } from "../../theme";
 
 type Props = {
@@ -14,16 +15,34 @@ type Props = {
 
 export function BookCover({ uri, width = 72, height = 108, style, cacheKey }: Props) {
   const { colors, radius } = useTheme();
+  const [displayUri, setDisplayUri] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
-  const displayUri =
-    uri && cacheKey !== undefined && cacheKey !== null
-      ? `${uri}${uri.includes("?") ? "&" : "?"}v=${cacheKey}`
-      : uri;
-  const showImage = !!displayUri && !failed;
 
   useEffect(() => {
+    let cancelled = false;
     setFailed(false);
+
+    if (!uri) {
+      setDisplayUri(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    void resolveCoverDisplayUri(uri, cacheKey).then((resolved) => {
+      if (cancelled) return;
+      setDisplayUri(resolved);
+      setFailed(!resolved);
+      setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [uri, cacheKey]);
+
+  const showImage = !!displayUri && !failed && !loading;
 
   return (
     <View
@@ -39,7 +58,9 @@ export function BookCover({ uri, width = 72, height = 108, style, cacheKey }: Pr
         style,
       ]}
     >
-      {showImage ? (
+      {loading ? (
+        <ActivityIndicator size="small" color={colors.navy} />
+      ) : showImage ? (
         <Image
           source={{ uri: displayUri }}
           style={{ width, height, borderRadius: radius.sm }}
@@ -47,7 +68,11 @@ export function BookCover({ uri, width = 72, height = 108, style, cacheKey }: Pr
           onError={() => setFailed(true)}
         />
       ) : (
-        <Ionicons name="book-outline" size={Math.min(width, height) * 0.38} color={colors.bookPlaceholderIcon} />
+        <Ionicons
+          name="book-outline"
+          size={Math.min(width, height) * 0.38}
+          color={colors.bookPlaceholderIcon}
+        />
       )}
     </View>
   );

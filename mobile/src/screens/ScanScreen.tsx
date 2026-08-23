@@ -24,6 +24,20 @@ import {
 
 type Mode = "borrow" | "return";
 
+function friendlyScanError(message: string): string {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes("qr") ||
+    lower.includes("copyid") ||
+    lower.includes("qrpayload") ||
+    lower.includes("valid library") ||
+    lower.includes("required")
+  ) {
+    return "That doesn't look like a library book label. Hold the camera steady, make sure the QR is clear, and try again.";
+  }
+  return message;
+}
+
 type Props = {
   navigation: NativeStackNavigationProp<any>;
 };
@@ -104,7 +118,7 @@ export default function ScanScreen({ navigation }: Props) {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setResult({
         kind: "error",
-        message: error.response?.data?.error || "Scan action failed",
+        message: friendlyScanError(error.response?.data?.error || "Scan action failed"),
         mode,
       });
     } finally {
