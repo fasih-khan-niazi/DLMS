@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Image, StyleSheet, View, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../theme";
@@ -8,12 +8,22 @@ type Props = {
   width?: number;
   height?: number;
   style?: ViewStyle;
+  /** Bumps when the cover changes so cached images reload. */
+  cacheKey?: string | number;
 };
 
-export function BookCover({ uri, width = 72, height = 108, style }: Props) {
+export function BookCover({ uri, width = 72, height = 108, style, cacheKey }: Props) {
   const { colors, radius } = useTheme();
   const [failed, setFailed] = useState(false);
-  const showImage = !!uri && !failed;
+  const displayUri =
+    uri && cacheKey !== undefined && cacheKey !== null
+      ? `${uri}${uri.includes("?") ? "&" : "?"}v=${cacheKey}`
+      : uri;
+  const showImage = !!displayUri && !failed;
+
+  useEffect(() => {
+    setFailed(false);
+  }, [uri, cacheKey]);
 
   return (
     <View
@@ -31,7 +41,7 @@ export function BookCover({ uri, width = 72, height = 108, style }: Props) {
     >
       {showImage ? (
         <Image
-          source={{ uri }}
+          source={{ uri: displayUri }}
           style={{ width, height, borderRadius: radius.sm }}
           resizeMode="cover"
           onError={() => setFailed(true)}

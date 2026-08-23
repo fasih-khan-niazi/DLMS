@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useTheme } from "../../theme";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "dangerSoft" | "amber";
 
 type Props = PressableProps & {
   title: string;
@@ -39,6 +39,8 @@ export function Button({
     secondary: { bg: colors.white, text: colors.navy, border: colors.border },
     ghost: { bg: "transparent", text: colors.navy },
     danger: { bg: colors.danger, text: colors.white },
+    dangerSoft: { bg: "#FEE4E2", text: colors.danger, border: "#FECACA" },
+    amber: { bg: colors.amber, text: colors.navy },
   };
   const p = palette[variant];
 
