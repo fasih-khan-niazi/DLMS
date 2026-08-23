@@ -259,6 +259,14 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 - [ ] Smart progress: page counts only after ~4s dwell; saves `lastPage`, `totalPages`, `progress`.
 - [ ] Home + digital detail "Continue where you left off" opens reader at last page.
 - [ ] PDF first-page cover generated on upload; `cover-image` proxy for digital titles.
+- [ ] Lazy cover backfill for older uploads (generate on first cover request).
+- [ ] Reader loads PDF bytes from API/Supabase into WebView (not raw `file://` paths).
+
+**Multi-user access model**
+- Source of truth: one PDF object in Supabase per digital book.
+- API authenticates each request and streams/proxies the file.
+- Each device may keep a private cache copy for offline reopen; caches never conflict.
+- Concurrent readers are independent downloads of the same object (normal CDN/storage pattern).
 
 **Regression:** Open reader, read a few pages, close, reopen at same page; progress updates on Home.
 

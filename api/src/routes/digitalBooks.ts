@@ -61,10 +61,68 @@ function buildDigitalCoverImageUrl(req: AuthRequest, digitalBookId: string) {
 
 function withCoverThumbnail(req: AuthRequest, row: Record<string, unknown>) {
   const digitalBookId = String(row.digitalBookId || "");
-  if (row.coverStoragePath) {
-    return { ...row, thumbnailUrl: buildDigitalCoverImageUrl(req, digitalBookId) };
+  // Always expose cover URL — endpoint lazy-generates from PDF page 1 if missing.
+  return {
+    ...row,
+    thumbnailUrl: buildDigitalCoverImageUrl(req, digitalBookId),
+  };
+}
+
+async function ensureDigitalCover(
+  digitalBookId: string,
+  data: Record<string, unknown>
+): Promise<{ buffer: Buffer; contentType: string; path: string }> {
+  const existingPath = String(data.coverStoragePath || "");
+  if (existingPath) {
+    try {
+      const file = await downloadBookCover(existingPath);
+      return { ...file, path: existingPath };
+    } catch {
+      // fall through and regenerate
+    }
   }
-  return row;
+
+  const coverPath = digitalCoverObjectPath(digitalBookId);
+  try {
+    const file = await downloadBookCover(coverPath);
+    if (!existingPath) {
+      await db.collection("digitalBooks").doc(digitalBookId).update({
+        coverStoragePath: coverPath,
+        updatedAt: new Date(),
+      });
+    }
+    return { ...file, path: coverPath };
+  } catch {
+    // generate from PDF
+  }
+
+  const backend = String(data.storageBackend || "local");
+  let pdfBuffer: Buffer;
+  if (backend === "supabase") {
+    const objectPath = String(data.storagePath || data.storedFileName || "");
+    if (!objectPath) {
+      throw new Error("PDF storage path missing");
+    }
+    pdfBuffer = await downloadDigitalBookPdf(objectPath);
+  } else {
+    const filePath = digitalBookFilePath(String(data.storedFileName || ""));
+    if (!fs.existsSync(filePath)) {
+      throw new Error("PDF file missing on server");
+    }
+    pdfBuffer = fs.readFileSync(filePath);
+  }
+
+  const coverBuffer = await renderPdfFirstPageToJpeg(pdfBuffer);
+  await uploadBookCover({
+    objectPath: coverPath,
+    buffer: coverBuffer,
+    contentType: "image/jpeg",
+  });
+  await db.collection("digitalBooks").doc(digitalBookId).update({
+    coverStoragePath: coverPath,
+    updatedAt: new Date(),
+  });
+  return { buffer: coverBuffer, contentType: "image/jpeg", path: coverPath };
 }
 
 // List published digital books (search optional)
@@ -210,9 +268,7 @@ router.get("/:digitalBookId", authenticate, async (req: AuthRequest, res: Respon
       ...data,
       digitalBookId,
       fileUrl: publicFileUrl(req, digitalBookId),
-      ...(data.coverStoragePath
-        ? { thumbnailUrl: buildDigitalCoverImageUrl(req, digitalBookId) }
-        : {}),
+      thumbnailUrl: buildDigitalCoverImageUrl(req, digitalBookId),
     });
   } catch (error) {
     console.error("Get digital book error:", error);
@@ -236,8 +292,7 @@ router.get("/:digitalBookId/cover-image", authenticate, async (req: AuthRequest,
       return;
     }
 
-    const objectPath = String(data.coverStoragePath || digitalCoverObjectPath(digitalBookId));
-    const file = await downloadBookCover(objectPath);
+    const file = await ensureDigitalCover(digitalBookId, data);
     res.setHeader("Content-Type", file.contentType);
     res.setHeader("Cache-Control", "private, max-age=3600");
     res.send(file.buffer);
@@ -298,8 +353,8 @@ router.put("/:digitalBookId/reviews", authenticate, async (req: AuthRequest, res
     let recommendScore: number | null = null;
     if (req.body.recommendScore !== undefined && req.body.recommendScore !== null) {
       recommendScore = Number(req.body.recommendScore);
-      if (!Number.isInteger(recommendScore) || recommendScore < 0 || recommendScore > 10) {
-        res.status(400).json({ error: "recommendScore must be an integer 0-10" });
+      if (!Number.isInteger(recommendScore) || recommendScore < 1 || recommendScore > 10) {
+        res.status(400).json({ error: "recommendScore must be an integer 1-10" });
         return;
       }
     }
@@ -436,19 +491,6 @@ router.post(
         contentType: "application/pdf",
       });
 
-      let coverStoragePath = "";
-      try {
-        const coverBuffer = await renderPdfFirstPageToJpeg(req.file.buffer);
-        coverStoragePath = digitalCoverObjectPath(digitalBookId);
-        await uploadBookCover({
-          objectPath: coverStoragePath,
-          buffer: coverBuffer,
-          contentType: "image/jpeg",
-        });
-      } catch (coverError) {
-        console.warn("Digital cover generation failed (book still uploaded):", coverError);
-      }
-
       const now = new Date();
       const searchKeywords = buildSearchKeywords({
         title,
@@ -456,6 +498,7 @@ router.post(
         isbn: digitalBookId,
       });
 
+      const coverStoragePath = digitalCoverObjectPath(digitalBookId);
       const doc = {
         digitalBookId,
         title,
@@ -468,7 +511,8 @@ router.post(
         mimeType: "application/pdf",
         isPublished: true,
         storageBackend: "supabase",
-        coverStoragePath: coverStoragePath || null,
+        // Path reserved; image is generated in background so upload returns quickly.
+        coverStoragePath,
         searchKeywords,
         uploadedBy: req.uid,
         createdAt: now,
@@ -477,12 +521,25 @@ router.post(
 
       await db.collection("digitalBooks").doc(digitalBookId).set(doc);
 
+      // Non-blocking: first-page cover while client already sees the new title.
+      const pdfBuffer = req.file.buffer;
+      void (async () => {
+        try {
+          const coverBuffer = await renderPdfFirstPageToJpeg(pdfBuffer);
+          await uploadBookCover({
+            objectPath: coverStoragePath,
+            buffer: coverBuffer,
+            contentType: "image/jpeg",
+          });
+        } catch (coverError) {
+          console.warn("Digital cover generation failed (book still uploaded):", coverError);
+        }
+      })();
+
       res.status(201).json({
         ...doc,
         fileUrl: publicFileUrl(req, digitalBookId),
-        ...(coverStoragePath
-          ? { thumbnailUrl: buildDigitalCoverImageUrl(req, digitalBookId) }
-          : {}),
+        thumbnailUrl: buildDigitalCoverImageUrl(req, digitalBookId),
         message: "PDF uploaded to Supabase Storage",
       });
     } catch (error: any) {

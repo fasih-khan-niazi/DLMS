@@ -43,7 +43,7 @@ export async function upsertDigitalBookReview(input: {
     recommendScore:
       input.recommendScore === undefined || input.recommendScore === null
         ? null
-        : Math.min(10, Math.max(0, Math.round(input.recommendScore))),
+        : Math.min(10, Math.max(1, Math.round(input.recommendScore))),
     comment: String(input.comment || "").trim().slice(0, 500),
     updatedAt: now,
     ...(existing.exists ? {} : { createdAt: now }),
@@ -62,7 +62,7 @@ export function summarizeReviews(reviews: Array<Record<string, unknown>>) {
     .map((r) => r.recommendScore)
     .filter((v) => v !== null && v !== undefined)
     .map(Number)
-    .filter((n) => n >= 0 && n <= 10);
+    .filter((n) => n >= 1 && n <= 10);
   const averageRating =
     ratings.length > 0
       ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10
