@@ -10,6 +10,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useIsFocused } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
 import { ScanResultSheet, type ScanResult } from "../components/ScanResultSheet";
@@ -61,6 +62,7 @@ async function resolveCopyLabel(copyId: string, isbn: string): Promise<string> {
 
 export default function ScanScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
   const { colors, fontFamily, space, type, radius } = useTheme();
   const { isStaff } = useProfile();
   const [permission, requestPermission] = useCameraPermissions();
@@ -78,8 +80,15 @@ export default function ScanScreen({ navigation }: Props) {
   }, [isStaff]);
 
   useEffect(() => {
-    void loadHistory();
-  }, [loadHistory]);
+    if (!isFocused) {
+      setTorchOn(false);
+      setScanned(false);
+    }
+  }, [isFocused]);
+
+  useEffect(() => {
+    if (isFocused) void loadHistory();
+  }, [isFocused, loadHistory]);
 
   const resetScan = () => {
     setScanned(false);
@@ -176,13 +185,18 @@ export default function ScanScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.navy }]}>
-      <CameraView
-        style={StyleSheet.absoluteFillObject}
-        facing="back"
-        enableTorch={torchOn}
-        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-        onBarcodeScanned={scanned ? undefined : handleBarcode}
-      />
+      {isFocused ? (
+        <CameraView
+          style={StyleSheet.absoluteFillObject}
+          facing="back"
+          mute
+          enableTorch={torchOn}
+          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          onBarcodeScanned={scanned ? undefined : handleBarcode}
+        />
+      ) : (
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.navy }]} />
+      )}
 
       <View style={[styles.frameOverlay, StyleSheet.absoluteFillObject]} pointerEvents="none">
         <View style={styles.dimTop} />

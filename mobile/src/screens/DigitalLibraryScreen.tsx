@@ -459,7 +459,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
                   { id: "all" as const, label: "All" },
                   { id: "saved" as const, label: "Saved" },
                   { id: "reading" as const, label: "Reading" },
-                  { id: "unread" as const, label: "Unread" },
+                  { id: "unread" as const, label: "Not saved" },
                   { id: "finished" as const, label: "Finished" },
                 ] as const
               ).map((c) => (

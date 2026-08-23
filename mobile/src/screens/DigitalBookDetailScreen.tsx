@@ -147,6 +147,8 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
   const [reviewLocked, setReviewLocked] = useState(false);
   const [confirmReviewOpen, setConfirmReviewOpen] = useState(false);
   const [reviewSuccessOpen, setReviewSuccessOpen] = useState(false);
+  const [addedModalOpen, setAddedModalOpen] = useState(false);
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [modal, setModal] = useState<{ visible: boolean; message: string }>({
     visible: false,
     message: "",
@@ -201,13 +203,14 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
 
 
   const openReader = () => {
+    if (!shelf) return;
     navigation.navigate("PdfReader", {
       digitalBookId,
       title: book?.title || "Book",
       initialPage: Number(shelf?.lastPage) || 1,
       initialProgress: Number(shelf?.progress) || 0,
       totalPages: Number(shelf?.totalPages) || undefined,
-      onBookshelf: !!shelf,
+      onBookshelf: true,
     });
   };
 
@@ -217,10 +220,27 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
     try {
       const res = await api.post(`/api/digital-books/${digitalBookId}/bookshelf`);
       setShelf(res.data);
+      setAddedModalOpen(true);
     } catch (error: any) {
       setModal({
         visible: true,
         message: error.response?.data?.error || "Could not add to bookshelf",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeFromBookshelf = async () => {
+    setRemoveConfirmOpen(false);
+    setBusy(true);
+    try {
+      await api.delete(`/api/digital-books/${digitalBookId}/bookshelf`);
+      setShelf(null);
+    } catch (error: any) {
+      setModal({
+        visible: true,
+        message: error.response?.data?.error || "Could not remove from bookshelf",
       });
     } finally {
       setBusy(false);
@@ -340,69 +360,65 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
         </View>
 
         <Card style={{ marginBottom: space.md }}>
-          <Button
-            title={hasProgress ? "Continue reading" : "Read Book"}
-            onPress={openReader}
-          />
-          {shelf ? (
-            <Text
-              style={{
-                marginTop: space.sm,
-                textAlign: "center",
-                fontFamily: fontFamily.body,
-                fontSize: type.caption,
-                color: colors.success,
-              }}
-            >
-              On your bookshelf
-            </Text>
-          ) : (
+          {!shelf ? (
             <Button
               title="Add to Bookshelf"
-              variant="secondary"
               onPress={() => void addToBookshelf()}
               loading={busy}
-              style={{ marginTop: space.sm }}
             />
+          ) : (
+            <>
+              <Button
+                title={hasProgress ? "Continue reading" : "Read Book"}
+                onPress={openReader}
+              />
+              <Button
+                title="Remove from Bookshelf"
+                variant="dangerSoft"
+                onPress={() => setRemoveConfirmOpen(true)}
+                loading={busy}
+                style={{ marginTop: space.sm }}
+              />
+            </>
           )}
         </Card>
 
-        <Card style={{ marginBottom: space.md }}>
-          <Text
-            style={{
-              fontFamily: fontFamily.bodyBold,
-              fontSize: type.body,
-              color: colors.navy,
-              marginBottom: space.xs,
-            }}
-          >
-            Reading progress
-          </Text>
-          <Text style={{ fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
-            {hasProgress
-              ? `Page ${shelf?.lastPage || "?"} · ${progress}% read`
-              : shelf
-                ? "Saved to your bookshelf. Open the book to start reading."
-                : "Add to your bookshelf to save progress while you read."}
-          </Text>
-          <View
-            style={{
-              marginTop: space.sm,
-              height: 8,
-              borderRadius: radius.pill,
-              backgroundColor: colors.creamDark,
-              overflow: "hidden",
-            }}
-          >
+        {shelf ? (
+          <Card style={{ marginBottom: space.md }}>
+            <Text
+              style={{
+                fontFamily: fontFamily.bodyBold,
+                fontSize: type.body,
+                color: colors.navy,
+                marginBottom: space.xs,
+              }}
+            >
+              Reading progress
+            </Text>
+            <Text style={{ fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
+              {hasProgress
+                ? `Page ${shelf?.lastPage || "?"} · ${progress}% read`
+                : "Saved to your bookshelf. Open the book to start reading."}
+            </Text>
             <View
               style={{
-                width: `${Math.min(Math.max(progress, 0), 100)}%`,
-                height: "100%",
-                backgroundColor: colors.navy,
+                marginTop: space.sm,
+                height: 8,
+                borderRadius: radius.pill,
+                backgroundColor: colors.creamDark,
+                overflow: "hidden",
               }}
-            />
-          </View>
-        </Card>
+            >
+              <View
+                style={{
+                  width: `${Math.min(Math.max(progress, 0), 100)}%`,
+                  height: "100%",
+                  backgroundColor: colors.navy,
+                }}
+              />
+            </View>
+          </Card>
+        ) : null}
 
         {!!book.description && (
           <Card style={{ marginBottom: space.md }}>
@@ -608,6 +624,33 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
         ) : null}
       </ScrollView>
 
+      <AppModal
+        visible={addedModalOpen}
+        variant="success"
+        title="Added to bookshelf"
+        message="This book is saved. You can start reading now, or remove it anytime."
+        confirmLabel="Read Book"
+        cancelLabel="Remove from Bookshelf"
+        onClose={() => setAddedModalOpen(false)}
+        onConfirm={() => {
+          setAddedModalOpen(false);
+          openReader();
+        }}
+        onCancel={() => {
+          setAddedModalOpen(false);
+          setRemoveConfirmOpen(true);
+        }}
+      />
+      <AppModal
+        visible={removeConfirmOpen}
+        variant="info"
+        title="Remove from bookshelf?"
+        message="Your reading progress for this book will be cleared from your shelf."
+        confirmLabel="Remove"
+        cancelLabel="Keep it"
+        onClose={() => setRemoveConfirmOpen(false)}
+        onConfirm={() => void removeFromBookshelf()}
+      />
       <AppModal
         visible={confirmReviewOpen}
         variant="info"

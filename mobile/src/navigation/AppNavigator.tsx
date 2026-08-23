@@ -93,7 +93,7 @@ function MainTabs() {
   return (
     <ProfileProvider>
       <Tab.Navigator
-        detachInactiveScreens={false}
+        detachInactiveScreens={true}
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: colors.navy,

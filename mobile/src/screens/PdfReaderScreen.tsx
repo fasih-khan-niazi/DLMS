@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
   Modal,
+  ScrollView,
 } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
@@ -40,6 +41,7 @@ type Props = {
 };
 
 const SAVE_INTERVAL_MS = 15000;
+const ZOOM_PILLS = [50, 75, 100, 110, 125, 140, 150, 175, 200];
 
 async function applyOrientation(lock: ReaderPrefs["orientation"]) {
   if (lock === "landscape") {
@@ -61,6 +63,7 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
   const { colors, fontFamily, space, type, radius } = useTheme();
   const insets = useSafeAreaInsets();
   const webRef = useRef<WebView>(null);
+  const tabParent = navigation.getParent();
 
   const trackerRef = useRef(
     new ReadingProgressTracker({
@@ -75,9 +78,30 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [html, setHtml] = useState<string | null>(null);
   const [pageLabel, setPageLabel] = useState("");
+  const [zoomPercent, setZoomPercent] = useState(100);
   const [prefs, setPrefs] = useState<ReaderPrefs>({ readMode: "scroll", orientation: "portrait" });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [draftPrefs, setDraftPrefs] = useState<ReaderPrefs>(prefs);
+  const [draftZoom, setDraftZoom] = useState(100);
+
+  const setTabBarHidden = useCallback(
+    (hidden: boolean) => {
+      tabParent?.setOptions({
+        tabBarStyle: hidden
+          ? { display: "none" }
+          : {
+              backgroundColor: colors.white,
+              borderTopColor: colors.border,
+              borderTopWidth: 1,
+              height: 56 + Math.max(insets.bottom, 8),
+              paddingTop: 6,
+              paddingBottom: Math.max(insets.bottom, 8),
+              elevation: 8,
+            },
+      });
+    },
+    [tabParent, colors.white, colors.border, insets.bottom]
+  );
 
   const saveProgress = useCallback(async () => {
     if (!onBookshelf) return;
@@ -94,13 +118,14 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
     }
   }, [digitalBookId, onBookshelf]);
 
-  const pushSettingsToWeb = useCallback((next: ReaderPrefs) => {
-    const js = `window.applyReaderSettings(${JSON.stringify({
-      mode: next.readMode,
-      rerender: true,
-    })}); true;`;
-    webRef.current?.injectJavaScript(js);
-  }, []);
+  const injectSettings = useCallback(
+    (opts: { mode?: ReaderMode; zoomPercent?: number; resetZoom?: boolean; rerender?: boolean }) => {
+      webRef.current?.injectJavaScript(
+        `window.applyReaderSettings(${JSON.stringify(opts)}); true;`
+      );
+    },
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -109,9 +134,16 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
       try {
         const savedPrefs = await getReaderPrefs();
         if (cancelled) return;
+        // Enforce XOR: landscape only with scroll
+        if (savedPrefs.orientation === "landscape" && savedPrefs.readMode === "page") {
+          savedPrefs.readMode = "scroll";
+        }
         setPrefs(savedPrefs);
         setDraftPrefs(savedPrefs);
+        setDraftZoom(100);
+        setZoomPercent(100);
         await applyOrientation(savedPrefs.orientation);
+        setTabBarHidden(savedPrefs.orientation === "landscape");
 
         const user = firebaseAuth.currentUser;
         if (!user) throw new Error("Not signed in");
@@ -127,6 +159,7 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
             authToken: token,
             startPage: initialPage,
             readMode: savedPrefs.readMode,
+            zoomPercent: 100,
           })
         );
       } catch (err: any) {
@@ -145,8 +178,9 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
       if (saveTimerRef.current) clearInterval(saveTimerRef.current);
       void saveProgress();
       void ScreenOrientation.unlockAsync();
+      setTabBarHidden(false);
     };
-  }, [digitalBookId, initialPage, saveProgress]);
+  }, [digitalBookId, initialPage, saveProgress, setTabBarHidden]);
 
   const onMessage = (event: WebViewMessageEvent) => {
     try {
@@ -154,6 +188,10 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
       if (data.type === "page" || data.type === "ready") {
         trackerRef.current.onPageChange(Number(data.page) || 1, Number(data.total) || 1);
         setPageLabel(`${data.page} / ${data.total}`);
+      }
+      if (data.type === "zoom") {
+        setZoomPercent(Number(data.percent) || 100);
+        setDraftZoom(Number(data.percent) || 100);
       }
       if (data.type === "error") {
         setError(data.message || "Reader error");
@@ -164,11 +202,22 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
   };
 
   const applySettings = async () => {
+    let next = { ...draftPrefs };
+    // Mutual exclusion
+    if (next.orientation === "landscape") next.readMode = "scroll";
+    if (next.readMode === "page") next.orientation = "portrait";
+
     setSettingsOpen(false);
-    setPrefs(draftPrefs);
-    await setReaderPrefs(draftPrefs);
-    await applyOrientation(draftPrefs.orientation);
-    pushSettingsToWeb(draftPrefs);
+    setPrefs(next);
+    await setReaderPrefs(next);
+    await applyOrientation(next.orientation);
+    setTabBarHidden(next.orientation === "landscape");
+    setZoomPercent(draftZoom);
+    injectSettings({
+      mode: next.readMode,
+      zoomPercent: draftZoom,
+      rerender: true,
+    });
   };
 
   if (loading) {
@@ -203,6 +252,8 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
   }
 
   const topPad = Math.max(insets.top, Platform.OS === "ios" ? 12 : 8);
+  const landscapeDraft = draftPrefs.orientation === "landscape";
+  const pageModeDraft = draftPrefs.readMode === "page";
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.navy }}>
@@ -246,7 +297,15 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
               {pageLabel}
             </Text>
           ) : null}
-          <Pressable onPress={() => setSettingsOpen(true)} hitSlop={10} style={{ marginTop: 4 }}>
+          <Pressable
+            onPress={() => {
+              setDraftPrefs(prefs);
+              setDraftZoom(zoomPercent);
+              setSettingsOpen(true);
+            }}
+            hitSlop={10}
+            style={{ marginTop: 4 }}
+          >
             <Ionicons name="settings-outline" size={22} color={colors.navy} />
           </Pressable>
         </View>
@@ -268,59 +327,123 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
             style={[styles.modalCard, { backgroundColor: colors.cream, borderRadius: radius.lg }]}
             onPress={(e) => e.stopPropagation()}
           >
-            <Text style={{ fontFamily: fontFamily.display, fontSize: type.titleSm, color: colors.navy }}>
-              Reader settings
-            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={{ fontFamily: fontFamily.display, fontSize: type.titleSm, color: colors.navy }}>
+                Reader settings
+              </Text>
 
-            <Text
-              style={{
-                marginTop: space.md,
-                marginBottom: space.sm,
-                fontFamily: fontFamily.bodyBold,
-                fontSize: type.small,
-                color: colors.navy,
-              }}
-            >
-              Reading layout
-            </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-              <Chip
-                label="Vertical scroll"
-                selected={draftPrefs.readMode === "scroll"}
-                onPress={() => setDraftPrefs((p) => ({ ...p, readMode: "scroll" }))}
-              />
-              <Chip
-                label="Page by page"
-                selected={draftPrefs.readMode === "page"}
-                onPress={() => setDraftPrefs((p) => ({ ...p, readMode: "page" as ReaderMode }))}
-              />
-            </View>
+              <Text
+                style={{
+                  marginTop: space.md,
+                  marginBottom: space.sm,
+                  fontFamily: fontFamily.bodyBold,
+                  fontSize: type.small,
+                  color: colors.navy,
+                }}
+              >
+                Reading layout
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                <Chip
+                  label="Vertical scroll"
+                  selected={draftPrefs.readMode === "scroll"}
+                  onPress={() => setDraftPrefs((p) => ({ ...p, readMode: "scroll" }))}
+                />
+                <View style={{ opacity: landscapeDraft ? 0.4 : 1 }}>
+                  <Chip
+                    label="Page by page"
+                    selected={draftPrefs.readMode === "page"}
+                    onPress={() => {
+                      if (landscapeDraft) return;
+                      setDraftPrefs((p) => ({ ...p, readMode: "page", orientation: "portrait" }));
+                    }}
+                  />
+                </View>
+              </View>
+              {landscapeDraft ? (
+                <Text
+                  style={{
+                    marginTop: space.xs,
+                    fontFamily: fontFamily.body,
+                    fontSize: type.caption,
+                    color: colors.muted,
+                  }}
+                >
+                  Page by page is unavailable in landscape.
+                </Text>
+              ) : null}
 
-            <Text
-              style={{
-                marginTop: space.md,
-                marginBottom: space.sm,
-                fontFamily: fontFamily.bodyBold,
-                fontSize: type.small,
-                color: colors.navy,
-              }}
-            >
-              Screen orientation
-            </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-              <Chip
-                label="Portrait"
-                selected={draftPrefs.orientation === "portrait"}
-                onPress={() => setDraftPrefs((p) => ({ ...p, orientation: "portrait" }))}
-              />
-              <Chip
-                label="Landscape"
-                selected={draftPrefs.orientation === "landscape"}
-                onPress={() => setDraftPrefs((p) => ({ ...p, orientation: "landscape" }))}
-              />
-            </View>
+              <Text
+                style={{
+                  marginTop: space.md,
+                  marginBottom: space.sm,
+                  fontFamily: fontFamily.bodyBold,
+                  fontSize: type.small,
+                  color: colors.navy,
+                }}
+              >
+                Screen orientation
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                <Chip
+                  label="Portrait"
+                  selected={draftPrefs.orientation === "portrait"}
+                  onPress={() => setDraftPrefs((p) => ({ ...p, orientation: "portrait" }))}
+                />
+                <View style={{ opacity: pageModeDraft ? 0.4 : 1 }}>
+                  <Chip
+                    label="Landscape"
+                    selected={draftPrefs.orientation === "landscape"}
+                    onPress={() => {
+                      if (pageModeDraft) return;
+                      setDraftPrefs((p) => ({ ...p, orientation: "landscape", readMode: "scroll" }));
+                    }}
+                  />
+                </View>
+              </View>
+              {pageModeDraft ? (
+                <Text
+                  style={{
+                    marginTop: space.xs,
+                    fontFamily: fontFamily.body,
+                    fontSize: type.caption,
+                    color: colors.muted,
+                  }}
+                >
+                  Landscape is available with vertical scroll only.
+                </Text>
+              ) : null}
 
-            <Button title="Apply" onPress={() => void applySettings()} style={{ marginTop: space.lg }} />
+              <Text
+                style={{
+                  marginTop: space.md,
+                  marginBottom: space.sm,
+                  fontFamily: fontFamily.bodyBold,
+                  fontSize: type.small,
+                  color: colors.navy,
+                }}
+              >
+                Zoom
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {ZOOM_PILLS.map((z) => (
+                  <Chip
+                    key={z}
+                    label={`${z}%`}
+                    selected={draftZoom === z}
+                    onPress={() => setDraftZoom(z)}
+                  />
+                ))}
+              </View>
+              <Button
+                title="Reset zoom"
+                variant="ghost"
+                onPress={() => setDraftZoom(100)}
+                style={{ marginTop: space.sm }}
+              />
+
+              <Button title="Apply" onPress={() => void applySettings()} style={{ marginTop: space.md }} />
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
@@ -366,5 +489,6 @@ const styles = StyleSheet.create({
   modalCard: {
     padding: 20,
     paddingBottom: 32,
+    maxHeight: "85%",
   },
 });
