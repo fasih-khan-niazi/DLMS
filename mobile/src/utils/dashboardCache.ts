@@ -13,6 +13,8 @@ export type DashboardSnapshot = {
     title: string;
     author?: string;
     progress: number;
+    lastPage?: number;
+    totalPages?: number;
   }>;
   fetchedAt: number;
 };

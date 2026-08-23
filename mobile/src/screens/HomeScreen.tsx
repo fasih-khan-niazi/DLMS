@@ -7,7 +7,7 @@ import api from "../config/api";
 import { firebaseAuth } from "../config/firebase";
 import { useProfile } from "../context/ProfileContext";
 import { SearchBar } from "../components/SearchBar";
-import { Card, Screen } from "../components/ui";
+import { Card, Screen, BookCover } from "../components/ui";
 import { useTheme } from "../theme";
 import {
   getDashboardCache,
@@ -62,13 +62,15 @@ export default function HomeScreen({ navigation }: Props) {
       const readyReservations = reservations.filter((r: any) => r.status === "ready").length;
 
       const continueReading = (shelfRes.data.items || [])
-        .filter((item: any) => Number(item.progress) > 0)
+        .filter((item: any) => Number(item.progress) > 0 && Number(item.progress) < 100)
         .slice(0, 6)
         .map((item: any) => ({
           digitalBookId: item.digitalBookId,
           title: item.title,
           author: item.author,
           progress: Number(item.progress) || 0,
+          lastPage: Number(item.lastPage) || 1,
+          totalPages: Number(item.totalPages) || undefined,
         }));
 
       const snapshot: DashboardSnapshot = {
@@ -341,12 +343,18 @@ export default function HomeScreen({ navigation }: Props) {
                 key={item.digitalBookId}
                 onPress={() =>
                   navigation.getParent()?.navigate("Catalog", {
-                    screen: "DigitalBookDetail",
-                    params: { digitalBookId: item.digitalBookId },
+                    screen: "PdfReader",
+                    params: {
+                      digitalBookId: item.digitalBookId,
+                      title: item.title,
+                      initialPage: item.lastPage || 1,
+                      initialProgress: item.progress,
+                      totalPages: item.totalPages,
+                    },
                   })
                 }
                 style={{
-                  width: 160,
+                  width: 140,
                   marginRight: 10,
                   padding: 12,
                   backgroundColor: colors.white,
@@ -355,9 +363,11 @@ export default function HomeScreen({ navigation }: Props) {
                   borderRadius: radius.md,
                 }}
               >
+                <BookCover width={116} height={72} style={{ alignSelf: "center" }} />
                 <Text
                   numberOfLines={2}
                   style={{
+                    marginTop: 8,
                     fontFamily: fontFamily.bodySemiBold,
                     fontSize: type.small,
                     color: colors.navy,
@@ -373,7 +383,7 @@ export default function HomeScreen({ navigation }: Props) {
                     color: colors.muted,
                   }}
                 >
-                  {item.progress}% read
+                  {item.progress}% · Page {item.lastPage || 1}
                 </Text>
               </Pressable>
             ))}

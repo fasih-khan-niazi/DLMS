@@ -23,6 +23,7 @@ import ProfileScreen from "../screens/ProfileScreen";
 import DigitalBookDetailScreen from "../screens/DigitalBookDetailScreen";
 import BookshelfScreen from "../screens/BookshelfScreen";
 import UploadDigitalBookScreen from "../screens/UploadDigitalBookScreen";
+import PdfReaderScreen from "../screens/PdfReaderScreen";
 import NotificationsScreen from "../screens/NotificationsScreen";
 import UnifiedSearchScreen from "../screens/UnifiedSearchScreen";
 
@@ -59,6 +60,11 @@ function CatalogStackNavigator() {
       <CatalogStackNav.Screen
         name="DigitalBookDetail"
         component={DigitalBookDetailScreen as React.ComponentType<any>}
+      />
+      <CatalogStackNav.Screen
+        name="PdfReader"
+        component={PdfReaderScreen as React.ComponentType<any>}
+        options={{ headerShown: false, presentation: "fullScreenModal" }}
       />
       <CatalogStackNav.Screen
         name="UploadDigitalBook"

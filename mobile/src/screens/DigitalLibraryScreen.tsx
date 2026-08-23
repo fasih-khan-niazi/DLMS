@@ -6,13 +6,14 @@ import {
   Pressable,
   StyleSheet,
   RefreshControl,
+  Modal,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
 import { SearchBar } from "../components/SearchBar";
-import { BookCover, Badge } from "../components/ui";
+import { BookCover, Badge, Button, Chip } from "../components/ui";
 import { EmptyState } from "../components/EmptyState";
 import { SkeletonList } from "../components/Skeleton";
 import { useProfile } from "../context/ProfileContext";
@@ -32,9 +33,12 @@ type DigitalBook = {
   author?: string;
   fileSizeBytes?: number;
   description?: string;
+  thumbnailUrl?: string;
 };
 
 type ViewMode = "list" | "grid";
+type SortOption = "title_asc" | "title_desc" | "newest";
+type ShelfFilter = "all" | "saved" | "reading" | "unread" | "finished";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -60,6 +64,13 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [pageSize, setPageSize] = useState(10);
+  const [sort, setSort] = useState<SortOption>("title_asc");
+  const [shelfFilter, setShelfFilter] = useState<ShelfFilter>("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [draftSort, setDraftSort] = useState<SortOption>("title_asc");
+  const [draftShelfFilter, setDraftShelfFilter] = useState<ShelfFilter>("all");
+
+  const filtersActive = sort !== "title_asc" || shelfFilter !== "all";
 
   useEffect(() => {
     void getCatalogPageSize().then(setPageSize);
@@ -71,15 +82,21 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
       pageNum?: number;
       skipCache?: boolean;
       silent?: boolean;
+      sortBy?: SortOption;
+      shelf?: ShelfFilter;
     }) => {
       const search = opts?.search ?? query;
       const pageNum = opts?.pageNum ?? page;
+      const sortBy = opts?.sortBy ?? sort;
+      const shelf = opts?.shelf ?? shelfFilter;
       const size = pageSize || (await getCatalogPageSize());
 
       const cacheKey = digitalCacheKey({
         q: search.trim(),
         page: pageNum,
         pageSize: size,
+        sort: sortBy,
+        shelfFilter: shelf,
       });
 
       if (!opts?.skipCache) {
@@ -102,6 +119,8 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
           params: {
             page: pageNum,
             pageSize: size,
+            sort: sortBy,
+            shelfFilter: shelf,
             ...(search.trim() ? { q: search.trim() } : {}),
           },
         });
@@ -119,8 +138,28 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
         setRefreshing(false);
       }
     },
-    [query, page, pageSize]
+    [query, page, pageSize, sort, shelfFilter]
   );
+
+  const openFilters = () => {
+    setDraftSort(sort);
+    setDraftShelfFilter(shelfFilter);
+    setFiltersOpen(true);
+  };
+
+  const applyFilters = () => {
+    setFiltersOpen(false);
+    if (draftSort === sort && draftShelfFilter === shelfFilter) return;
+    setSort(draftSort);
+    setShelfFilter(draftShelfFilter);
+    setPage(1);
+    load({ pageNum: 1, sortBy: draftSort, shelf: draftShelfFilter, skipCache: true });
+  };
+
+  const resetFilters = () => {
+    setDraftSort("title_asc");
+    setDraftShelfFilter("all");
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -151,7 +190,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
           style={[styles.gridCard, { backgroundColor: colors.white, borderColor: colors.border }]}
           onPress={() => openBook(item.digitalBookId)}
         >
-          <BookCover width={120} height={120} style={{ alignSelf: "center" }} />
+          <BookCover uri={item.thumbnailUrl} width={120} height={120} style={{ alignSelf: "center" }} />
           <Text
             numberOfLines={2}
             style={{
@@ -173,7 +212,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
         style={[styles.card, { backgroundColor: colors.white, borderColor: colors.border }]}
         onPress={() => openBook(item.digitalBookId)}
       >
-        <BookCover width={56} height={84} />
+        <BookCover uri={item.thumbnailUrl} width={56} height={84} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text
             style={{
@@ -224,6 +263,40 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
         />
 
         <View style={styles.toolbar}>
+          <Pressable
+            onPress={openFilters}
+            style={[
+              styles.filtersBtn,
+              {
+                backgroundColor: colors.white,
+                borderColor: filtersActive ? colors.navy : colors.border,
+              },
+            ]}
+          >
+            <Ionicons name="options-outline" size={18} color={colors.navy} />
+            <Text
+              style={{
+                marginLeft: 6,
+                fontFamily: fontFamily.bodySemiBold,
+                fontSize: type.small,
+                color: colors.navy,
+              }}
+            >
+              Filters
+            </Text>
+            {filtersActive ? (
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: colors.amber,
+                  marginLeft: 6,
+                }}
+              />
+            ) : null}
+          </Pressable>
+
           {isStaff ? (
             <Pressable
               onPress={() => navigation.navigate("UploadDigitalBook")}
@@ -245,7 +318,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
               </Text>
             </Pressable>
           ) : (
-            <View style={{ flex: 1 }} />
+            <View style={{ width: 8 }} />
           )}
 
           <View style={styles.viewToggle}>
@@ -332,6 +405,79 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
           </Pressable>
         </View>
       ) : null}
+
+      <Modal visible={filtersOpen} transparent animationType="fade" onRequestClose={() => setFiltersOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setFiltersOpen(false)}>
+          <Pressable
+            style={[styles.modalCard, { backgroundColor: colors.cream }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={{ fontFamily: fontFamily.display, fontSize: type.titleSm, color: colors.navy }}>
+              Filters
+            </Text>
+            <Text
+              style={{
+                marginTop: space.md,
+                marginBottom: space.sm,
+                fontFamily: fontFamily.bodyBold,
+                fontSize: type.small,
+                color: colors.navy,
+              }}
+            >
+              Sort
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {(
+                [
+                  { id: "title_asc" as const, label: "A–Z" },
+                  { id: "title_desc" as const, label: "Z–A" },
+                  { id: "newest" as const, label: "Newest" },
+                ] as const
+              ).map((c) => (
+                <Chip
+                  key={c.id}
+                  label={c.label}
+                  selected={draftSort === c.id}
+                  onPress={() => setDraftSort(c.id)}
+                />
+              ))}
+            </View>
+            <Text
+              style={{
+                marginTop: space.md,
+                marginBottom: space.sm,
+                fontFamily: fontFamily.bodyBold,
+                fontSize: type.small,
+                color: colors.navy,
+              }}
+            >
+              My library
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {(
+                [
+                  { id: "all" as const, label: "All" },
+                  { id: "saved" as const, label: "Saved" },
+                  { id: "reading" as const, label: "Reading" },
+                  { id: "unread" as const, label: "Unread" },
+                  { id: "finished" as const, label: "Finished" },
+                ] as const
+              ).map((c) => (
+                <Chip
+                  key={c.id}
+                  label={c.label}
+                  selected={draftShelfFilter === c.id}
+                  onPress={() => setDraftShelfFilter(c.id)}
+                />
+              ))}
+            </View>
+            <View style={{ marginTop: space.lg, gap: space.sm }}>
+              <Button title="Apply filters" onPress={applyFilters} />
+              <Button title="Reset" variant="ghost" onPress={resetFilters} />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -352,6 +498,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 14,
     paddingVertical: 10,
+  },
+  filtersBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(46, 74, 98, 0.45)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 32,
   },
   viewToggle: { flexDirection: "row", gap: 12 },
   listArea: { flex: 1, minHeight: 0 },

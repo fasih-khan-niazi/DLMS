@@ -250,6 +250,37 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 
 ---
 
+## Phase 9b: In-app reader and smart progress (14 extended)
+
+**Goal:** Read PDFs inside the app; progress reflects actual reading, not scroll position.
+
+**Tasks**
+- [ ] In-app PDF reader screen (WebView + PDF.js), no share sheet for primary flow.
+- [ ] Smart progress: page counts only after ~4s dwell; saves `lastPage`, `totalPages`, `progress`.
+- [ ] Home + digital detail "Continue where you left off" opens reader at last page.
+- [ ] PDF first-page cover generated on upload; `cover-image` proxy for digital titles.
+
+**Regression:** Open reader, read a few pages, close, reopen at same page; progress updates on Home.
+
+**Git:** `feat(mobile): in-app pdf reader and smart reading progress`
+
+---
+
+## Phase 9c: Digital reviews and NPS (14 extended)
+
+**Goal:** Students rate and recommend books; peers can read reviews (collapsed by default).
+
+**Tasks**
+- [ ] API: reviews subcollection, aggregate summary, PUT own review (rating + NPS 0–10 + comment).
+- [ ] Mobile: review form on digital detail; expandable "Student reviews" list (names only).
+- [ ] Upload screen: themed, config-driven max PDF size, AppModal success/error.
+
+**Regression:** Save review, expand list, other students see name + rating + recommend score.
+
+**Git:** `feat(api): digital book reviews` + `feat(mobile): student reviews and upload polish`
+
+---
+
 ## Phase 10: Profile and settings (15, 7, 5 toggle)
 
 **Goal:** Profile is a settings hub, not a debug screen.

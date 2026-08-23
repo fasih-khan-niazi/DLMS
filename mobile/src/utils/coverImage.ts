@@ -6,25 +6,38 @@ import { firebaseAuth } from "../config/firebase";
 const REVISION_PREFIX = "dlms.cover.rev.";
 
 export function isApiCoverUrl(uri: string): boolean {
-  return uri.includes("/api/catalog/books/") && uri.includes("/cover-image");
+  return uri.includes("/cover-image") && (uri.includes("/api/catalog/books/") || uri.includes("/api/digital-books/"));
 }
 
+export function extractCoverCacheKey(uri: string): string | null {
+  const catalog = uri.match(/\/api\/catalog\/books\/([^/?]+)\/cover-image/);
+  if (catalog) return `cat_${decodeURIComponent(catalog[1])}`;
+  const digital = uri.match(/\/api\/digital-books\/([^/?]+)\/cover-image/);
+  if (digital) return `dig_${decodeURIComponent(digital[1])}`;
+  return null;
+}
+
+/** @deprecated use extractCoverCacheKey */
 export function extractCoverIsbn(uri: string): string | null {
-  const match = uri.match(/\/api\/catalog\/books\/([^/?]+)\/cover-image/);
-  if (!match) return null;
-  return decodeURIComponent(match[1]);
+  return extractCoverCacheKey(uri);
 }
 
 /** Force cover-image requests through the mobile API base URL (LAN IP vs localhost). */
 export function normalizeCoverUrl(uri: string): string {
   if (!isApiCoverUrl(uri)) return uri;
-  const isbn = extractCoverIsbn(uri);
-  if (!isbn) return uri;
-  return `${API_BASE_URL}/api/catalog/books/${encodeURIComponent(isbn)}/cover-image`;
+  const key = extractCoverCacheKey(uri);
+  if (!key) return uri;
+
+  if (key.startsWith("cat_")) {
+    const isbn = key.slice(4);
+    return `${API_BASE_URL}/api/catalog/books/${encodeURIComponent(isbn)}/cover-image`;
+  }
+  const id = key.slice(4);
+  return `${API_BASE_URL}/api/digital-books/${encodeURIComponent(id)}/cover-image`;
 }
 
-function stableCoverPath(isbn: string): string {
-  const safe = isbn.replace(/[^a-zA-Z0-9_-]/g, "_");
+function stableCoverPath(cacheKey: string): string {
+  const safe = cacheKey.replace(/[^a-zA-Z0-9_-]/g, "_");
   return `${FileSystem.cacheDirectory}cover_${safe}.img`;
 }
 
@@ -33,25 +46,28 @@ export async function peekCoverCache(uri: string): Promise<string | null> {
   if (!uri.trim()) return null;
   if (!isApiCoverUrl(uri)) return uri;
 
-  const isbn = extractCoverIsbn(normalizeCoverUrl(uri));
-  if (!isbn) return null;
+  const cacheKey = extractCoverCacheKey(normalizeCoverUrl(uri));
+  if (!cacheKey) return null;
 
-  const dest = stableCoverPath(isbn);
+  const dest = stableCoverPath(cacheKey);
   const info = await FileSystem.getInfoAsync(dest);
   return info.exists ? dest : null;
 }
 
-export async function invalidateCoverCache(isbn: string): Promise<void> {
-  const dest = stableCoverPath(isbn);
-  try {
-    await FileSystem.deleteAsync(dest, { idempotent: true });
-  } catch {
-    // ignore
-  }
-  try {
-    await AsyncStorage.removeItem(`${REVISION_PREFIX}${isbn}`);
-  } catch {
-    // ignore
+export async function invalidateCoverCache(idOrIsbn: string): Promise<void> {
+  const keys = [`cat_${idOrIsbn}`, `dig_${idOrIsbn}`];
+  for (const cacheKey of keys) {
+    const dest = stableCoverPath(cacheKey);
+    try {
+      await FileSystem.deleteAsync(dest, { idempotent: true });
+    } catch {
+      // ignore
+    }
+    try {
+      await AsyncStorage.removeItem(`${REVISION_PREFIX}${cacheKey}`);
+    } catch {
+      // ignore
+    }
   }
 }
 
@@ -72,10 +88,10 @@ export async function resolveCoverDisplayUri(
   if (!user) return null;
 
   const normalized = normalizeCoverUrl(uri);
-  const isbn = extractCoverIsbn(normalized);
-  if (!isbn) return null;
+  const storageKey = extractCoverCacheKey(normalized);
+  if (!storageKey) return null;
 
-  const dest = stableCoverPath(isbn);
+  const dest = stableCoverPath(storageKey);
   const revision = cacheKey !== undefined && cacheKey !== null ? String(cacheKey) : null;
 
   const info = await FileSystem.getInfoAsync(dest);
@@ -83,7 +99,7 @@ export async function resolveCoverDisplayUri(
     if (!revision) {
       return dest;
     }
-    const stored = await AsyncStorage.getItem(`${REVISION_PREFIX}${isbn}`);
+    const stored = await AsyncStorage.getItem(`${REVISION_PREFIX}${storageKey}`);
     if (stored === revision) {
       return dest;
     }
@@ -101,7 +117,7 @@ export async function resolveCoverDisplayUri(
   }
 
   if (revision) {
-    await AsyncStorage.setItem(`${REVISION_PREFIX}${isbn}`, revision);
+    await AsyncStorage.setItem(`${REVISION_PREFIX}${storageKey}`, revision);
   }
 
   return dest;

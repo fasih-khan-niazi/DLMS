@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
 } from "react-native";
@@ -13,8 +12,9 @@ import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import api from "../config/api";
+import { AppModal } from "../components/AppModal";
 import { BookCover, Button, Card } from "../components/ui";
-import { downloadDigitalPdf, openOrSharePdf } from "../utils/digitalPdf";
+import { downloadDigitalPdf } from "../utils/digitalPdf";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -22,77 +22,87 @@ type Props = {
   route: RouteProp<{ params: { digitalBookId: string } }, "params">;
 };
 
-function ProgressBar({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (next: number) => void;
-}) {
-  const { colors, radius, space, fontFamily, type } = useTheme();
-  const steps = [0, 25, 50, 75, 100];
+type ReviewSummary = {
+  count: number;
+  averageRating: number | null;
+  recommendPercent: number | null;
+};
 
-  return (
-    <View>
-      <View
-        style={{
-          height: 10,
-          borderRadius: radius.pill,
-          backgroundColor: colors.creamDark,
-          overflow: "hidden",
-          marginBottom: space.sm,
-        }}
-      >
-        <View
-          style={{
-            width: `${Math.min(Math.max(value, 0), 100)}%`,
-            height: "100%",
-            backgroundColor: colors.navy,
-            borderRadius: radius.pill,
-          }}
-        />
-      </View>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        {steps.map((step) => (
-          <Pressable key={step} onPress={() => onChange(step)} hitSlop={8}>
-            <Text
-              style={{
-                fontFamily: fontFamily.bodySemiBold,
-                fontSize: type.caption,
-                color: value >= step ? colors.navy : colors.muted,
-              }}
-            >
-              {step}%
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
-}
+type ReviewItem = {
+  reviewId: string;
+  displayName: string;
+  rating: number;
+  recommendScore: number | null;
+  comment: string;
+  isMine?: boolean;
+};
 
 function StarRating({
   value,
   onSelect,
   disabled,
+  size = 32,
 }: {
   value: number | null;
   onSelect: (rating: number) => void;
   disabled?: boolean;
+  size?: number;
 }) {
   const { colors, space } = useTheme();
-
   return (
     <View style={{ flexDirection: "row", gap: space.sm }}>
-      {[1, 2, 3, 4, 5].map((star) => {
-        const filled = (value || 0) >= star;
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Pressable key={star} onPress={() => onSelect(star)} disabled={disabled} hitSlop={8}>
+          <Ionicons
+            name={(value || 0) >= star ? "star" : "star-outline"}
+            size={size}
+            color={(value || 0) >= star ? colors.amber : colors.muted}
+          />
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function NpsPicker({
+  value,
+  onSelect,
+  disabled,
+}: {
+  value: number | null;
+  onSelect: (score: number) => void;
+  disabled?: boolean;
+}) {
+  const { colors, fontFamily, space, type, radius } = useTheme();
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
+      {Array.from({ length: 11 }, (_, i) => i).map((score) => {
+        const selected = value === score;
         return (
-          <Pressable key={star} onPress={() => onSelect(star)} disabled={disabled} hitSlop={8}>
-            <Ionicons
-              name={filled ? "star" : "star-outline"}
-              size={32}
-              color={filled ? colors.amber : colors.muted}
-            />
+          <Pressable
+            key={score}
+            disabled={disabled}
+            onPress={() => onSelect(score)}
+            style={{
+              minWidth: 36,
+              paddingVertical: 8,
+              paddingHorizontal: 6,
+              borderRadius: radius.sm,
+              borderWidth: 1,
+              borderColor: selected ? colors.navy : colors.border,
+              backgroundColor: selected ? colors.navy : colors.white,
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: fontFamily.bodySemiBold,
+                fontSize: type.caption,
+                color: selected ? colors.white : colors.navy,
+              }}
+            >
+              {score}
+            </Text>
           </Pressable>
         );
       })}
@@ -106,24 +116,48 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
 
   const [book, setBook] = useState<any>(null);
   const [shelf, setShelf] = useState<any>(null);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [draftRating, setDraftRating] = useState<number | null>(null);
+  const [draftRecommend, setDraftRecommend] = useState<number | null>(null);
+  const [draftComment, setDraftComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
-  const [progress, setProgress] = useState(0);
+  const [modal, setModal] = useState<{ visible: boolean; message: string }>({
+    visible: false,
+    message: "",
+  });
 
   const load = async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
     try {
-      const bookRes = await api.get(`/api/digital-books/${digitalBookId}`);
+      const [bookRes, shelfRes, reviewsRes] = await Promise.all([
+        api.get(`/api/digital-books/${digitalBookId}`),
+        api.get("/api/digital-books/bookshelf/mine"),
+        api.get(`/api/digital-books/${digitalBookId}/reviews`),
+      ]);
       setBook(bookRes.data);
 
-      const shelfRes = await api.get("/api/digital-books/bookshelf/mine");
       const found = (shelfRes.data.items || []).find(
         (item: any) => item.digitalBookId === digitalBookId
       );
       setShelf(found || null);
-      setProgress(Number(found?.progress ?? 0));
+
+      setReviewSummary(reviewsRes.data.summary);
+      setReviewItems(reviewsRes.data.items || []);
+      const mine = reviewsRes.data.mine;
+      if (mine) {
+        setDraftRating(Number(mine.rating) || null);
+        setDraftRecommend(
+          mine.recommendScore === null || mine.recommendScore === undefined
+            ? null
+            : Number(mine.recommendScore)
+        );
+        setDraftComment(String(mine.comment || ""));
+      }
     } catch {
       setBook(null);
       setShelf(null);
@@ -146,52 +180,46 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
     return res.data;
   };
 
-  const openPdf = async () => {
+  const openReader = async () => {
     setBusy(true);
     setDownloadProgress(0);
     try {
       await ensureOnBookshelf();
-      const uri = await downloadDigitalPdf(
+      await downloadDigitalPdf(digitalBookId, book?.title || "book", (p) => setDownloadProgress(p));
+      navigation.navigate("PdfReader", {
         digitalBookId,
-        book?.title || "book",
-        (p) => setDownloadProgress(p)
-      );
-      await openOrSharePdf(uri);
-      await load({ silent: true });
+        title: book?.title || "Book",
+        initialPage: Number(shelf?.lastPage) || 1,
+        initialProgress: Number(shelf?.progress) || 0,
+        totalPages: Number(shelf?.totalPages) || undefined,
+      });
     } catch (error: any) {
-      Alert.alert("Could not open PDF", error.message || "Download failed");
+      setModal({ visible: true, message: error.message || "Could not open reader" });
     } finally {
       setBusy(false);
       setDownloadProgress(null);
     }
   };
 
-  const saveProgress = async (next: number) => {
-    setProgress(next);
-    setBusy(true);
-    try {
-      await ensureOnBookshelf();
-      const res = await api.patch(`/api/digital-books/${digitalBookId}/bookshelf`, {
-        progress: next,
-      });
-      setShelf(res.data);
-    } catch (error: any) {
-      Alert.alert("Save failed", error.response?.data?.error || "Could not save progress");
-    } finally {
-      setBusy(false);
+  const saveReview = async () => {
+    if (!draftRating) {
+      setModal({ visible: true, message: "Pick a star rating first." });
+      return;
     }
-  };
-
-  const setRating = async (rating: number) => {
     setBusy(true);
     try {
       await ensureOnBookshelf();
-      const res = await api.patch(`/api/digital-books/${digitalBookId}/bookshelf`, {
-        rating,
+      await api.put(`/api/digital-books/${digitalBookId}/reviews`, {
+        rating: draftRating,
+        recommendScore: draftRecommend,
+        comment: draftComment.trim(),
       });
-      setShelf(res.data);
+      await load({ silent: true });
     } catch (error: any) {
-      Alert.alert("Save failed", error.response?.data?.error || "Could not save rating");
+      setModal({
+        visible: true,
+        message: error.response?.data?.error || "Could not save your review",
+      });
     } finally {
       setBusy(false);
     }
@@ -216,93 +244,86 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
     );
   }
 
-  const hasProgress = (shelf?.progress ?? progress) > 0;
+  const progress = Number(shelf?.progress ?? 0);
+  const hasProgress = progress > 0 && progress < 100;
+  const otherReviews = reviewItems.filter((r) => !r.isMine);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.cream }}
-      contentContainerStyle={{ paddingTop: 56, paddingHorizontal: 20, paddingBottom: 40 }}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            void load({ silent: true });
-          }}
-          tintColor={colors.navy}
-        />
-      }
-    >
-      <Pressable onPress={() => navigation.goBack()} style={{ marginBottom: space.md }}>
-        <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>← Back</Text>
-      </Pressable>
+    <>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.cream }}
+        contentContainerStyle={{ paddingTop: 56, paddingHorizontal: 20, paddingBottom: 40 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              void load({ silent: true });
+            }}
+            tintColor={colors.navy}
+          />
+        }
+      >
+        <Pressable onPress={() => navigation.goBack()} style={{ marginBottom: space.md }}>
+          <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>← Back</Text>
+        </Pressable>
 
-      <View style={{ alignItems: "center", marginBottom: space.lg }}>
-        <BookCover width={140} height={200} />
-        <Text
-          style={{
-            marginTop: space.md,
-            textAlign: "center",
-            fontFamily: fontFamily.display,
-            fontSize: type.titleSm,
-            color: colors.navy,
-          }}
-        >
-          {book.title}
-        </Text>
-        <Text
-          style={{
-            marginTop: 6,
-            textAlign: "center",
-            fontFamily: fontFamily.body,
-            fontSize: type.body,
-            color: colors.muted,
-          }}
-        >
-          {book.author || "Unknown author"}
-        </Text>
-        {book.fileSizeBytes ? (
+        <View style={{ alignItems: "center", marginBottom: space.lg }}>
+          <BookCover uri={book.thumbnailUrl} width={140} height={200} />
           <Text
             style={{
-              marginTop: 4,
+              marginTop: space.md,
+              textAlign: "center",
+              fontFamily: fontFamily.display,
+              fontSize: type.titleSm,
+              color: colors.navy,
+            }}
+          >
+            {book.title}
+          </Text>
+          <Text
+            style={{
+              marginTop: 6,
+              textAlign: "center",
               fontFamily: fontFamily.body,
-              fontSize: type.small,
+              fontSize: type.body,
               color: colors.muted,
             }}
           >
-            PDF · {Math.round(book.fileSizeBytes / 1024)} KB
+            {book.author || "Unknown author"}
           </Text>
-        ) : null}
-      </View>
+          {book.fileSizeBytes ? (
+            <Text
+              style={{
+                marginTop: 4,
+                fontFamily: fontFamily.body,
+                fontSize: type.small,
+                color: colors.muted,
+              }}
+            >
+              PDF · {Math.round(book.fileSizeBytes / 1024)} KB
+            </Text>
+          ) : null}
+        </View>
 
-      {hasProgress ? (
-        <Card style={{ marginBottom: space.md }}>
-          <Text
-            style={{
-              fontFamily: fontFamily.bodyBold,
-              fontSize: type.body,
-              color: colors.navy,
-              marginBottom: space.xs,
-            }}
-          >
-            Continue reading
-          </Text>
-          <Text style={{ fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
-            You are {shelf?.progress ?? progress}% through this book.
-          </Text>
-        </Card>
-      ) : null}
-
-      <Card style={{ marginBottom: space.md }}>
-        <Button
-          title={hasProgress ? "Continue reading" : "Open PDF"}
-          onPress={openPdf}
-          loading={busy && downloadProgress === null}
-        />
-        {downloadProgress !== null ? (
-          <View style={{ marginTop: space.sm }}>
+        {hasProgress ? (
+          <Card style={{ marginBottom: space.md }}>
+            <Text
+              style={{
+                fontFamily: fontFamily.bodyBold,
+                fontSize: type.body,
+                color: colors.navy,
+                marginBottom: space.xs,
+              }}
+            >
+              Continue where you left off
+            </Text>
+            <Text style={{ fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
+              Page {shelf?.lastPage || "?"} · {progress}% read
+            </Text>
             <View
               style={{
+                marginTop: space.sm,
                 height: 8,
                 borderRadius: radius.pill,
                 backgroundColor: colors.creamDark,
@@ -311,28 +332,79 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
             >
               <View
                 style={{
-                  width: `${Math.round(downloadProgress * 100)}%`,
+                  width: `${progress}%`,
                   height: "100%",
-                  backgroundColor: colors.amber,
+                  backgroundColor: colors.navy,
                 }}
               />
             </View>
+          </Card>
+        ) : null}
+
+        <Card style={{ marginBottom: space.md }}>
+          <Button
+            title={hasProgress ? "Continue reading" : "Read in app"}
+            onPress={openReader}
+            loading={busy && downloadProgress === null}
+          />
+          {downloadProgress !== null ? (
+            <View style={{ marginTop: space.sm }}>
+              <View
+                style={{
+                  height: 8,
+                  borderRadius: radius.pill,
+                  backgroundColor: colors.creamDark,
+                  overflow: "hidden",
+                }}
+              >
+                <View
+                  style={{
+                    width: `${Math.round(downloadProgress * 100)}%`,
+                    height: "100%",
+                    backgroundColor: colors.amber,
+                  }}
+                />
+              </View>
+              <Text
+                style={{
+                  marginTop: 6,
+                  textAlign: "center",
+                  fontFamily: fontFamily.body,
+                  fontSize: type.caption,
+                  color: colors.muted,
+                }}
+              >
+                Downloading… {Math.round(downloadProgress * 100)}%
+              </Text>
+            </View>
+          ) : null}
+        </Card>
+
+        {!!book.description && (
+          <Card style={{ marginBottom: space.md }}>
             <Text
               style={{
-                marginTop: 6,
-                textAlign: "center",
-                fontFamily: fontFamily.body,
-                fontSize: type.caption,
-                color: colors.muted,
+                fontFamily: fontFamily.bodyBold,
+                fontSize: type.body,
+                color: colors.navy,
+                marginBottom: space.sm,
               }}
             >
-              Downloading… {Math.round(downloadProgress * 100)}%
+              About
             </Text>
-          </View>
-        ) : null}
-      </Card>
+            <Text
+              style={{
+                fontFamily: fontFamily.body,
+                fontSize: type.small,
+                color: colors.text,
+                lineHeight: 22,
+              }}
+            >
+              {book.description}
+            </Text>
+          </Card>
+        )}
 
-      {!!book.description && (
         <Card style={{ marginBottom: space.md }}>
           <Text
             style={{
@@ -342,69 +414,133 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
               marginBottom: space.sm,
             }}
           >
-            About
+            Your review
+          </Text>
+          <StarRating value={draftRating} onSelect={setDraftRating} disabled={busy} />
+          <Text
+            style={{
+              marginTop: space.md,
+              marginBottom: space.sm,
+              fontFamily: fontFamily.bodySemiBold,
+              fontSize: type.small,
+              color: colors.navy,
+            }}
+          >
+            Would you recommend this book to your friends?
           </Text>
           <Text
             style={{
+              marginBottom: space.sm,
               fontFamily: fontFamily.body,
-              fontSize: type.small,
-              color: colors.text,
-              lineHeight: 22,
+              fontSize: type.caption,
+              color: colors.muted,
             }}
           >
-            {book.description}
+            0 = not at all · 10 = definitely
           </Text>
+          <NpsPicker value={draftRecommend} onSelect={setDraftRecommend} disabled={busy} />
+          <Button
+            title="Save review"
+            variant="secondary"
+            onPress={() => void saveReview()}
+            loading={busy}
+            style={{ marginTop: space.md }}
+          />
         </Card>
-      )}
 
-      <Card style={{ marginBottom: space.md }}>
-        <Text
-          style={{
-            fontFamily: fontFamily.bodyBold,
-            fontSize: type.body,
-            color: colors.navy,
-            marginBottom: space.sm,
-          }}
-        >
-          Reading progress
-        </Text>
-        <ProgressBar value={progress} onChange={(next) => void saveProgress(next)} />
-        <Button
-          title="Save progress"
-          variant="secondary"
-          onPress={() => void saveProgress(progress)}
-          loading={busy}
-          style={{ marginTop: space.md }}
-        />
-      </Card>
+        {(reviewSummary?.count ?? 0) > 0 ? (
+          <Card style={{ marginBottom: space.md }}>
+            <Pressable
+              onPress={() => setReviewsOpen((v) => !v)}
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+            >
+              <View>
+                <Text style={{ fontFamily: fontFamily.bodyBold, fontSize: type.body, color: colors.navy }}>
+                  Student reviews ({reviewSummary?.count})
+                </Text>
+                {reviewSummary?.averageRating ? (
+                  <Text
+                    style={{
+                      marginTop: 4,
+                      fontFamily: fontFamily.body,
+                      fontSize: type.caption,
+                      color: colors.muted,
+                    }}
+                  >
+                    ★ {reviewSummary.averageRating} average
+                    {reviewSummary.recommendPercent !== null
+                      ? ` · ${reviewSummary.recommendPercent}% would recommend`
+                      : ""}
+                  </Text>
+                ) : null}
+              </View>
+              <Ionicons
+                name={reviewsOpen ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={colors.muted}
+              />
+            </Pressable>
 
-      <Card style={{ marginBottom: space.md }}>
-        <Text
-          style={{
-            fontFamily: fontFamily.bodyBold,
-            fontSize: type.body,
-            color: colors.navy,
-            marginBottom: space.sm,
-          }}
-        >
-          Your rating
-        </Text>
-        <StarRating
-          value={shelf?.rating ?? null}
-          onSelect={(rating) => void setRating(rating)}
-          disabled={busy}
-        />
-        <Text
-          style={{
-            marginTop: space.sm,
-            fontFamily: fontFamily.body,
-            fontSize: type.caption,
-            color: colors.muted,
-          }}
-        >
-          {shelf?.rating ? `You rated this ${shelf.rating}/5` : "Tap a star to rate"}
-        </Text>
-      </Card>
-    </ScrollView>
+            {reviewsOpen ? (
+              <View style={{ marginTop: space.md, gap: space.sm }}>
+                {otherReviews.length === 0 ? (
+                  <Text style={{ fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
+                    No reviews from other students yet.
+                  </Text>
+                ) : (
+                  otherReviews.map((review) => (
+                    <View
+                      key={review.reviewId}
+                      style={{
+                        padding: space.sm,
+                        borderRadius: radius.md,
+                        backgroundColor: colors.creamDark,
+                      }}
+                    >
+                      <Text style={{ fontFamily: fontFamily.bodyBold, color: colors.navy }}>
+                        {review.displayName}
+                      </Text>
+                      <Text
+                        style={{
+                          marginTop: 4,
+                          fontFamily: fontFamily.body,
+                          fontSize: type.caption,
+                          color: colors.amberDark,
+                        }}
+                      >
+                        ★ {review.rating}/5
+                        {review.recommendScore !== null ? ` · Recommend ${review.recommendScore}/10` : ""}
+                      </Text>
+                      {review.comment ? (
+                        <Text
+                          style={{
+                            marginTop: 6,
+                            fontFamily: fontFamily.body,
+                            fontSize: type.small,
+                            color: colors.text,
+                            lineHeight: 20,
+                          }}
+                        >
+                          {review.comment}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ))
+                )}
+              </View>
+            ) : null}
+          </Card>
+        ) : null}
+      </ScrollView>
+
+      <AppModal
+        visible={modal.visible}
+        variant="error"
+        title="Something went wrong"
+        message={modal.message}
+        confirmLabel="OK"
+        onClose={() => setModal({ visible: false, message: "" })}
+      />
+    </>
   );
 }
