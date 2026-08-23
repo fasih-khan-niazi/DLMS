@@ -40,7 +40,7 @@ type Props = {
 };
 
 const SAVE_INTERVAL_MS = 15000;
-const ZOOM_PILLS = [50, 75, 100, 110, 125, 150, 175, 200, 225, 250];
+const ZOOM_PILLS = [50, 75, 100, 125, 150, 175, 200, 225, 250];
 
 async function applyOrientation(lock: ReaderPrefs["orientation"]) {
   if (lock === "landscape") {
