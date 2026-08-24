@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -7,16 +7,22 @@ import ReservationsScreen from "./ReservationsScreen";
 import LoanHistoryScreen from "./LoanHistoryScreen";
 import { useTheme } from "../theme";
 
-type Props = {
-  navigation: NativeStackNavigationProp<any>;
-};
-
 type ActivityTab = "loans" | "reservations" | "history";
 
-export default function ActivityScreen({ navigation }: Props) {
+type Props = {
+  navigation: NativeStackNavigationProp<any>;
+  route?: { params?: { initialTab?: ActivityTab } };
+};
+
+export default function ActivityScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, fontFamily, radius, space, type } = useTheme();
-  const [tab, setTab] = useState<ActivityTab>("loans");
+  const [tab, setTab] = useState<ActivityTab>(route?.params?.initialTab || "loans");
+
+  useEffect(() => {
+    const next = route?.params?.initialTab;
+    if (next) setTab(next);
+  }, [route?.params?.initialTab]);
 
   const tabs: { id: ActivityTab; label: string }[] = [
     { id: "loans", label: "Loans" },

@@ -20,6 +20,9 @@ function serializeNotification(id: string, data: Record<string, any>) {
     sentAt,
     loanId: data.loanId || null,
     reservationId: data.reservationId || null,
+    isbn: data.isbn || null,
+    copyId: data.copyId || null,
+    digitalBookId: data.digitalBookId || null,
   };
 }
 

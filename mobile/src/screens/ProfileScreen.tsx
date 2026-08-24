@@ -3,8 +3,10 @@ import { Text, Pressable, Switch, View } from "react-native";
 import { signOut } from "firebase/auth";
 import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { firebaseAuth } from "../config/firebase";
+import api from "../config/api";
 import { useProfile } from "../context/ProfileContext";
 import { AppModal } from "../components/AppModal";
 import { Button, Card, Screen } from "../components/ui";
@@ -41,12 +43,14 @@ function MenuRow({
   icon,
   onPress,
   last,
+  badge,
 }: {
   label: string;
   subtitle?: string;
   icon?: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   last?: boolean;
+  badge?: number;
 }) {
   const { colors, fontFamily, type } = useTheme();
 
@@ -88,6 +92,30 @@ function MenuRow({
           </Text>
         ) : null}
       </View>
+      {badge && badge > 0 ? (
+        <View
+          style={{
+            minWidth: 20,
+            height: 20,
+            borderRadius: 10,
+            backgroundColor: colors.amber,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 5,
+            marginRight: 8,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.navyDark,
+              fontSize: 11,
+              fontFamily: fontFamily.bodyBold,
+            }}
+          >
+            {badge > 9 ? "9+" : badge}
+          </Text>
+        </View>
+      ) : null}
       <Ionicons name="chevron-forward" size={18} color={colors.muted} />
     </Pressable>
   );
@@ -120,6 +148,16 @@ export default function ProfileScreen({ navigation }: Props) {
   const { colors, fontFamily, space, type, mode, setMode } = useTheme();
   const { profile, isStaff } = useProfile();
   const [help, setHelp] = useState<HelpKind>(null);
+  const [unread, setUnread] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      void api
+        .get("/api/notifications/unread-count")
+        .then((res) => setUnread(Number(res.data.unreadCount) || 0))
+        .catch(() => {});
+    }, [])
+  );
 
   const displayName =
     profile?.displayName || firebaseAuth.currentUser?.displayName || "User";
@@ -232,6 +270,7 @@ export default function ProfileScreen({ navigation }: Props) {
           label="Notifications"
           subtitle="Inbox and alerts"
           icon="notifications-outline"
+          badge={unread}
           onPress={() => navigation.navigate("Notifications")}
         />
         <MenuRow
