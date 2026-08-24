@@ -216,7 +216,10 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
       BORROW_LIMIT: [403, "Borrow limit reached"],
       ALREADY_ISSUED: [409, "Book already issued"],
       COPY_DAMAGED: [409, "Copy is damaged"],
-      RESERVED_FOR_OTHER: [409, "Copy is reserved for another student"],
+      RESERVED_FOR_OTHER: [
+        409,
+        "This copy is reserved for another student. Please pick another available copy or another book.",
+      ],
       COPY_UNAVAILABLE: [409, "Copy is not available"],
       CATALOG_MISSING: [404, "Catalog entry missing"],
       CATALOG_INACTIVE: [409, "This title is deactivated and cannot be borrowed"],
