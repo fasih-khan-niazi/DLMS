@@ -27,6 +27,9 @@ type Mode = "borrow" | "return";
 
 function friendlyScanError(message: string): string {
   const lower = message.toLowerCase();
+  if (lower.includes("reserved for another")) {
+    return "This copy is held for another reader in the reservation queue. Please choose a different available copy, or another title.";
+  }
   if (
     lower.includes("qr") ||
     lower.includes("copyid") ||

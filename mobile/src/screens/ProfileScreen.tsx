@@ -149,6 +149,7 @@ export default function ProfileScreen({ navigation }: Props) {
   const { profile, isStaff } = useProfile();
   const [help, setHelp] = useState<HelpKind>(null);
   const [unread, setUnread] = useState(0);
+  const [signOutOpen, setSignOutOpen] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -320,7 +321,7 @@ export default function ProfileScreen({ navigation }: Props) {
         />
       </Card>
 
-      <Button title="Sign out" variant="secondary" onPress={() => signOut(firebaseAuth)} />
+      <Button title="Sign out" variant="secondary" onPress={() => setSignOutOpen(true)} />
 
       <Text
         style={{
@@ -334,6 +335,21 @@ export default function ProfileScreen({ navigation }: Props) {
       >
         DLMS · v{appVersion}
       </Text>
+
+      <AppModal
+        visible={signOutOpen}
+        variant="info"
+        title="Sign out?"
+        message="You will need to sign in again to use the library app."
+        confirmLabel="Sign out"
+        cancelLabel="Stay signed in"
+        onClose={() => setSignOutOpen(false)}
+        onConfirm={() => {
+          setSignOutOpen(false);
+          void signOut(firebaseAuth);
+        }}
+        onCancel={() => setSignOutOpen(false)}
+      />
 
       <AppModal
         visible={help === "print"}

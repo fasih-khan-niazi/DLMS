@@ -46,7 +46,6 @@ export default function BookDetailScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [reserving, setReserving] = useState(false);
-  const [actionCopyId, setActionCopyId] = useState<string | null>(null);
   const [togglingStatus, setTogglingStatus] = useState(false);
   const [coverUrlDraft, setCoverUrlDraft] = useState("");
   const [coverRevision, setCoverRevision] = useState(0);
@@ -121,32 +120,6 @@ export default function BookDetailScreen({ navigation, route }: Props) {
 
   const goToScan = () => {
     navigation.getParent()?.navigate("Scan");
-  };
-
-  const borrowCopy = async (copyId: string) => {
-    setActionCopyId(copyId);
-    try {
-      const response = await api.post("/api/loans/borrow", { copyId });
-      Alert.alert("Borrowed", response.data.message || "Success");
-      await load({ silent: true });
-    } catch (error: any) {
-      Alert.alert("Borrow failed", error.response?.data?.error || "Request failed");
-    } finally {
-      setActionCopyId(null);
-    }
-  };
-
-  const returnCopy = async (copyId: string) => {
-    setActionCopyId(copyId);
-    try {
-      const response = await api.post("/api/loans/return", { copyId });
-      Alert.alert("Returned", response.data.message || "Success");
-      await load({ silent: true });
-    } catch (error: any) {
-      Alert.alert("Return failed", error.response?.data?.error || "Request failed");
-    } finally {
-      setActionCopyId(null);
-    }
   };
 
   const toggleCatalogActive = () => {
@@ -573,8 +546,8 @@ export default function BookDetailScreen({ navigation, route }: Props) {
                 lineHeight: 20,
               }}
             >
-              Each copy has a unique, permanent QR code for shelf labels. Open a copy to view or
-              export its label.
+              Each copy has a unique QR for shelf labels. Borrow and return only via the Scan tab.
+              Open a copy to view or export its label.
             </Text>
             {(book.copies || []).length === 0 ? (
               <Text style={{ fontFamily: fontFamily.body, color: colors.muted, marginBottom: space.lg }}>
@@ -582,7 +555,6 @@ export default function BookDetailScreen({ navigation, route }: Props) {
               </Text>
             ) : (
               (book.copies || []).map((copy: any, index: number) => {
-                const isMine = myActiveCopyIds.has(copy.copyId);
                 const copyLabel = `Copy ${index + 1}`;
                 const expanded = expandedCopyId === copy.copyId;
 
@@ -623,46 +595,19 @@ export default function BookDetailScreen({ navigation, route }: Props) {
                       />
                     </Pressable>
 
-                    {expanded ? (
-                      <View style={{ marginTop: space.sm, gap: space.sm }}>
-                        {!!copy.qrPayload && (
-                          <Button
-                            title="View QR label"
-                            variant="secondary"
-                            onPress={() =>
-                              setQrModal({
-                                copyLabel,
-                                qrPayload: copy.qrPayload,
-                                authors: book.authors,
-                              })
-                            }
-                          />
-                        )}
-
-                        {copy.status === "available" && book.isActive !== false && (
-                          <Button
-                            title="Borrow this copy"
-                            onPress={() => borrowCopy(copy.copyId)}
-                            loading={actionCopyId === copy.copyId}
-                          />
-                        )}
-
-                        {copy.status === "issued" && isMine && (
-                          <Button
-                            title="Return this copy"
-                            variant="secondary"
-                            onPress={() => returnCopy(copy.copyId)}
-                            loading={actionCopyId === copy.copyId}
-                          />
-                        )}
-
-                        {copy.status === "reserved" && (
-                          <Button
-                            title="Claim reserved copy"
-                            onPress={() => borrowCopy(copy.copyId)}
-                            loading={actionCopyId === copy.copyId}
-                          />
-                        )}
+                    {expanded && !!copy.qrPayload ? (
+                      <View style={{ marginTop: space.sm }}>
+                        <Button
+                          title="View QR label"
+                          variant="secondary"
+                          onPress={() =>
+                            setQrModal({
+                              copyLabel,
+                              qrPayload: copy.qrPayload,
+                              authors: book.authors,
+                            })
+                          }
+                        />
                       </View>
                     ) : null}
                   </Card>
