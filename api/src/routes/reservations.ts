@@ -6,13 +6,11 @@ import { getSystemConfig } from "../services/loans";
 import {
   computeQueuePosition,
   fulfillWaitingWithAvailableCopies,
+  normalizeIsbn,
+  reconcileReservationsForIsbn,
 } from "../services/reservations";
 
 const router = Router();
-
-function normalizeIsbn(isbn: string): string {
-  return isbn.replace(/[-\s]/g, "").toUpperCase();
-}
 
 // Create a reservation (queue) for an unavailable title
 router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
@@ -26,16 +24,29 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
     const isbn = normalizeIsbn(String(isbnRaw));
     const config = await getSystemConfig();
 
+    // Heal drift before deciding whether reserve is allowed
+    try {
+      await reconcileReservationsForIsbn(isbn);
+    } catch (error) {
+      console.error("[reserve] pre-create reconcile failed:", error);
+    }
+
     const userRef = db.collection("users").doc(req.uid!);
     const catalogRef = db.collection("catalog").doc(isbn);
 
-    const [userSnap, catalogSnap, activeLoansSnap] = await Promise.all([
+    const [userSnap, catalogSnap, activeLoansSnap, availableCopiesSnap] = await Promise.all([
       userRef.get(),
       catalogRef.get(),
       db
         .collection("loans")
         .where("userId", "==", req.uid)
         .where("status", "==", "active")
+        .get(),
+      db
+        .collection("bookCopies")
+        .where("isbn", "==", isbn)
+        .where("status", "==", "available")
+        .limit(1)
         .get(),
     ]);
 
@@ -76,7 +87,7 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    if ((catalog.availableCount || 0) > 0) {
+    if (!availableCopiesSnap.empty || (catalog.availableCount || 0) > 0) {
       res.status(409).json({
         error: "Copies are available. Borrow from the shelf instead of reserving.",
       });

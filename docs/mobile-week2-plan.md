@@ -33,6 +33,7 @@ No em dashes in UI copy.
 | 9 | E-books tab and reader | 13, 14 | Medium |
 | 10 | Profile and settings | 15, 7, 5 (dark toggle) | Low |
 | 11 | Notifications polish | 16 | Low |
+| R | Reservation harden | return→queue→ready | High |
 | 12 | Onboarding | 19 | Low |
 | 13 | Motion, haptics, perf | 4, 17, 18 | Low |
 | 14 | Dark theme completion | 5 | Low |
@@ -325,6 +326,39 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 **Regression:** API mark-read; counts update after mark all / tap.
 
 **Git:** `feat(mobile): notification badges and deep links`
+
+---
+
+## Phase R: Reservation harden (return → queue → ready)
+
+**Status:** Implemented (2026-08-24). **B / C / D and Phases 12–15 remain paused** until you say so.
+
+**Bug fixed:** After Person A returned via scan, Person B stayed `waiting`, got no ready notification, and scans said “held for another student” while the free copy was inconsistently reserved.
+
+**Root causes addressed**
+- Silent swallow of assign failures after return
+- ISBN format drift (hyphenated vs normalized) so waiters were not found
+- Orphan `reserved` copies without a matching `ready` reservation
+- Catalog counter drift vs real copy statuses
+- No periodic heal for missed fulfills
+
+**Deliverables**
+- [x] Atomic `assignCopyToNextReservation` (strict `available` → `reserved` + `waiting` → `ready` + notify)
+- [x] `reconcileReservationsForIsbn`: promote orphans, free true orphans, FIFO assign, recount catalog
+- [x] Return path: assign this copy, then reconcile; surface `reservationHold` / `reconcile` / `fulfillError`
+- [x] Borrow path: normalize ISBN; heal claim when reserved-for-me but still waiting; background reconcile on stuck hold errors
+- [x] Reserve create: pre-reconcile + real available-copy check
+- [x] Cron every 15 min: `reconcileAllWaitingQueues`
+- [x] Admin: `POST /api/admin/reservations/reconcile` (`{ isbn? }`)
+
+**How to heal live stuck data (after deploy)**
+1. Redeploy API, then as admin call reconcile for the stuck ISBN (or omit isbn for all waiting titles).
+2. Or: have Person A’s returned title reconciled automatically on next return/reserve/15‑min cron.
+3. Person B should become `ready`, get inbox `reservation_ready`, then claim via Scan on the held copy.
+
+**Regression:** A borrows → B reserves → A returns → B ready + notified → B scan borrows; third student scanning held copy still blocked.
+
+**Git:** `fix(api): harden reservation fulfill and reconcile after return`
 
 ---
 

@@ -3,6 +3,11 @@ import { auth, db } from "../config/firebase";
 import { authenticate, AuthRequest } from "../middleware/authenticate";
 import { requireRole } from "../middleware/requireRole";
 import { clampCatalogPageSize, getSystemConfig } from "../services/loans";
+import {
+  normalizeIsbn,
+  reconcileAllWaitingQueues,
+  reconcileReservationsForIsbn,
+} from "../services/reservations";
 
 const router = Router();
 
@@ -425,5 +430,27 @@ router.post("/users/:uid/status", requireRole("admin"), async (req: AuthRequest,
     res.status(500).json({ error: "Failed to update user status" });
   }
 });
+
+/** Heal reservation/copy drift for one ISBN or all waiting queues (admin). */
+router.post(
+  "/reservations/reconcile",
+  requireRole("librarian", "admin"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const isbnRaw = req.body?.isbn || req.query?.isbn;
+      if (isbnRaw) {
+        const isbn = normalizeIsbn(String(isbnRaw));
+        const result = await reconcileReservationsForIsbn(isbn);
+        res.json({ scope: "isbn", isbn, ...result });
+        return;
+      }
+      const result = await reconcileAllWaitingQueues();
+      res.json({ scope: "all_waiting", ...result });
+    } catch (error) {
+      console.error("Admin reservation reconcile error:", error);
+      res.status(500).json({ error: "Failed to reconcile reservations" });
+    }
+  }
+);
 
 export default router;

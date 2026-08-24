@@ -1,5 +1,8 @@
 import cron from "node-cron";
-import { expireReadyReservationHolds } from "../services/reservations";
+import {
+  expireReadyReservationHolds,
+  reconcileAllWaitingQueues,
+} from "../services/reservations";
 import { runDailyLoanNotifications } from "../services/notifications";
 
 export function startCronJobs() {
@@ -33,5 +36,28 @@ export function startCronJobs() {
     { timezone: "Asia/Karachi" }
   );
 
+  // Every 15 minutes: heal stuck waiting queues (missed return fulfills, orphan holds)
+  cron.schedule(
+    "*/15 * * * *",
+    async () => {
+      console.log("[CRON] Reconciling waiting reservation queues...");
+      try {
+        const result = await reconcileAllWaitingQueues();
+        console.log("[CRON] Waiting queue reconcile:", result);
+      } catch (error) {
+        console.error("[CRON] Waiting queue reconcile failed:", error);
+      }
+    },
+    { timezone: "Asia/Karachi" }
+  );
+
   console.log("Cron jobs scheduled (Asia/Karachi timezone)");
+
+  // Heal any stuck queues immediately after deploy/restart (covers the live A-returned / B-waiting case)
+  setTimeout(() => {
+    console.log("[CRON] Startup waiting-queue reconcile...");
+    reconcileAllWaitingQueues()
+      .then((result) => console.log("[CRON] Startup waiting-queue reconcile:", result))
+      .catch((error) => console.error("[CRON] Startup waiting-queue reconcile failed:", error));
+  }, 4000);
 }
