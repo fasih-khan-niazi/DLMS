@@ -312,15 +312,17 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 
 ## Phase 11: Notifications polish (16)
 
+**Status:** Implemented (2026-08-24).
+
 **Goal:** Notifications feel integrated.
 
 **Tasks**
-- [ ] Unread badge on Home bell (if not done in Phase 5) and optional Profile row.
-- [ ] Inbox: read/unread styling, **Mark all read**.
-- [ ] Tap row: navigate to Activity (loan), Catalog detail (reservation ready), etc. from metadata.
-- [ ] Empty and skeleton states.
+- [x] Unread badge on Home bell and Profile Notifications row.
+- [x] Inbox: read/unread styling, **Mark all read**, themed empty/error + retry.
+- [x] Tap row: navigate to Activity (loans / reservations) or Catalog book detail from metadata.
+- [x] Empty and skeleton states.
 
-**Regression:** API mark-read; counts update.
+**Regression:** API mark-read; counts update after mark all / tap.
 
 **Git:** `feat(mobile): notification badges and deep links`
 

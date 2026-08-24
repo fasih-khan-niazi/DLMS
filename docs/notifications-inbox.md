@@ -16,9 +16,10 @@ Auth required (Bearer Firebase ID token).
 
 ## Mobile
 
-- Home **Alerts** chip (shows unread badge)
-- Profile -> Notifications
-- Tap a row to mark it read
+- Home bell with unread badge
+- Profile -> Notifications (unread badge on the row)
+- Inbox: unread styling, Mark all read, pull to refresh
+- Tap a row: marks it read and opens Activity (loans / reservations) or Catalog book detail when ISBN is present
 
 ## Later (dedicated app build)
 
