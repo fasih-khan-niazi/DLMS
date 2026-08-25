@@ -1,10 +1,18 @@
 import React from "react";
-import { Modal, View, Text, Pressable, StyleSheet } from "react-native";
+import {
+  Modal,
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  type ViewStyle,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Button } from "./ui/Button";
 import { useTheme } from "../theme";
 
-export type AppModalVariant = "success" | "error" | "info";
+export type AppModalVariant = "success" | "error" | "info" | "danger";
 
 type Props = {
   visible: boolean;
@@ -13,15 +21,23 @@ type Props = {
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** Primary CTA style. Use danger for sign-out / cancel reservation. */
+  confirmVariant?: "primary" | "danger" | "secondary";
+  /** center = outcome/confirm dialog; sheet = bottom sheet for actions/filters. */
+  presentation?: "center" | "sheet";
   onClose: () => void;
   onConfirm?: () => void;
   onCancel?: () => void;
 };
 
-const ICONS: Record<AppModalVariant, { name: keyof typeof Ionicons.glyphMap; colorKey: "success" | "danger" | "navy" }> = {
+const ICONS: Record<
+  AppModalVariant,
+  { name: keyof typeof Ionicons.glyphMap; colorKey: "success" | "danger" | "navy" | "warning" }
+> = {
   success: { name: "checkmark-circle", colorKey: "success" },
   error: { name: "close-circle", colorKey: "danger" },
   info: { name: "information-circle", colorKey: "navy" },
+  danger: { name: "warning", colorKey: "danger" },
 };
 
 export function AppModal({
@@ -31,25 +47,54 @@ export function AppModal({
   message,
   confirmLabel = "Done",
   cancelLabel = "Cancel",
+  confirmVariant = "primary",
+  presentation = "center",
   onClose,
   onConfirm,
   onCancel,
 }: Props) {
+  const insets = useSafeAreaInsets();
   const { colors, fontFamily, space, type, radius } = useTheme();
   const icon = ICONS[variant];
   const iconColor = colors[icon.colorKey];
-  const showSecondary = !!(onConfirm || onCancel);
+  const showCancel = typeof onCancel === "function";
+  const isSheet = presentation === "sheet";
+
+  const panelStyle: ViewStyle = isSheet
+    ? {
+        backgroundColor: colors.cream,
+        borderTopLeftRadius: radius.lg,
+        borderTopRightRadius: radius.lg,
+        paddingHorizontal: 24,
+        paddingTop: 20,
+        paddingBottom: Math.max(insets.bottom, 16) + 12,
+        alignItems: "center",
+      }
+    : {
+        backgroundColor: colors.cream,
+        borderRadius: radius.lg,
+        padding: 24,
+        alignItems: "center",
+      };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable
-          style={[styles.card, { backgroundColor: colors.cream, borderRadius: radius.lg }]}
-          onPress={(e) => e.stopPropagation()}
-        >
+    <Modal
+      visible={visible}
+      transparent
+      animationType={isSheet ? "slide" : "fade"}
+      onRequestClose={onClose}
+    >
+      <Pressable
+        style={[styles.backdrop, isSheet ? styles.backdropSheet : styles.backdropCenter]}
+        onPress={onClose}
+      >
+        <Pressable style={panelStyle} onPress={(e) => e.stopPropagation()}>
+          {isSheet ? <View style={[styles.handle, { backgroundColor: colors.border }]} /> : null}
+
           <View style={styles.iconWrap}>
-            <Ionicons name={icon.name} size={56} color={iconColor} />
+            <Ionicons name={icon.name} size={isSheet ? 44 : 56} color={iconColor} />
           </View>
+
           <Text
             style={{
               fontFamily: fontFamily.display,
@@ -72,12 +117,14 @@ export function AppModal({
           >
             {message}
           </Text>
+
           <Button
             title={confirmLabel}
+            variant={confirmVariant}
             onPress={onConfirm ?? onClose}
             style={{ marginTop: space.lg }}
           />
-          {showSecondary ? (
+          {showCancel ? (
             <Button
               title={cancelLabel}
               variant="ghost"
@@ -95,12 +142,20 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(46, 74, 98, 0.45)",
+  },
+  backdropCenter: {
     justifyContent: "center",
     paddingHorizontal: 28,
   },
-  card: {
-    padding: 24,
-    alignItems: "center",
+  backdropSheet: {
+    justifyContent: "flex-end",
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 12,
+    alignSelf: "center",
   },
   iconWrap: {
     marginBottom: 12,

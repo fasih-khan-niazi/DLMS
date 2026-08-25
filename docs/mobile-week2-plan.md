@@ -33,7 +33,10 @@ No em dashes in UI copy.
 | 9 | E-books tab and reader | 13, 14 | Medium |
 | 10 | Profile and settings | 15, 7, 5 (dark toggle) | Low |
 | 11 | Notifications polish | 16 | Low |
-| R | Reservation harden | return→queue→ready | High |
+| R | Reservation harden | return→queue→ready | High — **PARKED incomplete** |
+| B | Auth + modals + profile | extras | Low |
+| C | Available Copies UI | extras | Low |
+| D | Admin configs | extras | Medium |
 | 12 | Onboarding | 19 | Low |
 | 13 | Motion, haptics, perf | 4, 17, 18 | Low |
 | 14 | Dark theme completion | 5 | Low |
@@ -331,34 +334,67 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 
 ## Phase R: Reservation harden (return → queue → ready)
 
-**Status:** Implemented (2026-08-24). **B / C / D and Phases 12–15 remain paused** until you say so.
+**Status:** **PARKED incomplete (2026-08-25).** Code landed on `dev` but live QA still fails. Do **not** treat as done. Resume only after **B → C → D** and Phases **12+** are finished (your call).
 
-**Bug fixed:** After Person A returned via scan, Person B stayed `waiting`, got no ready notification, and scans said “held for another student” while the free copy was inconsistently reserved.
+**Still broken in production / live demo (reconfirmed)**
+- After return via scan, waiter can stay `waiting` (no ready / no notify)
+- Catalog can keep showing unavailable / reserved after return
+- Student 1 blocked (“reserved”) even when Student 2 is the holder and stuck waiting
+- Cancel reservation does not refresh catalog availability / reserved badge
+- Copy vs reservation vs catalog counters can stay out of sync
 
-**Root causes addressed**
-- Silent swallow of assign failures after return
-- ISBN format drift (hyphenated vs normalized) so waiters were not found
-- Orphan `reserved` copies without a matching `ready` reservation
-- Catalog counter drift vs real copy statuses
-- No periodic heal for missed fulfills
+**What was attempted (partial)**
+- Assign + `reconcileReservationsForIsbn` after return
+- Legacy ISBN heal, orphan reserved free/promote
+- Cron every 15 min + startup reconcile
+- Admin `POST /api/admin/reservations/reconcile`
+- Borrow/reserve path hardening
 
-**Deliverables**
-- [x] Atomic `assignCopyToNextReservation` (strict `available` → `reserved` + `waiting` → `ready` + notify)
-- [x] `reconcileReservationsForIsbn`: promote orphans, free true orphans, FIFO assign, recount catalog
-- [x] Return path: assign this copy, then reconcile; surface `reservationHold` / `reconcile` / `fulfillError`
-- [x] Borrow path: normalize ISBN; heal claim when reserved-for-me but still waiting; background reconcile on stuck hold errors
-- [x] Reserve create: pre-reconcile + real available-copy check
-- [x] Cron every 15 min: `reconcileAllWaitingQueues`
-- [x] Admin: `POST /api/admin/reservations/reconcile` (`{ isbn? }`)
+**When we resume Phase R (single aggressive pass)**
+1. Reproduce with logging on return / cancel / catalog reads
+2. Prove return → FIFO ready + notify + catalog counts in one atomic outcome
+3. Cancel waiting/ready must free held copy (if any) and recount catalog; mobile/catalog must refetch
+4. Catalog availability chip must come from live copy aggregate (or forced recount), not stale counters alone
+5. Staff tools + tests for A borrow → B reserve → A return → B ready → B claim; cancel → shelf free
+6. Manual heal script/admin button for currently stuck ISBNs
 
-**How to heal live stuck data (after deploy)**
-1. Redeploy API, then as admin call reconcile for the stuck ISBN (or omit isbn for all waiting titles).
-2. Or: have Person A’s returned title reconciled automatically on next return/reserve/15‑min cron.
-3. Person B should become `ready`, get inbox `reservation_ready`, then claim via Scan on the held copy.
+**B / C / D and Phases 12–15:** proceed first. Phase R waits.
 
-**Regression:** A borrows → B reserves → A returns → B ready + notified → B scan borrows; third student scanning held copy still blocked.
+**Git (if not already pushed):** `fix(api): harden reservation fulfill and reconcile after return` (keep; do not revert blindly)
 
-**Git:** `fix(api): harden reservation fulfill and reconcile after return`
+---
+
+## Extras B / C / D (above Phase 12) — parked until you say start
+
+Order when you resume: **B → C → D**, then Phases **12+**, then **Phase R** again.
+
+### B — Auth polish + modals + profile refresh
+
+**Status:** Implemented (2026-08-25).
+
+- [x] Splash navy + keyboard resize; auth shell polish (amber accent, Android keyboard)
+- [x] Login: password eye toggle; AppModal for missing / invalid credentials
+- [x] Register + Forgot: AppModals; password eye; 8-char password aligned with API
+- [x] Reserve modals: success / fail / already reserved (Book detail)
+- [x] Activity Reservations: full-width **danger** Cancel + bottom-sheet confirm
+- [x] Sign-out confirm: reddish Sign out CTA only
+- [x] Modal consistency: AppModal `presentation` center|sheet + `confirmVariant`
+- [x] Bottom sheets: cancel confirm, profile help, catalog/digital filters, PDF settings, scan results (existing)
+- [x] Profile: refresh `/me` on focus (fixes stale active loans) + pull-to-refresh
+
+**Git:** `feat(mobile): auth polish, AppModals, reservation cancel, profile refresh`
+
+### C — Available Copies UI
+
+- Rename **Manage copies** → **Available Copies**
+- Show the section to **students** too (status / availability)
+- QR / print / View QR label: **staff only**
+- Still no in-app borrow/return/claim on expand (scan-only stays)
+
+### D — Admin configs + librarian borrow harden
+
+- Admin toggle `allowInAppCopyBorrow` (future in-app borrow for everyone when on; default off / scan-only)
+- Harden `librariansCanBorrow`: block new borrow+reserve when off; keep active loans + scan return; cancel waiting/ready when toggle turns off; admin always full; digital bookshelf unrestricted for librarians; same fines
 
 ---
 

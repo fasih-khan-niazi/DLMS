@@ -328,7 +328,7 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
         style={{ flex: 1, backgroundColor: "#1a2a38" }}
       />
 
-      <Modal visible={settingsOpen} transparent animationType="fade" onRequestClose={() => setSettingsOpen(false)}>
+      <Modal visible={settingsOpen} transparent animationType="slide" onRequestClose={() => setSettingsOpen(false)}>
         <Pressable
           style={[
             styles.modalBackdrop,

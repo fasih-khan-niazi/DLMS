@@ -643,13 +643,15 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
       />
       <AppModal
         visible={removeConfirmOpen}
-        variant="info"
+        variant="danger"
         title="Remove from bookshelf?"
         message="Your reading progress for this book will be cleared from your shelf."
         confirmLabel="Remove"
+        confirmVariant="danger"
         cancelLabel="Keep it"
         onClose={() => setRemoveConfirmOpen(false)}
         onConfirm={() => void removeFromBookshelf()}
+        onCancel={() => setRemoveConfirmOpen(false)}
       />
       <AppModal
         visible={confirmReviewOpen}
@@ -660,6 +662,7 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
         cancelLabel="Go back"
         onClose={() => setConfirmReviewOpen(false)}
         onConfirm={() => void submitReview()}
+        onCancel={() => setConfirmReviewOpen(false)}
       />
       <AppModal
         visible={reviewSuccessOpen}

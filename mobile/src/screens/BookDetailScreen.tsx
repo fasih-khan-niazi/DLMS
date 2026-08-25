@@ -18,7 +18,7 @@ import api, { API_BASE_URL } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
 import { useProfile } from "../context/ProfileContext";
 import { CopyQrModal } from "../components/CopyQrModal";
-import { SuccessModal } from "../components/SuccessModal";
+import { AppModal } from "../components/AppModal";
 import { BookCover, Badge, Button, Card } from "../components/ui";
 import { formatIsbn } from "../utils/isbn";
 import { invalidateCatalogCache } from "../utils/catalogCache";
@@ -54,6 +54,12 @@ export default function BookDetailScreen({ navigation, route }: Props) {
   const [qrModal, setQrModal] = useState<QrModalState | null>(null);
   const [expandedCopyId, setExpandedCopyId] = useState<string | null>(null);
   const [coverSuccess, setCoverSuccess] = useState<{ title: string; message: string } | null>(null);
+  const [reserveFeedback, setReserveFeedback] = useState<{
+    variant: "success" | "error" | "info";
+    title: string;
+    message: string;
+    goActivity?: boolean;
+  } | null>(null);
 
   const load = async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) {
@@ -109,10 +115,24 @@ export default function BookDetailScreen({ navigation, route }: Props) {
     setReserving(true);
     try {
       const response = await api.post("/api/reservations", { isbn });
-      Alert.alert("Reserved", response.data.message || "Added to queue");
-      navigation.getParent()?.navigate("Activity");
+      setReserveFeedback({
+        variant: "success",
+        title: "Reservation placed",
+        message:
+          response.data.message ||
+          "You are in the queue. We will notify you when a copy is ready to claim.",
+        goActivity: true,
+      });
     } catch (error: any) {
-      Alert.alert("Could not reserve", error.response?.data?.error || "Request failed");
+      const apiMessage = error.response?.data?.error || "Request failed";
+      const already =
+        /already have an active reservation/i.test(apiMessage) ||
+        /already have this book on loan/i.test(apiMessage);
+      setReserveFeedback({
+        variant: already ? "info" : "error",
+        title: already ? "Already reserved" : "Could not reserve",
+        message: apiMessage,
+      });
     } finally {
       setReserving(false);
     }
@@ -630,11 +650,35 @@ export default function BookDetailScreen({ navigation, route }: Props) {
         />
       ) : null}
 
-      <SuccessModal
+      <AppModal
         visible={!!coverSuccess}
+        variant="success"
         title={coverSuccess?.title || ""}
         message={coverSuccess?.message || ""}
+        confirmLabel="Done"
         onClose={() => setCoverSuccess(null)}
+      />
+
+      <AppModal
+        visible={!!reserveFeedback}
+        variant={reserveFeedback?.variant || "info"}
+        title={reserveFeedback?.title || ""}
+        message={reserveFeedback?.message || ""}
+        confirmLabel={reserveFeedback?.goActivity ? "View reservations" : "OK"}
+        cancelLabel={reserveFeedback?.goActivity ? "Stay here" : undefined}
+        onClose={() => setReserveFeedback(null)}
+        onConfirm={() => {
+          const go = !!reserveFeedback?.goActivity;
+          setReserveFeedback(null);
+          if (go) {
+            navigation.getParent()?.navigate("Activity", { initialTab: "reservations" });
+          }
+        }}
+        onCancel={
+          reserveFeedback?.goActivity
+            ? () => setReserveFeedback(null)
+            : undefined
+        }
       />
     </>
   );

@@ -34,18 +34,20 @@ export function AuthLayout({
   return (
     <KeyboardAvoidingView
       style={[styles.root, { backgroundColor: colors.navy }]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
     >
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
           {
             paddingTop: insets.top + space.xl,
-            paddingBottom: insets.bottom + space.xl,
+            paddingBottom: insets.bottom + space.xl + 24,
           },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        bounces={false}
       >
         <View style={styles.hero}>
           <Text
@@ -58,9 +60,18 @@ export function AuthLayout({
           >
             DLMS
           </Text>
-          <Text
+          <View
             style={{
               marginTop: space.sm,
+              width: 36,
+              height: 3,
+              borderRadius: 2,
+              backgroundColor: colors.amber,
+            }}
+          />
+          <Text
+            style={{
+              marginTop: space.md,
               fontFamily: fontFamily.body,
               fontSize: type.subtitle,
               color: colors.heroText,
@@ -115,9 +126,12 @@ export function AuthLayout({
 export function AuthLink({
   label,
   onPress,
+  onDark = false,
 }: {
   label: string;
   onPress: () => void;
+  /** Use on navy auth background (footer links). */
+  onDark?: boolean;
 }) {
   const { colors, fontFamily, type, space } = useTheme();
 
@@ -126,7 +140,7 @@ export function AuthLink({
       <Text
         style={{
           textAlign: "center",
-          color: colors.navy,
+          color: onDark ? "#F8F7F4" : colors.navy,
           fontFamily: fontFamily.bodySemiBold,
           fontSize: type.small,
         }}

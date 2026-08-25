@@ -6,6 +6,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2E4A62"
+    },
     "plugins": [
       [
         "expo-camera",
@@ -26,6 +31,7 @@
     ],
     "android": {
       "package": "com.fyp.dlms",
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "CAMERA",
         "POST_NOTIFICATIONS",

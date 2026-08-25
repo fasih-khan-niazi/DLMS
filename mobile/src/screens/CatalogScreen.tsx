@@ -467,19 +467,31 @@ export default function CatalogScreen({
         </View>
       ) : null}
 
-      <Modal visible={filtersOpen} transparent animationType="fade" onRequestClose={() => setFiltersOpen(false)}>
+      <Modal visible={filtersOpen} transparent animationType="slide" onRequestClose={() => setFiltersOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setFiltersOpen(false)}>
           <Pressable
             style={[
               styles.modalCard,
               {
                 backgroundColor: colors.cream,
-                borderRadius: radius.lg,
-                marginBottom: insets.bottom + 16,
+                borderTopLeftRadius: radius.lg,
+                borderTopRightRadius: radius.lg,
+                marginBottom: 0,
+                paddingBottom: insets.bottom + 20,
               },
             ]}
             onPress={(e) => e.stopPropagation()}
           >
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: colors.border,
+                alignSelf: "center",
+                marginBottom: 12,
+              }}
+            />
             <Text
               style={{
                 fontFamily: fontFamily.display,
@@ -620,10 +632,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(46, 74, 98, 0.45)",
     justifyContent: "flex-end",
-    paddingHorizontal: 20,
   },
   modalCard: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 12,
   },
   chipWrap: {
     flexDirection: "row",

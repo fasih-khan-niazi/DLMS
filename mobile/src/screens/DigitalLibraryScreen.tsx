@@ -409,7 +409,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
         </View>
       ) : null}
 
-      <Modal visible={filtersOpen} transparent animationType="fade" onRequestClose={() => setFiltersOpen(false)}>
+      <Modal visible={filtersOpen} transparent animationType="slide" onRequestClose={() => setFiltersOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setFiltersOpen(false)}>
           <Pressable
             style={[styles.modalCard, { backgroundColor: colors.cream }]}

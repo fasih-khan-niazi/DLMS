@@ -146,19 +146,33 @@ function StatRow({ label, value, last }: { label: string; value: string; last?: 
 
 export default function ProfileScreen({ navigation }: Props) {
   const { colors, fontFamily, space, type, mode, setMode } = useTheme();
-  const { profile, isStaff } = useProfile();
+  const { profile, isStaff, refresh } = useProfile();
   const [help, setHelp] = useState<HelpKind>(null);
   const [unread, setUnread] = useState(0);
   const [signOutOpen, setSignOutOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const reload = useCallback(async () => {
+    try {
+      await refresh();
+      const res = await api.get("/api/notifications/unread-count");
+      setUnread(Number(res.data.unreadCount) || 0);
+    } catch {
+      // keep last known values
+    }
+  }, [refresh]);
 
   useFocusEffect(
     useCallback(() => {
-      void api
-        .get("/api/notifications/unread-count")
-        .then((res) => setUnread(Number(res.data.unreadCount) || 0))
-        .catch(() => {});
-    }, [])
+      void reload();
+    }, [reload])
   );
+
+  const onPullRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await reload();
+    setRefreshing(false);
+  }, [reload]);
 
   const displayName =
     profile?.displayName || firebaseAuth.currentUser?.displayName || "User";
@@ -172,7 +186,14 @@ export default function ProfileScreen({ navigation }: Props) {
   }, [navigation]);
 
   return (
-    <Screen scroll contentStyle={{ paddingHorizontal: 20 }}>
+    <Screen
+      scroll
+      contentStyle={{ paddingHorizontal: 20 }}
+      refreshing={refreshing}
+      onRefresh={() => {
+        void onPullRefresh();
+      }}
+    >
       <Text
         style={{
           fontFamily: fontFamily.display,
@@ -338,10 +359,11 @@ export default function ProfileScreen({ navigation }: Props) {
 
       <AppModal
         visible={signOutOpen}
-        variant="info"
+        variant="danger"
         title="Sign out?"
         message="You will need to sign in again to use the library app."
         confirmLabel="Sign out"
+        confirmVariant="danger"
         cancelLabel="Stay signed in"
         onClose={() => setSignOutOpen(false)}
         onConfirm={() => {
@@ -354,6 +376,7 @@ export default function ProfileScreen({ navigation }: Props) {
       <AppModal
         visible={help === "print"}
         variant="info"
+        presentation="sheet"
         title="Print shelf labels"
         message="Open any physical book in Catalog, then use Print label on a copy. That creates a QR sticker you can share or print."
         confirmLabel="Open Catalog"
@@ -366,6 +389,7 @@ export default function ProfileScreen({ navigation }: Props) {
       <AppModal
         visible={help === "borrow"}
         variant="info"
+        presentation="sheet"
         title="How borrowing works"
         message="Use Scan to borrow or return a physical copy. If a title is unavailable, reserve it from Catalog. Unpaid fines block new loans until cleared at the desk."
         confirmLabel="Got it"

@@ -2,6 +2,7 @@ import React, { type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -16,6 +17,8 @@ type Props = {
   keyboard?: boolean;
   style?: ViewStyle;
   contentStyle?: ViewStyle;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 };
 
 export function Screen({
@@ -24,6 +27,8 @@ export function Screen({
   keyboard = false,
   style,
   contentStyle,
+  refreshing = false,
+  onRefresh,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
@@ -39,6 +44,16 @@ export function Screen({
       contentContainerStyle={[padding, contentStyle]}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.navy}
+            colors={[colors.navy]}
+          />
+        ) : undefined
+      }
     >
       {children}
     </ScrollView>
@@ -54,7 +69,7 @@ export function Screen({
     return (
       <KeyboardAvoidingView
         style={styles.fill}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         {content}
       </KeyboardAvoidingView>

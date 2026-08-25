@@ -5,11 +5,11 @@ import {
   FlatList,
   StyleSheet,
   RefreshControl,
-  Alert,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
+import { AppModal } from "../components/AppModal";
 import { Badge, Button, Card } from "../components/ui";
 import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
@@ -28,6 +28,13 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(false);
+  const [cancelId, setCancelId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    variant: "success" | "error";
+    title: string;
+    message: string;
+  } | null>(null);
 
   const load = async () => {
     setError(false);
@@ -50,22 +57,28 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
     }, [])
   );
 
-  const cancelReservation = (reservationId: string) => {
-    Alert.alert("Cancel reservation?", "You will leave the waiting queue.", [
-      { text: "No", style: "cancel" },
-      {
-        text: "Yes, cancel",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.delete(`/api/reservations/${reservationId}`);
-            await load();
-          } catch (err: any) {
-            Alert.alert("Error", err.response?.data?.error || "Cancel failed");
-          }
-        },
-      },
-    ]);
+  const confirmCancel = async () => {
+    if (!cancelId) return;
+    setCancelling(true);
+    try {
+      await api.delete(`/api/reservations/${cancelId}`);
+      setCancelId(null);
+      setFeedback({
+        variant: "success",
+        title: "Reservation cancelled",
+        message: "You left the waiting queue for this title.",
+      });
+      await load();
+    } catch (err: any) {
+      setCancelId(null);
+      setFeedback({
+        variant: "error",
+        title: "Could not cancel",
+        message: err.response?.data?.error || "Cancel failed. Try again.",
+      });
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const goCatalog = () => navigation.getParent()?.navigate("Catalog");
@@ -190,9 +203,9 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
                 {item.status === "waiting" && (
                   <Button
                     title="Cancel reservation"
-                    variant="ghost"
-                    onPress={() => cancelReservation(item.reservationId)}
-                    style={{ marginTop: space.sm, alignSelf: "flex-start" }}
+                    variant="danger"
+                    onPress={() => setCancelId(item.reservationId)}
+                    style={{ marginTop: space.md }}
                   />
                 )}
               </Card>
@@ -200,6 +213,31 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
           }}
         />
       )}
+
+      <AppModal
+        visible={!!cancelId}
+        variant="danger"
+        presentation="sheet"
+        title="Cancel reservation?"
+        message="You will leave the waiting queue for this title. You can reserve again later if it is still unavailable."
+        confirmLabel="Yes, cancel"
+        confirmVariant="danger"
+        cancelLabel="Keep reservation"
+        onClose={() => setCancelId(null)}
+        onConfirm={() => {
+          if (!cancelling) void confirmCancel();
+        }}
+        onCancel={() => setCancelId(null)}
+      />
+
+      <AppModal
+        visible={!!feedback}
+        variant={feedback?.variant || "info"}
+        title={feedback?.title || ""}
+        message={feedback?.message || ""}
+        confirmLabel="OK"
+        onClose={() => setFeedback(null)}
+      />
     </View>
   );
 }
