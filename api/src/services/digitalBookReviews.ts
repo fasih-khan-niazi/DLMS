@@ -63,7 +63,13 @@ export async function upsertDigitalBookReview(input: {
 
 export function summarizeReviews(reviews: Array<Record<string, unknown>>) {
   if (reviews.length === 0) {
-    return { count: 0, averageRating: null, recommendPercent: null };
+    return {
+      count: 0,
+      averageRating: null,
+      recommendPercent: null,
+      recommendLabel: null as string | null,
+      npsScore: null as number | null,
+    };
   }
   const ratings = reviews.map((r) => Number(r.rating)).filter((n) => n >= 1 && n <= 5);
   const nps = reviews
@@ -79,5 +85,21 @@ export function summarizeReviews(reviews: Array<Record<string, unknown>>) {
   const detractors = nps.filter((n) => n <= 6).length;
   const recommendPercent =
     nps.length > 0 ? Math.round(((promoters - detractors) / nps.length) * 100) : null;
-  return { count: reviews.length, averageRating, recommendPercent };
+
+  // Word band from NPS score (-100..100)
+  let recommendLabel: string | null = null;
+  if (recommendPercent !== null) {
+    if (recommendPercent <= -50) recommendLabel = "Rarely recommended";
+    else if (recommendPercent <= 0) recommendLabel = "Sometimes recommended";
+    else if (recommendPercent <= 50) recommendLabel = "Mostly recommended";
+    else recommendLabel = "Highly recommended";
+  }
+
+  return {
+    count: reviews.length,
+    averageRating,
+    recommendPercent,
+    recommendLabel,
+    npsScore: recommendPercent,
+  };
 }
