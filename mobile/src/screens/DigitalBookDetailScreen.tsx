@@ -546,7 +546,7 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
                       color: colors.muted,
                     }}
                   >
-                    ★ {reviewSummary.averageRating}
+                    ★ {reviewSummary.averageRating}/5
                     {reviewSummary.recommendLabel
                       ? ` · ${reviewSummary.recommendLabel}`
                       : ""}

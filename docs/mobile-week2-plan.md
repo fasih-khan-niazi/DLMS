@@ -396,14 +396,17 @@ Order: **B (done) → Phase B2 (this polish) → C → D**, then Phases **12+**,
 #### Delivered
 - [x] `dangerSoft` on cancel reservation / sign-out / remove shelf / lock sheet
 - [x] Shared `BackButton` (chevron) across detail / add / upload / search / bookshelf
-- [x] AppModal + scan/filter/settings sheets: no outside dismiss; light haptic on outside tap
-- [x] `AppToast` (3s, top overlay, X dismiss) via `ToastProvider`
+- [x] AppModal + scan/filter/settings sheets: no outside dismiss; haptic on outside tap (Expo Go may not feel it — works on dev build)
+- [x] `AppToast` — compact centered, light red (`dangerSoft` palette), circled X, 3s countdown bar
+- [x] `softOutline` cancel buttons on modals (Stay signed in, Keep reservation, etc.) — light amber + border, dark-mode aware
+- [x] Tab bar active tab glow (filled icon + pill highlight)
+- [x] Reviews summary: `★ avg/5` under Student reviews
 - [x] API `GET /api/auth/login-lock` + `POST /api/auth/login-attempt` (`loginLocks` collection)
 - [x] Login: toast on wrong password + attempts left; sheet on 3rd fail; toast if try while locked
 - [x] Forgot: press glow; no “Firebase” in UI copy
 - [x] Browse catalog → Catalog tab (`goToCatalogTab`)
 - [x] Reservation chips: Cancelled vs Expired
-- [x] Book detail skeleton; reviews `★ avg` + NPS word band; clearer recommend line
+- [x] Book detail skeleton; reviews `★ avg/5` + NPS word band; clearer recommend line
 - [x] Dark mode still hydrates from AsyncStorage before UI (ThemeProvider `ready`)
 
 #### Firebase email template (you — Console)
@@ -411,9 +414,25 @@ Order: **B (done) → Phase B2 (this polish) → C → D**, then Phases **12+**,
 Authentication → Templates → Password reset:
 
 - **Subject:** Reset your DLMS password
-- **Body:** Hello, follow this link to reset the password for your DLMS account. If you did not request a reset, you can ignore this email.
-- **Closing:** Thanks, The DLMS team
+- **Body (verified):**
+  - Greeting + `%EMAIL%` placeholder (Firebase replaces with the account email)
+  - Reset link via `%LINK%` (required — do not hard-code URLs)
+  - Ignore-if-not-you line; sign-off **The DLMS Team**
 - **From name:** DLMS (if available)
+- **Note:** Copy is professional; no Firebase/project-id wording in body. `%EMAIL%` and `%LINK%` are the correct Firebase template variables.
+
+#### Theme VnV (2026-08-26)
+
+| Area | Status |
+|------|--------|
+| Destructive confirms | `dangerSoft` — sign out, cancel reservation, remove shelf, lock sheet |
+| Modal cancel buttons | `softOutline` default — amber tint + border, dark mode |
+| Filter Reset buttons | `ghost` (intentional low-emphasis inside sheets) |
+| Profile Sign out row button | `secondary` (opens modal; confirm is `dangerSoft`) |
+| Primary CTAs | `primary` / `amber` for staff actions |
+| Toasts | Light red dangerSoft palette (not navy) |
+
+**Minor note:** Catalog/Digital filter **Reset** stays `ghost` (no border) by design — low priority action inside a sheet.
 
 #### VnV — reservationHoldHours
 
@@ -428,13 +447,13 @@ Authentication → Templates → Password reset:
 
 ### C — Available Copies UI
 
-**Status:** Next after B2.
+**Status:** Done (2026-08-26).
 
-- [ ] Rename **Manage copies** → **Available Copies**
-- [ ] Show section to **students** (status / availability only)
-- [ ] Expand: students see status; staff keep **View QR / Print label**
-- [ ] No in-app borrow / return / claim (scan-only stays)
-- [ ] Helper text: borrow/return via Scan
+- [x] Rename **Manage copies** → **Available Copies**
+- [x] Show section to **students** (status / availability only)
+- [x] Expand: students see status; staff keep **View QR / Print label**
+- [x] No in-app borrow / return / claim (scan-only stays)
+- [x] Helper text: borrow/return via Scan
 
 **Regression:** Student sees copies list; staff QR still works; scan borrow/return unchanged.
 
@@ -444,13 +463,15 @@ Authentication → Templates → Password reset:
 
 ### D — Admin configs + librarian borrow harden
 
-**Status:** After C (unchanged scope).
+**Status:** Done (2026-08-26).
 
-- Admin toggle `allowInAppCopyBorrow` (default off / scan-only)
-- Harden `librariansCanBorrow`: block new borrow+reserve when off; keep active loans + scan return; cancel waiting/ready when toggle turns off; admin always full; digital OK for librarians; same fines
-- Optional: admin unlock locked login emails
+- [x] Admin toggle `allowInAppCopyBorrow` (default off / scan-only; stored for future in-app path)
+- [x] Harden `librariansCanBorrow`: block new borrow (existing) + **reserve** when off
+- [x] When toggle turns off: cancel waiting/ready librarian reservations + notify
+- [x] Admin always full; digital bookshelf unaffected; same fines rules
+- [x] Admin `POST /api/admin/login-locks/unlock` with `{ email }` to clear lock
 
----
+**Git:** `feat(api): librarian borrow harden and allowInAppCopyBorrow config`
 
 ## Phase 12: Onboarding (19)
 

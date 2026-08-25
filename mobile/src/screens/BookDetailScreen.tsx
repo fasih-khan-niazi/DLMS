@@ -541,97 +541,96 @@ export default function BookDetailScreen({ navigation, route }: Props) {
           </Card>
         ) : null}
 
-        {isStaff ? (
-          <>
-            <Text
-              style={{
-                fontFamily: fontFamily.bodyBold,
-                fontSize: type.titleSm,
-                color: colors.navy,
-                marginBottom: space.sm,
-              }}
-            >
-              Manage copies
+        <>
+          <Text
+            style={{
+              fontFamily: fontFamily.bodyBold,
+              fontSize: type.titleSm,
+              color: colors.navy,
+              marginBottom: space.sm,
+            }}
+          >
+            Available Copies
+          </Text>
+          <Text
+            style={{
+              fontFamily: fontFamily.body,
+              fontSize: type.small,
+              color: colors.muted,
+              marginBottom: space.md,
+              lineHeight: 20,
+            }}
+          >
+            {isStaff
+              ? "Each copy has a unique QR for shelf labels. Borrow and return only via the Scan tab. Open a copy to view or export its label."
+              : "Borrow and return only via the Scan tab. Status for each copy is shown below."}
+          </Text>
+          {(book.copies || []).length === 0 ? (
+            <Text style={{ fontFamily: fontFamily.body, color: colors.muted, marginBottom: space.lg }}>
+              No physical copies yet.
             </Text>
-            <Text
-              style={{
-                fontFamily: fontFamily.body,
-                fontSize: type.small,
-                color: colors.muted,
-                marginBottom: space.md,
-                lineHeight: 20,
-              }}
-            >
-              Each copy has a unique QR for shelf labels. Borrow and return only via the Scan tab.
-              Open a copy to view or export its label.
-            </Text>
-            {(book.copies || []).length === 0 ? (
-              <Text style={{ fontFamily: fontFamily.body, color: colors.muted, marginBottom: space.lg }}>
-                No physical copies yet.
-              </Text>
-            ) : (
-              (book.copies || []).map((copy: any, index: number) => {
-                const copyLabel = `Copy ${index + 1}`;
-                const expanded = expandedCopyId === copy.copyId;
+          ) : (
+            (book.copies || []).map((copy: any, index: number) => {
+              const copyLabel = `Copy ${index + 1}`;
+              const expanded = expandedCopyId === copy.copyId;
 
-                return (
-                  <Card key={copy.copyId} style={{ marginBottom: space.sm }}>
-                    <Pressable
-                      onPress={() =>
-                        setExpandedCopyId((current) =>
-                          current === copy.copyId ? null : copy.copyId
-                        )
-                      }
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontFamily: fontFamily.bodyBold, color: colors.navy }}>
-                          {copyLabel}
-                        </Text>
-                        <Text
-                          style={{
-                            marginTop: 4,
-                            fontFamily: fontFamily.body,
-                            fontSize: type.small,
-                            color: colors.muted,
-                            textTransform: "capitalize",
-                          }}
-                        >
-                          Status: {copy.status}
-                        </Text>
-                      </View>
-                      <Ionicons
-                        name={expanded ? "chevron-up" : "chevron-down"}
-                        size={20}
-                        color={colors.navy}
+              return (
+                <Card key={copy.copyId} style={{ marginBottom: space.sm }}>
+                  <Pressable
+                    onPress={() =>
+                      setExpandedCopyId((current) =>
+                        current === copy.copyId ? null : copy.copyId
+                      )
+                    }
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: fontFamily.bodyBold, color: colors.navy }}>
+                        {copyLabel}
+                      </Text>
+                      <Text
+                        style={{
+                          marginTop: 4,
+                          fontFamily: fontFamily.body,
+                          fontSize: type.small,
+                          color: colors.muted,
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        Status: {copy.status}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name={expanded ? "chevron-up" : "chevron-down"}
+                      size={20}
+                      color={colors.navy}
+                    />
+                  </Pressable>
+
+                  {expanded && isStaff && !!copy.qrPayload ? (
+                    <View style={{ marginTop: space.sm }}>
+                      <Button
+                        title="View QR label"
+                        variant="secondary"
+                        onPress={() =>
+                          setQrModal({
+                            copyLabel,
+                            qrPayload: copy.qrPayload,
+                            authors: book.authors,
+                          })
+                        }
                       />
-                    </Pressable>
-
-                    {expanded && !!copy.qrPayload ? (
-                      <View style={{ marginTop: space.sm }}>
-                        <Button
-                          title="View QR label"
-                          variant="secondary"
-                          onPress={() =>
-                            setQrModal({
-                              copyLabel,
-                              qrPayload: copy.qrPayload,
-                              authors: book.authors,
-                            })
-                          }
-                        />
-                      </View>
-                    ) : null}
-                  </Card>
-                );
-              })
-            )}
-          </>
-        ) : null}
+                    </View>
+                  ) : null}
+                </Card>
+              );
+            })
+          )}
+        </>
       </ScrollView>
 
       {qrModal ? (

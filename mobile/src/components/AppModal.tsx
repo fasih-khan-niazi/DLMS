@@ -23,7 +23,9 @@ type Props = {
   confirmLabel?: string;
   cancelLabel?: string;
   /** Primary CTA style. Prefer dangerSoft for destructive confirms. */
-  confirmVariant?: "primary" | "danger" | "dangerSoft" | "secondary";
+  confirmVariant?: "primary" | "danger" | "dangerSoft" | "secondary" | "softOutline";
+  /** Secondary/cancel button style when cancelLabel is shown. */
+  cancelVariant?: "ghost" | "secondary" | "softOutline";
   /** center = outcome/confirm dialog; sheet = bottom sheet for actions. */
   presentation?: "center" | "sheet";
   onClose: () => void;
@@ -49,6 +51,7 @@ export function AppModal({
   confirmLabel = "Done",
   cancelLabel = "Cancel",
   confirmVariant = "primary",
+  cancelVariant = "softOutline",
   presentation = "center",
   onClose,
   onConfirm,
@@ -62,7 +65,9 @@ export function AppModal({
   const isSheet = presentation === "sheet";
 
   const onBackdropPress = () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    });
   };
 
   const panelStyle: ViewStyle = isSheet
@@ -130,7 +135,7 @@ export function AppModal({
           {showCancel ? (
             <Button
               title={cancelLabel}
-              variant="ghost"
+              variant={cancelVariant}
               onPress={onCancel ?? onClose}
               style={{ marginTop: space.sm }}
             />

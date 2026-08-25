@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { firebaseAuth } from "../config/firebase";
 import { registerForPushNotifications } from "../utils/notifications";
@@ -32,6 +33,51 @@ const HomeStackNav = createNativeStackNavigator();
 const CatalogStackNav = createNativeStackNavigator();
 const ProfileStackNav = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+
+type IoniconName = ComponentProps<typeof Ionicons>["name"];
+
+function TabBarIcon({
+  focused,
+  color,
+  size,
+  outline,
+  solid,
+}: {
+  focused: boolean;
+  color: string;
+  size: number;
+  outline: IoniconName;
+  solid: IoniconName;
+}) {
+  const { colors, mode } = useTheme();
+
+  if (!focused) {
+    return <Ionicons name={outline} size={size} color={color} />;
+  }
+
+  const glowColor = mode === "dark" ? colors.amber : colors.navy;
+
+  return (
+    <View
+      style={{
+        alignItems: "center",
+        justifyContent: "center",
+        minWidth: 44,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 16,
+        backgroundColor: mode === "dark" ? "rgba(232, 168, 56, 0.16)" : "rgba(26, 42, 62, 0.08)",
+        shadowColor: glowColor,
+        shadowOpacity: 0.45,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 6,
+      }}
+    >
+      <Ionicons name={solid} size={size} color={color} />
+    </View>
+  );
+}
 
 function HomeStackNavigator() {
   return (
@@ -120,8 +166,14 @@ function MainTabs() {
           component={HomeStackNavigator}
           options={{
             title: "Home",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="home-outline" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabBarIcon
+                focused={focused}
+                color={color}
+                size={size}
+                outline="home-outline"
+                solid="home"
+              />
             ),
           }}
         />
@@ -130,8 +182,14 @@ function MainTabs() {
           component={CatalogStackNavigator}
           options={{
             title: "Catalog",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="library-outline" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabBarIcon
+                focused={focused}
+                color={color}
+                size={size}
+                outline="library-outline"
+                solid="library"
+              />
             ),
           }}
         />
@@ -140,8 +198,14 @@ function MainTabs() {
           component={ScanScreen}
           options={{
             title: "Scan",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="qr-code-outline" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabBarIcon
+                focused={focused}
+                color={color}
+                size={size}
+                outline="qr-code-outline"
+                solid="qr-code"
+              />
             ),
           }}
         />
@@ -150,8 +214,14 @@ function MainTabs() {
           component={ActivityScreen}
           options={{
             title: "Activity",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="time-outline" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabBarIcon
+                focused={focused}
+                color={color}
+                size={size}
+                outline="time-outline"
+                solid="time"
+              />
             ),
           }}
         />
@@ -160,8 +230,14 @@ function MainTabs() {
           component={ProfileStackNavigator}
           options={{
             title: "Profile",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="person-outline" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabBarIcon
+                focused={focused}
+                color={color}
+                size={size}
+                outline="person-outline"
+                solid="person"
+              />
             ),
           }}
         />
