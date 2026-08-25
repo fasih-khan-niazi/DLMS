@@ -477,15 +477,30 @@ Authentication → Templates → Password reset:
 
 **Goal:** First-run training without annoying veterans.
 
-**Tasks**
-- [ ] 3-4 slide carousel after first successful login (AsyncStorage flag `onboardingDone`).
-- [ ] Topics: Scan to borrow, Return via Scan, Reserve when unavailable, Fines block new loans.
-- [ ] Skip + Done; replay from Profile > Help.
-- [ ] Optional one-time coach mark on Scan tab first visit (single tooltip, dismiss forever).
+**Status:** Done (2026-08-26).
 
-**Regression:** Skip works; does not show again unless replay.
+**Tasks**
+- [x] 4-slide carousel after first successful login (`onboardingDone` in AsyncStorage)
+- [x] Topics: Scan to borrow, Return via Scan, Reserve when unavailable, Fines block new loans
+- [x] Skip + Done; replay from Profile → Support → **App tour**
+- [x] One-time coach mark on Scan tab first visit (dismiss with **Got it**)
+
+**Regression:** Skip works; does not show again unless replay from Profile.
 
 **Git:** `feat(mobile): first-run onboarding carousel`
+
+---
+
+### Polish pass (2026-08-26, post C/D)
+
+- [x] Modal cancel buttons: outline-only (`softOutline`, no fill)
+- [x] Button press: scale + glow + light haptic app-wide
+- [x] Tab bar: fixed-size icon glow (no vertical compression)
+- [x] Scan error sheet: **Try again** only → dismisses and re-enables camera
+- [x] Students: no chevron on copy cards; staff expand + QR modal (no backdrop dismiss, haptics, smaller)
+- [x] `allowInAppCopyBorrow` wired: API `/api/config/app` + book detail copy actions (refresh/pull picks up admin toggle; no rebuild needed)
+- [x] Reset buttons: `ghostOutline` in catalog/digital filters + PDF reader settings
+- [x] API gates in-app borrow/return by `copyId` when toggle off
 
 ---
 

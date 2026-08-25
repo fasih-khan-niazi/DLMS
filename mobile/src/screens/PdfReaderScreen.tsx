@@ -516,7 +516,7 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
                 </View>
                 <Button
                   title="Reset All"
-                  variant="secondary"
+                  variant="ghostOutline"
                   onPress={resetAllDraft}
                   style={{ marginTop: 10 }}
                 />

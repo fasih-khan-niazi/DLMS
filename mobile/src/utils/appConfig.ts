@@ -9,6 +9,7 @@ const FALLBACK_MAX_PDF_MB = 25;
 type AppConfig = {
   catalogPageSize: number;
   maxPdfSizeMb: number;
+  allowInAppCopyBorrow: boolean;
   fetchedAt: number;
 };
 
@@ -47,29 +48,38 @@ export async function hydrateAppConfig(): Promise<AppConfig | null> {
   return hydratePromise;
 }
 
-export async function getAppConfig(force = false): Promise<{ catalogPageSize: number; maxPdfSizeMb: number }> {
+export async function getAppConfig(force = false): Promise<{
+  catalogPageSize: number;
+  maxPdfSizeMb: number;
+  allowInAppCopyBorrow: boolean;
+}> {
   await hydrateAppConfig();
 
   if (!force && memory && Date.now() - memory.fetchedAt < TTL_MS) {
     return {
       catalogPageSize: memory.catalogPageSize,
       maxPdfSizeMb: memory.maxPdfSizeMb,
+      allowInAppCopyBorrow: memory.allowInAppCopyBorrow,
     };
   }
 
   try {
-    const response = await api.get<{ catalogPageSize: number; maxPdfSizeMb?: number }>(
-      "/api/config/app"
-    );
+    const response = await api.get<{
+      catalogPageSize: number;
+      maxPdfSizeMb?: number;
+      allowInAppCopyBorrow?: boolean;
+    }>("/api/config/app");
     const catalogPageSize = Number(response.data.catalogPageSize) || FALLBACK_PAGE_SIZE;
     const maxPdfSizeMb = Number(response.data.maxPdfSizeMb) || FALLBACK_MAX_PDF_MB;
-    memory = { catalogPageSize, maxPdfSizeMb, fetchedAt: Date.now() };
+    const allowInAppCopyBorrow = response.data.allowInAppCopyBorrow === true;
+    memory = { catalogPageSize, maxPdfSizeMb, allowInAppCopyBorrow, fetchedAt: Date.now() };
     await writeStoredConfig(memory);
-    return { catalogPageSize, maxPdfSizeMb };
+    return { catalogPageSize, maxPdfSizeMb, allowInAppCopyBorrow };
   } catch {
     return {
       catalogPageSize: memory?.catalogPageSize ?? FALLBACK_PAGE_SIZE,
       maxPdfSizeMb: memory?.maxPdfSizeMb ?? FALLBACK_MAX_PDF_MB,
+      allowInAppCopyBorrow: memory?.allowInAppCopyBorrow ?? false,
     };
   }
 }
@@ -84,9 +94,18 @@ export async function getMaxPdfSizeMb(): Promise<number> {
   return config.maxPdfSizeMb;
 }
 
+export async function getAllowInAppCopyBorrow(force = false): Promise<boolean> {
+  const config = await getAppConfig(force);
+  return config.allowInAppCopyBorrow;
+}
+
 /** Returns cached max PDF size immediately when available (no network). */
 export function peekMaxPdfSizeMb(): number | null {
   return memory?.maxPdfSizeMb ?? null;
+}
+
+export function peekAllowInAppCopyBorrow(): boolean | null {
+  return memory?.allowInAppCopyBorrow ?? null;
 }
 
 export function invalidateAppConfigCache(): void {

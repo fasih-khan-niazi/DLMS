@@ -8,6 +8,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { firebaseAuth } from "../config/firebase";
 import api from "../config/api";
 import { useProfile } from "../context/ProfileContext";
+import { useOnboarding } from "../context/OnboardingContext";
 import { AppModal } from "../components/AppModal";
 import { Button, Card, Screen } from "../components/ui";
 import { useTheme } from "../theme";
@@ -147,6 +148,7 @@ function StatRow({ label, value, last }: { label: string; value: string; last?: 
 export default function ProfileScreen({ navigation }: Props) {
   const { colors, fontFamily, space, type, mode, setMode } = useTheme();
   const { profile, isStaff, refresh } = useProfile();
+  const { openOnboarding } = useOnboarding();
   const [help, setHelp] = useState<HelpKind>(null);
   const [unread, setUnread] = useState(0);
   const [signOutOpen, setSignOutOpen] = useState(false);
@@ -338,6 +340,12 @@ export default function ProfileScreen({ navigation }: Props) {
           subtitle="Scan, return, fines"
           icon="help-circle-outline"
           onPress={() => setHelp("borrow")}
+        />
+        <MenuRow
+          label="App tour"
+          subtitle="Replay the first-run guide"
+          icon="school-outline"
+          onPress={openOnboarding}
           last
         />
       </Card>

@@ -556,7 +556,7 @@ export default function CatalogScreen({
 
             <View style={{ marginTop: space.lg, gap: space.sm }}>
               <Button title="Apply filters" onPress={applyFilters} />
-              <Button title="Reset" variant="ghost" onPress={resetFilters} />
+              <Button title="Reset" variant="ghostOutline" onPress={resetFilters} />
             </View>
           </View>
         </View>

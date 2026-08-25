@@ -10,6 +10,7 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { Button } from "./ui/Button";
 import { exportCopyQrLabelPdf, formatAuthors, qrImageUrl } from "../utils/qrLabelPdf";
 import { useTheme } from "../theme";
@@ -48,10 +49,17 @@ export function CopyQrModal({
     }
   };
 
+  const onBackdropPress = () => {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    });
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable
+      <View style={styles.backdrop}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onBackdropPress} />
+        <View
           style={[
             styles.card,
             {
@@ -59,21 +67,20 @@ export function CopyQrModal({
               borderRadius: radius.lg,
             },
           ]}
-          onPress={(e) => e.stopPropagation()}
         >
           <View style={styles.header}>
             <Text
               style={{
                 flex: 1,
                 fontFamily: fontFamily.display,
-                fontSize: type.titleSm,
+                fontSize: type.body,
                 color: colors.navy,
               }}
             >
               {copyLabel} label
             </Text>
             <Pressable onPress={onClose} hitSlop={12}>
-              <Ionicons name="close" size={24} color={colors.muted} />
+              <Ionicons name="close" size={22} color={colors.muted} />
             </Pressable>
           </View>
 
@@ -88,15 +95,16 @@ export function CopyQrModal({
             ]}
           >
             <Image
-              source={{ uri: qrImageUrl(qrPayload, 280) }}
-              style={{ width: 220, height: 220 }}
+              source={{ uri: qrImageUrl(qrPayload, 200) }}
+              style={{ width: 148, height: 148 }}
             />
           </View>
 
           <Text
+            numberOfLines={2}
             style={{
               fontFamily: fontFamily.bodyBold,
-              fontSize: type.body,
+              fontSize: type.small,
               color: colors.navy,
               textAlign: "center",
               marginTop: space.sm,
@@ -105,10 +113,11 @@ export function CopyQrModal({
             {title}
           </Text>
           <Text
+            numberOfLines={1}
             style={{
-              marginTop: 4,
+              marginTop: 2,
               fontFamily: fontFamily.body,
-              fontSize: type.small,
+              fontSize: type.caption,
               color: colors.muted,
               textAlign: "center",
             }}
@@ -117,39 +126,14 @@ export function CopyQrModal({
           </Text>
           <Text
             style={{
-              marginTop: space.sm,
+              marginTop: space.xs,
               fontFamily: fontFamily.bodySemiBold,
-              fontSize: type.small,
+              fontSize: type.caption,
               color: colors.navy,
               textAlign: "center",
             }}
           >
-            {copyLabel}
-          </Text>
-          <Text
-            style={{
-              marginTop: 4,
-              fontFamily: fontFamily.body,
-              fontSize: type.caption,
-              color: colors.muted,
-              textAlign: "center",
-            }}
-          >
-            ISBN {isbn}
-          </Text>
-
-          <Text
-            style={{
-              marginTop: space.md,
-              fontFamily: fontFamily.body,
-              fontSize: type.caption,
-              color: colors.muted,
-              textAlign: "center",
-              lineHeight: 18,
-            }}
-          >
-            This QR is permanent for this physical copy. It stays the same even if the title is
-            deactivated.
+            {copyLabel} · ISBN {isbn}
           </Text>
 
           {exporting ? (
@@ -162,8 +146,8 @@ export function CopyQrModal({
               style={{ marginTop: space.md }}
             />
           )}
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -173,19 +157,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(46, 74, 98, 0.45)",
     justifyContent: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: 28,
   },
   card: {
-    padding: 20,
+    padding: 16,
+    maxWidth: 320,
+    alignSelf: "center",
+    width: "100%",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 8,
   },
   qrWrap: {
     alignSelf: "center",
-    padding: 16,
+    padding: 10,
     borderWidth: 1,
   },
 });

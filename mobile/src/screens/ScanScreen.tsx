@@ -22,6 +22,7 @@ import {
   pushScanHistory,
   type ScanHistoryEntry,
 } from "../utils/scanHistory";
+import { dismissScanCoach, isScanCoachDismissed } from "../utils/onboarding";
 
 type Mode = "borrow" | "return";
 
@@ -76,6 +77,7 @@ export default function ScanScreen({ navigation }: Props) {
   const [result, setResult] = useState<ScanResult | null>(null);
   const [history, setHistory] = useState<ScanHistoryEntry[]>([]);
   const [lastPayload, setLastPayload] = useState<string | null>(null);
+  const [showScanCoach, setShowScanCoach] = useState(false);
 
   const loadHistory = useCallback(async () => {
     if (!isStaff) return;
@@ -92,6 +94,12 @@ export default function ScanScreen({ navigation }: Props) {
   useEffect(() => {
     if (isFocused) void loadHistory();
   }, [isFocused, loadHistory]);
+
+  useEffect(() => {
+    if (isFocused) {
+      void isScanCoachDismissed().then((dismissed) => setShowScanCoach(!dismissed));
+    }
+  }, [isFocused]);
 
   const resetScan = () => {
     setScanned(false);
@@ -149,10 +157,6 @@ export default function ScanScreen({ navigation }: Props) {
 
   const retryScan = () => {
     setResult(null);
-    if (lastPayload) {
-      void runScan(lastPayload, true);
-      return;
-    }
     resetScan();
   };
 
@@ -227,6 +231,50 @@ export default function ScanScreen({ navigation }: Props) {
           <Ionicons name={torchOn ? "flashlight" : "flashlight-outline"} size={24} color={colors.white} />
         </Pressable>
       </View>
+
+      {showScanCoach ? (
+        <View
+          style={{
+            position: "absolute",
+            top: insets.top + 56,
+            left: 16,
+            right: 16,
+            zIndex: 3,
+            backgroundColor: colors.cream,
+            borderRadius: radius.md,
+            padding: 12,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: fontFamily.bodySemiBold,
+              fontSize: type.small,
+              color: colors.navy,
+            }}
+          >
+            Tip: switch Borrow / Return above, then scan the shelf QR inside the frame.
+          </Text>
+          <Pressable
+            onPress={() => {
+              void dismissScanCoach();
+              setShowScanCoach(false);
+            }}
+            style={{ marginTop: 8, alignSelf: "flex-end" }}
+          >
+            <Text
+              style={{
+                fontFamily: fontFamily.bodyBold,
+                fontSize: type.small,
+                color: colors.amber,
+              }}
+            >
+              Got it
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={[styles.bottomPanel, { paddingBottom: insets.bottom + 16 }]}>
         <View style={[styles.modeRow, { backgroundColor: "rgba(255,255,255,0.12)", borderRadius: radius.md }]}>

@@ -114,12 +114,9 @@ export function ScanResultSheet({ result, onDismiss, onRetry }: Props) {
           <View style={{ marginTop: space.lg, gap: space.sm }}>
             {result.kind === "error" && onRetry ? (
               <Button title="Try again" onPress={onRetry} />
-            ) : null}
-            <Button
-              title="Done"
-              variant={result.kind === "error" && onRetry ? "secondary" : "primary"}
-              onPress={onDismiss}
-            />
+            ) : (
+              <Button title="Done" onPress={onDismiss} />
+            )}
           </View>
         </View>
       </View>

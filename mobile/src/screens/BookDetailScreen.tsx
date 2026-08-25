@@ -23,6 +23,7 @@ import { BookDetailSkeleton } from "../components/Skeleton";
 import { formatIsbn } from "../utils/isbn";
 import { invalidateCatalogCache } from "../utils/catalogCache";
 import { invalidateCoverCache } from "../utils/coverImage";
+import { getAllowInAppCopyBorrow, invalidateAppConfigCache } from "../utils/appConfig";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -38,7 +39,7 @@ type QrModalState = {
 
 export default function BookDetailScreen({ navigation, route }: Props) {
   const { isbn } = route.params;
-  const { isStaff } = useProfile();
+  const { isStaff, profile } = useProfile();
   const { colors, fontFamily, space, type, radius } = useTheme();
 
   const [book, setBook] = useState<any>(null);
@@ -59,6 +60,13 @@ export default function BookDetailScreen({ navigation, route }: Props) {
     title: string;
     message: string;
     goActivity?: boolean;
+  } | null>(null);
+  const [allowInAppCopyBorrow, setAllowInAppCopyBorrow] = useState(false);
+  const [copyActionId, setCopyActionId] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<{
+    variant: "success" | "error";
+    title: string;
+    message: string;
   } | null>(null);
 
   const load = async (opts?: { silent?: boolean }) => {
@@ -90,6 +98,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
 
   useFocusEffect(
     useCallback(() => {
+      void getAllowInAppCopyBorrow(true).then(setAllowInAppCopyBorrow);
       void load();
     }, [isbn])
   );
@@ -140,6 +149,36 @@ export default function BookDetailScreen({ navigation, route }: Props) {
 
   const goToScan = () => {
     navigation.getParent()?.navigate("Scan");
+  };
+
+  const runCopyAction = async (
+    copyId: string,
+    action: "borrow" | "return",
+    copyLabel: string
+  ) => {
+    setCopyActionId(copyId);
+    try {
+      const endpoint = action === "borrow" ? "/api/loans/borrow" : "/api/loans/return";
+      const response = await api.post(endpoint, { copyId });
+      invalidateCatalogCache();
+      invalidateAppConfigCache();
+      await load({ silent: true });
+      setCopyFeedback({
+        variant: "success",
+        title: action === "borrow" ? "Borrowed" : "Returned",
+        message:
+          response.data.message ||
+          `${copyLabel} ${action === "borrow" ? "is now on your account" : "was returned successfully"}.`,
+      });
+    } catch (error: any) {
+      setCopyFeedback({
+        variant: "error",
+        title: action === "borrow" ? "Could not borrow" : "Could not return",
+        message: error.response?.data?.error || "Request failed",
+      });
+    } finally {
+      setCopyActionId(null);
+    }
   };
 
   const toggleCatalogActive = () => {
@@ -308,6 +347,8 @@ export default function BookDetailScreen({ navigation, route }: Props) {
             onRefresh={() => {
               setRefreshing(true);
               invalidateCatalogCache();
+              invalidateAppConfigCache();
+              void getAllowInAppCopyBorrow(true).then(setAllowInAppCopyBorrow);
               void load({ silent: true });
             }}
             tintColor={colors.navy}
@@ -562,8 +603,12 @@ export default function BookDetailScreen({ navigation, route }: Props) {
             }}
           >
             {isStaff
-              ? "Each copy has a unique QR for shelf labels. Borrow and return only via the Scan tab. Open a copy to view or export its label."
-              : "Borrow and return only via the Scan tab. Status for each copy is shown below."}
+              ? allowInAppCopyBorrow
+                ? "Each copy has a unique QR for shelf labels. Borrow or return from here when enabled, or use the Scan tab."
+                : "Each copy has a unique QR for shelf labels. Borrow and return via the Scan tab. Open a copy to view or export its label."
+              : allowInAppCopyBorrow
+                ? "Borrow or return copies below when available, or use the Scan tab."
+                : "Borrow and return only via the Scan tab. Status for each copy is shown below."}
           </Text>
           {(book.copies || []).length === 0 ? (
             <Text style={{ fontFamily: fontFamily.body, color: colors.muted, marginBottom: space.lg }}>
@@ -573,57 +618,112 @@ export default function BookDetailScreen({ navigation, route }: Props) {
             (book.copies || []).map((copy: any, index: number) => {
               const copyLabel = `Copy ${index + 1}`;
               const expanded = expandedCopyId === copy.copyId;
+              const isMine = myActiveCopyIds.has(copy.copyId);
+              const heldForMe =
+                copy.status === "reserved" &&
+                !!profile?.uid &&
+                String(copy.reservedForUserId || "") === profile.uid;
+              const showBorrow =
+                allowInAppCopyBorrow && (copy.status === "available" || heldForMe);
+              const showReturn = allowInAppCopyBorrow && copy.status === "issued" && isMine;
+              const busy = copyActionId === copy.copyId;
+
+              const statusBlock = (
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: fontFamily.bodyBold, color: colors.navy }}>
+                    {copyLabel}
+                  </Text>
+                  <Text
+                    style={{
+                      marginTop: 4,
+                      fontFamily: fontFamily.body,
+                      fontSize: type.small,
+                      color: colors.muted,
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    Status: {copy.status}
+                  </Text>
+                </View>
+              );
 
               return (
                 <Card key={copy.copyId} style={{ marginBottom: space.sm }}>
-                  <Pressable
-                    onPress={() =>
-                      setExpandedCopyId((current) =>
-                        current === copy.copyId ? null : copy.copyId
-                      )
-                    }
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontFamily: fontFamily.bodyBold, color: colors.navy }}>
-                        {copyLabel}
-                      </Text>
-                      <Text
-                        style={{
-                          marginTop: 4,
-                          fontFamily: fontFamily.body,
-                          fontSize: type.small,
-                          color: colors.muted,
-                          textTransform: "capitalize",
-                        }}
-                      >
-                        Status: {copy.status}
-                      </Text>
-                    </View>
-                    <Ionicons
-                      name={expanded ? "chevron-up" : "chevron-down"}
-                      size={20}
-                      color={colors.navy}
-                    />
-                  </Pressable>
-
-                  {expanded && isStaff && !!copy.qrPayload ? (
-                    <View style={{ marginTop: space.sm }}>
-                      <Button
-                        title="View QR label"
-                        variant="secondary"
-                        onPress={() =>
-                          setQrModal({
-                            copyLabel,
-                            qrPayload: copy.qrPayload,
-                            authors: book.authors,
-                          })
-                        }
+                  {isStaff ? (
+                    <Pressable
+                      onPress={() =>
+                        setExpandedCopyId((current) =>
+                          current === copy.copyId ? null : copy.copyId
+                        )
+                      }
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      {statusBlock}
+                      <Ionicons
+                        name={expanded ? "chevron-up" : "chevron-down"}
+                        size={20}
+                        color={colors.navy}
                       />
+                    </Pressable>
+                  ) : (
+                    statusBlock
+                  )}
+
+                  {!isStaff && (showBorrow || showReturn) ? (
+                    <View style={{ marginTop: space.sm }}>
+                      {showBorrow ? (
+                        <Button
+                          title={heldForMe ? "Borrow reserved copy" : "Borrow copy"}
+                          onPress={() => void runCopyAction(copy.copyId, "borrow", copyLabel)}
+                          loading={busy}
+                        />
+                      ) : null}
+                      {showReturn ? (
+                        <Button
+                          title="Return copy"
+                          variant="secondary"
+                          onPress={() => void runCopyAction(copy.copyId, "return", copyLabel)}
+                          loading={busy}
+                          style={{ marginTop: showBorrow ? space.sm : 0 }}
+                        />
+                      ) : null}
+                    </View>
+                  ) : null}
+
+                  {expanded && isStaff ? (
+                    <View style={{ marginTop: space.sm, gap: space.sm }}>
+                      {allowInAppCopyBorrow && showBorrow ? (
+                        <Button
+                          title={heldForMe ? "Borrow reserved copy" : "Borrow copy"}
+                          onPress={() => void runCopyAction(copy.copyId, "borrow", copyLabel)}
+                          loading={busy}
+                        />
+                      ) : null}
+                      {allowInAppCopyBorrow && showReturn ? (
+                        <Button
+                          title="Return copy"
+                          variant="secondary"
+                          onPress={() => void runCopyAction(copy.copyId, "return", copyLabel)}
+                          loading={busy}
+                        />
+                      ) : null}
+                      {!!copy.qrPayload ? (
+                        <Button
+                          title="View QR label"
+                          variant="secondary"
+                          onPress={() =>
+                            setQrModal({
+                              copyLabel,
+                              qrPayload: copy.qrPayload,
+                              authors: book.authors,
+                            })
+                          }
+                        />
+                      ) : null}
                     </View>
                   ) : null}
                 </Card>
@@ -652,6 +752,15 @@ export default function BookDetailScreen({ navigation, route }: Props) {
         message={coverSuccess?.message || ""}
         confirmLabel="Done"
         onClose={() => setCoverSuccess(null)}
+      />
+
+      <AppModal
+        visible={!!copyFeedback}
+        variant={copyFeedback?.variant === "success" ? "success" : "error"}
+        title={copyFeedback?.title || ""}
+        message={copyFeedback?.message || ""}
+        confirmLabel="OK"
+        onClose={() => setCopyFeedback(null)}
       />
 
       <AppModal

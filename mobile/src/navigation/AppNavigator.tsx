@@ -10,6 +10,7 @@ import { onAuthStateChanged, User } from "firebase/auth";
 import { firebaseAuth } from "../config/firebase";
 import { registerForPushNotifications } from "../utils/notifications";
 import { ProfileProvider } from "../context/ProfileContext";
+import { OnboardingProvider } from "../context/OnboardingContext";
 import { useTheme } from "../theme";
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
@@ -50,31 +51,28 @@ function TabBarIcon({
   solid: IoniconName;
 }) {
   const { colors, mode } = useTheme();
-
-  if (!focused) {
-    return <Ionicons name={outline} size={size} color={color} />;
-  }
-
+  const iconName = focused ? solid : outline;
   const glowColor = mode === "dark" ? colors.amber : colors.navy;
 
   return (
     <View
       style={{
+        width: 28,
+        height: 28,
         alignItems: "center",
         justifyContent: "center",
-        minWidth: 44,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 16,
-        backgroundColor: mode === "dark" ? "rgba(232, 168, 56, 0.16)" : "rgba(26, 42, 62, 0.08)",
-        shadowColor: glowColor,
-        shadowOpacity: 0.45,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 0 },
-        elevation: 6,
+        ...(focused
+          ? {
+              shadowColor: glowColor,
+              shadowOpacity: 0.75,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 0 },
+              elevation: 8,
+            }
+          : null),
       }}
     >
-      <Ionicons name={solid} size={size} color={color} />
+      <Ionicons name={iconName} size={size} color={color} />
     </View>
   );
 }
@@ -138,8 +136,9 @@ function MainTabs() {
   const { colors, mode } = useTheme();
 
   return (
-    <ProfileProvider>
-      <Tab.Navigator
+    <OnboardingProvider>
+      <ProfileProvider>
+        <Tab.Navigator
         detachInactiveScreens={true}
         screenOptions={{
           headerShown: false,
@@ -242,7 +241,8 @@ function MainTabs() {
           }}
         />
       </Tab.Navigator>
-    </ProfileProvider>
+      </ProfileProvider>
+    </OnboardingProvider>
   );
 }
 
