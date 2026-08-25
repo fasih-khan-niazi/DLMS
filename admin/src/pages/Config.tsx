@@ -11,6 +11,7 @@ type SystemConfig = {
   workingDaysOff?: string[];
   maxPdfSizeMb?: number;
   librariansCanBorrow?: boolean;
+  allowInAppCopyBorrow?: boolean;
   timezone?: string;
   catalogPageSize?: number;
 };
@@ -25,6 +26,7 @@ const defaults: SystemConfig = {
   workingDaysOff: ["Sunday"],
   maxPdfSizeMb: 25,
   librariansCanBorrow: true,
+  allowInAppCopyBorrow: false,
   timezone: "Asia/Karachi",
   catalogPageSize: 10,
 };
@@ -183,6 +185,16 @@ export function ConfigPage() {
                 }
               />
               Librarians can borrow physical books
+            </label>
+            <label className="checkbox-row config-span">
+              <input
+                type="checkbox"
+                checked={!!form.allowInAppCopyBorrow}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, allowInAppCopyBorrow: e.target.checked }))
+                }
+              />
+              Allow in-app copy borrow/return (Scan remains primary; default off)
             </label>
           </div>
         </section>

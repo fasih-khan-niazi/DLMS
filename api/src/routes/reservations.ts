@@ -72,6 +72,13 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    if (user.role === "librarian" && config.librariansCanBorrow === false) {
+      res.status(403).json({
+        error: "Librarians cannot reserve physical books while borrowing is disabled",
+      });
+      return;
+    }
+
     if (config.blockCheckoutIfUnpaidFine && user.hasUnpaidFines) {
       res.status(403).json({ error: "Clear unpaid fines before reserving" });
       return;

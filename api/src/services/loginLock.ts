@@ -166,3 +166,18 @@ export async function recordLoginAttempt(input: {
     lockedForSeconds: 0,
   };
 }
+
+export async function clearLoginLock(emailRaw: string): Promise<void> {
+  const email = normalizeEmail(emailRaw);
+  const ref = db.collection("loginLocks").doc(lockDocId(email));
+  await ref.set(
+    {
+      email,
+      failedAttempts: 0,
+      lockedUntil: null,
+      updatedAt: new Date(),
+      clearedAt: new Date(),
+    },
+    { merge: true }
+  );
+}

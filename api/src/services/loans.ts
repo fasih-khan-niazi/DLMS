@@ -30,6 +30,7 @@ export async function getSystemConfig() {
       blockCheckoutIfUnpaidFine: true,
       workingDaysOff: ["Sunday"],
       librariansCanBorrow: true,
+      allowInAppCopyBorrow: false,
       maxPdfSizeMb: 25,
       reminderDaysBefore: [2, 1],
       catalogPageSize: 10,

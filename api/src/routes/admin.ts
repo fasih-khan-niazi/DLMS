@@ -7,7 +7,9 @@ import {
   normalizeIsbn,
   reconcileAllWaitingQueues,
   reconcileReservationsForIsbn,
+  cancelLibrarianReservations,
 } from "../services/reservations";
+import { clearLoginLock } from "../services/loginLock";
 
 const router = Router();
 
@@ -23,6 +25,7 @@ const CONFIG_ALLOWED_FIELDS = [
   "workingDaysOff",
   "maxPdfSizeMb",
   "librariansCanBorrow",
+  "allowInAppCopyBorrow",
   "timezone",
   "catalogPageSize",
 ] as const;
@@ -153,17 +156,35 @@ router.put("/config", requireRole("admin"), async (req: AuthRequest, res: Respon
       updates.catalogPageSize = clampCatalogPageSize(updates.catalogPageSize);
     }
 
+    const prevConfig = await getSystemConfig();
+    const disablingLibrarianBorrow =
+      Object.prototype.hasOwnProperty.call(updates, "librariansCanBorrow") &&
+      updates.librariansCanBorrow === false &&
+      prevConfig.librariansCanBorrow !== false;
+
     updates.updatedAt = new Date();
     updates.updatedBy = req.uid;
 
     const ref = db.collection("config").doc("system");
     await ref.set(updates, { merge: true });
 
+    let cancelledLibrarianReservations = 0;
+    if (disablingLibrarianBorrow) {
+      try {
+        cancelledLibrarianReservations = await cancelLibrarianReservations();
+      } catch (error) {
+        console.error("Cancel librarian reservations after config change:", error);
+      }
+    }
+
     await db.collection("auditLog").add({
       action: "config_updated",
       actorId: req.uid,
       targetId: "system",
-      metadata: { fields: Object.keys(updates).filter((k) => k !== "updatedAt" && k !== "updatedBy") },
+      metadata: {
+        fields: Object.keys(updates).filter((k) => k !== "updatedAt" && k !== "updatedBy"),
+        cancelledLibrarianReservations,
+      },
       timestamp: new Date(),
     });
 
@@ -452,5 +473,31 @@ router.post(
     }
   }
 );
+
+/** Clear login lock for an email (admin). */
+router.post("/login-locks/unlock", requireRole("admin"), async (req: AuthRequest, res: Response) => {
+  try {
+    const email = String(req.body?.email || "").trim();
+    if (!email) {
+      res.status(400).json({ error: "email is required" });
+      return;
+    }
+
+    await clearLoginLock(email);
+
+    await db.collection("auditLog").add({
+      action: "login_lock_cleared",
+      actorId: req.uid,
+      targetId: email.toLowerCase(),
+      metadata: {},
+      timestamp: new Date(),
+    });
+
+    res.json({ success: true, email });
+  } catch (error) {
+    console.error("Login lock unlock error:", error);
+    res.status(500).json({ error: "Failed to unlock login" });
+  }
+});
 
 export default router;

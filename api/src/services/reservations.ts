@@ -524,6 +524,85 @@ export async function cancelReservationsForDeactivatedTitle(input: {
   return cancelled;
 }
 
+/** Cancel waiting/ready physical reservations for all librarians (e.g. when borrow is disabled). */
+export async function cancelLibrarianReservations() {
+  const librariansSnap = await db.collection("users").where("role", "==", "librarian").get();
+  if (librariansSnap.empty) return 0;
+
+  const now = new Date();
+  let cancelled = 0;
+
+  for (const libDoc of librariansSnap.docs) {
+    const userId = libDoc.id;
+    const snap = await db
+      .collection("reservations")
+      .where("userId", "==", userId)
+      .where("status", "in", ["waiting", "ready"])
+      .get();
+
+    for (const doc of snap.docs) {
+      const reservation = doc.data();
+      const reservationRef = doc.ref;
+      const copyId = reservation.assignedCopyId as string | undefined;
+      const isbn = normalizeIsbn(String(reservation.isbn || ""));
+      const catalogRef = db.collection("catalog").doc(isbn);
+      const title = String(reservation.title || "this title");
+
+      await db.runTransaction(async (tx) => {
+        const fresh = await tx.get(reservationRef);
+        if (!fresh.exists) return;
+        const data = fresh.data()!;
+        if (data.status !== "waiting" && data.status !== "ready") return;
+
+        const catalogSnap = await tx.get(catalogRef);
+
+        tx.update(reservationRef, {
+          status: "cancelled",
+          cancelReason: "librarian_borrow_disabled",
+          updatedAt: now,
+        });
+
+        if (data.status === "ready" && copyId) {
+          const copyRef = db.collection("bookCopies").doc(copyId);
+          const copySnap = await tx.get(copyRef);
+          if (copySnap.exists) {
+            const copy = copySnap.data()!;
+            if (copy.status === "reserved" && copy.reservedForUserId === data.userId) {
+              tx.update(copyRef, {
+                status: "available",
+                reservedForUserId: null,
+                readyAt: null,
+                expiresAt: null,
+                updatedAt: now,
+              });
+            }
+          }
+          if (catalogSnap.exists) {
+            const catalog = catalogSnap.data()!;
+            tx.update(catalogRef, {
+              reservedCount: Math.max((catalog.reservedCount || 0) - 1, 0),
+              availableCount: (catalog.availableCount || 0) + 1,
+              updatedAt: now,
+            });
+          }
+        }
+      });
+
+      await notifyUser({
+        userId,
+        type: "reservation_cancelled",
+        title: "Reservation cancelled",
+        body: `Your reservation for "${title}" was cancelled because librarian borrowing is disabled.`,
+        metadata: { isbn, reservationId: doc.id },
+      });
+
+      cancelled += 1;
+    }
+  }
+
+  return cancelled;
+}
+
 /** If copies are available while people are waiting, hold for the next waiter. */
 export async function fulfillWaitingWithAvailableCopies(isbn: string) {
   const result = await reconcileReservationsForIsbn(isbn);
