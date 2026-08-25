@@ -9,7 +9,7 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
-import { BookCover, Card } from "../components/ui";
+import { BookCover, Card, BackButton } from "../components/ui";
 import { EmptyState } from "../components/EmptyState";
 import { SkeletonList } from "../components/Skeleton";
 import { useTheme } from "../theme";
@@ -162,9 +162,7 @@ export default function BookshelfScreen({ navigation }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.cream, paddingTop: 56, paddingHorizontal: 20 }}>
-      <Pressable onPress={() => navigation.goBack()} style={{ marginBottom: space.sm }}>
-        <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>← Back</Text>
-      </Pressable>
+      <BackButton onPress={() => navigation.goBack()} style={{ marginBottom: space.sm, marginLeft: -8 }} />
       <Text
         style={{
           fontFamily: fontFamily.display,

@@ -12,6 +12,7 @@ import {
   formatShortDate,
   loanStatusChip,
 } from "../utils/loanDates";
+import { goToCatalogTab } from "../utils/navigation";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -47,8 +48,8 @@ export default function MyLoansScreen({ navigation, embedded }: Props) {
     }, [])
   );
 
-  const goCatalog = () => navigation.getParent()?.navigate("Catalog");
-  const goScan = () => navigation.getParent()?.navigate("Scan");
+  const goCatalog = () => goToCatalogTab(navigation);
+  const goScan = () => navigation.navigate("Scan");
 
   return (
     <View style={[styles.container, { backgroundColor: colors.cream }]}>

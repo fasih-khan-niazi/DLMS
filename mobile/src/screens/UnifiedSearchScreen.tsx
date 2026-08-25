@@ -4,7 +4,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import { useFocusEffect } from "@react-navigation/native";
 import api from "../config/api";
-import { BookCover, Badge, Screen } from "../components/ui";
+import { BookCover, Badge, Screen, BackButton } from "../components/ui";
 import { EmptyState } from "../components/EmptyState";
 import { SkeletonList } from "../components/Skeleton";
 import { CATALOG_TABS } from "../constants/catalogTabs";
@@ -84,11 +84,7 @@ export default function UnifiedSearchScreen({ navigation, route }: Props) {
       contentStyle={{ paddingHorizontal: 20 }}
       // refresh via pull is optional; keep simple
     >
-      <Pressable onPress={() => navigation.goBack()} style={{ marginBottom: space.md }}>
-        <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>
-          ← Back
-        </Text>
-      </Pressable>
+      <BackButton onPress={() => navigation.goBack()} style={{ marginBottom: space.sm, marginLeft: -8 }} />
 
       <Text
         style={{

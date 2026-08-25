@@ -3,7 +3,6 @@ import {
   View,
   Text,
   ScrollView,
-  ActivityIndicator,
   Alert,
   Pressable,
   TextInput,
@@ -19,7 +18,8 @@ import { firebaseAuth } from "../config/firebase";
 import { useProfile } from "../context/ProfileContext";
 import { CopyQrModal } from "../components/CopyQrModal";
 import { AppModal } from "../components/AppModal";
-import { BookCover, Badge, Button, Card } from "../components/ui";
+import { BookCover, Badge, Button, Card, BackButton } from "../components/ui";
+import { BookDetailSkeleton } from "../components/Skeleton";
 import { formatIsbn } from "../utils/isbn";
 import { invalidateCatalogCache } from "../utils/catalogCache";
 import { invalidateCoverCache } from "../utils/coverImage";
@@ -275,8 +275,8 @@ export default function BookDetailScreen({ navigation, route }: Props) {
 
   if (loading && !book) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.cream }}>
-        <ActivityIndicator color={colors.navy} />
+      <View style={{ flex: 1, backgroundColor: colors.cream }}>
+        <BookDetailSkeleton />
       </View>
     );
   }
@@ -285,9 +285,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.cream }}>
         <Text style={{ fontFamily: fontFamily.bodyBold, color: colors.danger }}>Book not found</Text>
-        <Pressable onPress={() => navigation.goBack()} style={{ marginTop: 12 }}>
-          <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>Go back</Text>
-        </Pressable>
+        <BackButton onPress={() => navigation.goBack()} style={{ marginTop: 12 }} />
       </View>
     );
   }
@@ -316,9 +314,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
           />
         }
       >
-        <Pressable onPress={() => navigation.goBack()} style={{ marginBottom: space.md }}>
-          <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>← Back</Text>
-        </Pressable>
+        <BackButton onPress={() => navigation.goBack()} style={{ marginBottom: space.sm, marginLeft: -8 }} />
 
         <View style={{ alignItems: "center", marginBottom: space.lg }}>
           <BookCover

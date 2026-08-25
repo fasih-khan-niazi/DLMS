@@ -11,6 +11,7 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
 import { SearchBar } from "../components/SearchBar";
@@ -468,8 +469,14 @@ export default function CatalogScreen({
       ) : null}
 
       <Modal visible={filtersOpen} transparent animationType="slide" onRequestClose={() => setFiltersOpen(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setFiltersOpen(false)}>
+        <View style={styles.modalBackdrop}>
           <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }}
+          />
+          <View
             style={[
               styles.modalCard,
               {
@@ -480,7 +487,6 @@ export default function CatalogScreen({
                 paddingBottom: insets.bottom + 20,
               },
             ]}
-            onPress={(e) => e.stopPropagation()}
           >
             <View
               style={{
@@ -552,8 +558,8 @@ export default function CatalogScreen({
               <Button title="Apply filters" onPress={applyFilters} />
               <Button title="Reset" variant="ghost" onPress={resetFilters} />
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );

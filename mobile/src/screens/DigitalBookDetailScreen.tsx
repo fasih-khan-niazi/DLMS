@@ -3,7 +3,6 @@ import {
   View,
   Text,
   ScrollView,
-  ActivityIndicator,
   Pressable,
   RefreshControl,
 } from "react-native";
@@ -13,7 +12,8 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import api from "../config/api";
 import { AppModal } from "../components/AppModal";
-import { BookCover, Button, Card } from "../components/ui";
+import { BookCover, Button, Card, BackButton } from "../components/ui";
+import { BookDetailSkeleton } from "../components/Skeleton";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -25,6 +25,7 @@ type ReviewSummary = {
   count: number;
   averageRating: number | null;
   recommendPercent: number | null;
+  recommendLabel?: string | null;
 };
 
 type ReviewItem = {
@@ -280,8 +281,8 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
 
   if (loading && !book) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.cream }}>
-        <ActivityIndicator color={colors.navy} />
+      <View style={{ flex: 1, backgroundColor: colors.cream }}>
+        <BookDetailSkeleton />
       </View>
     );
   }
@@ -290,9 +291,7 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.cream }}>
         <Text style={{ fontFamily: fontFamily.bodyBold, color: colors.danger }}>Book not found</Text>
-        <Pressable onPress={() => navigation.goBack()} style={{ marginTop: 12 }}>
-          <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>Go back</Text>
-        </Pressable>
+        <BackButton onPress={() => navigation.goBack()} style={{ marginTop: 12 }} />
       </View>
     );
   }
@@ -317,9 +316,7 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
           />
         }
       >
-        <Pressable onPress={() => navigation.goBack()} style={{ marginBottom: space.md }}>
-          <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>← Back</Text>
-        </Pressable>
+        <BackButton onPress={() => navigation.goBack()} style={{ marginBottom: space.sm, marginLeft: -8 }} />
 
         <View style={{ alignItems: "center", marginBottom: space.lg }}>
           <BookCover uri={book.thumbnailUrl} width={140} height={200} />
@@ -549,9 +546,9 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
                       color: colors.muted,
                     }}
                   >
-                    ★ {reviewSummary.averageRating} average
-                    {reviewSummary.recommendPercent !== null
-                      ? ` · ${reviewSummary.recommendPercent}% would recommend`
+                    ★ {reviewSummary.averageRating}
+                    {reviewSummary.recommendLabel
+                      ? ` · ${reviewSummary.recommendLabel}`
                       : ""}
                   </Text>
                 ) : null}
@@ -600,7 +597,7 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
                     >
                       ★ {review.rating}/5
                       {review.recommendScore !== null
-                        ? ` · Recommend ${review.recommendScore}/10`
+                        ? ` · Would recommend to friends: ${review.recommendScore}/10`
                         : ""}
                     </Text>
                     {review.comment ? (
@@ -647,7 +644,7 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
         title="Remove from bookshelf?"
         message="Your reading progress for this book will be cleared from your shelf."
         confirmLabel="Remove"
-        confirmVariant="danger"
+        confirmVariant="dangerSoft"
         cancelLabel="Keep it"
         onClose={() => setRemoveConfirmOpen(false)}
         onConfirm={() => void removeFromBookshelf()}

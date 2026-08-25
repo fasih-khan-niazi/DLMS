@@ -8,6 +8,7 @@ import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
 import { SkeletonList } from "../components/Skeleton";
 import { formatShortDate } from "../utils/loanDates";
+import { goToCatalogTab } from "../utils/navigation";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -43,7 +44,7 @@ export default function LoanHistoryScreen({ navigation, embedded }: Props) {
     }, [])
   );
 
-  const goCatalog = () => navigation.getParent()?.navigate("Catalog");
+  const goCatalog = () => goToCatalogTab(navigation);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.cream }]}>

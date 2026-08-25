@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
+import { BackButton } from "../components/ui";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -97,9 +98,7 @@ export default function AddBookScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <TouchableOpacity onPress={() => navigation.goBack()}>
-        <Text style={styles.back}>← Back</Text>
-      </TouchableOpacity>
+      <BackButton onPress={() => navigation.goBack()} style={{ marginBottom: 8, marginLeft: -8 }} />
 
       <Text style={styles.heading}>Add Book</Text>
 

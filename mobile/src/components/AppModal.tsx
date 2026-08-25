@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { Button } from "./ui/Button";
 import { useTheme } from "../theme";
 
@@ -21,9 +22,9 @@ type Props = {
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  /** Primary CTA style. Use danger for sign-out / cancel reservation. */
-  confirmVariant?: "primary" | "danger" | "secondary";
-  /** center = outcome/confirm dialog; sheet = bottom sheet for actions/filters. */
+  /** Primary CTA style. Prefer dangerSoft for destructive confirms. */
+  confirmVariant?: "primary" | "danger" | "dangerSoft" | "secondary";
+  /** center = outcome/confirm dialog; sheet = bottom sheet for actions. */
   presentation?: "center" | "sheet";
   onClose: () => void;
   onConfirm?: () => void;
@@ -60,6 +61,10 @@ export function AppModal({
   const showCancel = typeof onCancel === "function";
   const isSheet = presentation === "sheet";
 
+  const onBackdropPress = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  };
+
   const panelStyle: ViewStyle = isSheet
     ? {
         backgroundColor: colors.cream,
@@ -84,11 +89,9 @@ export function AppModal({
       animationType={isSheet ? "slide" : "fade"}
       onRequestClose={onClose}
     >
-      <Pressable
-        style={[styles.backdrop, isSheet ? styles.backdropSheet : styles.backdropCenter]}
-        onPress={onClose}
-      >
-        <Pressable style={panelStyle} onPress={(e) => e.stopPropagation()}>
+      <View style={[styles.backdrop, isSheet ? styles.backdropSheet : styles.backdropCenter]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onBackdropPress} />
+        <View style={panelStyle}>
           {isSheet ? <View style={[styles.handle, { backgroundColor: colors.border }]} /> : null}
 
           <View style={styles.iconWrap}>
@@ -132,8 +135,8 @@ export function AppModal({
               style={{ marginTop: space.sm }}
             />
           ) : null}
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }

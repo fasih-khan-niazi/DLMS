@@ -63,9 +63,12 @@ export function reservationStatusChip(status: string): { label: string; tone: Du
       return { label: "Ready", tone: "success" };
     case "waiting":
       return { label: "Waiting", tone: "warning" };
-    case "expired":
     case "cancelled":
+      return { label: "Cancelled", tone: "muted" };
+    case "expired":
       return { label: "Expired", tone: "muted" };
+    case "fulfilled":
+      return { label: "Fulfilled", tone: "success" };
     default:
       return { label: status || "Unknown", tone: "muted" };
   }

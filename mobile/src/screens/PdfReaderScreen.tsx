@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import * as ScreenOrientation from "expo-screen-orientation";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
@@ -329,14 +330,19 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
       />
 
       <Modal visible={settingsOpen} transparent animationType="slide" onRequestClose={() => setSettingsOpen(false)}>
-        <Pressable
+        <View
           style={[
             styles.modalBackdrop,
             isLandscape && { justifyContent: "center", paddingHorizontal: 16 },
           ]}
-          onPress={() => setSettingsOpen(false)}
         >
           <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }}
+          />
+          <View
             style={[
               styles.modalCard,
               {
@@ -347,7 +353,6 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
                 maxWidth: "100%",
               },
             ]}
-            onPress={(e) => e.stopPropagation()}
           >
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <Text style={{ fontFamily: fontFamily.display, fontSize: type.titleSm, color: colors.navy }}>
@@ -519,8 +524,8 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
             )}
 
             <Button title="Apply" onPress={() => void applySettings()} style={{ marginTop: 12 }} />
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );

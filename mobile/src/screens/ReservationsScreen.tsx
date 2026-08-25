@@ -15,6 +15,7 @@ import { EmptyState } from "../components/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
 import { SkeletonList } from "../components/Skeleton";
 import { formatShortDate, reservationStatusChip } from "../utils/loanDates";
+import { goToCatalogTab } from "../utils/navigation";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -81,8 +82,8 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
     }
   };
 
-  const goCatalog = () => navigation.getParent()?.navigate("Catalog");
-  const goScan = () => navigation.getParent()?.navigate("Scan");
+  const goCatalog = () => goToCatalogTab(navigation);
+  const goScan = () => navigation.navigate("Scan");
 
   return (
     <View style={[styles.container, { backgroundColor: colors.cream }]}>
@@ -203,7 +204,7 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
                 {item.status === "waiting" && (
                   <Button
                     title="Cancel reservation"
-                    variant="danger"
+                    variant="dangerSoft"
                     onPress={() => setCancelId(item.reservationId)}
                     style={{ marginTop: space.md }}
                   />
@@ -221,7 +222,7 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
         title="Cancel reservation?"
         message="You will leave the waiting queue for this title. You can reserve again later if it is still unavailable."
         confirmLabel="Yes, cancel"
-        confirmVariant="danger"
+        confirmVariant="dangerSoft"
         cancelLabel="Keep reservation"
         onClose={() => setCancelId(null)}
         onConfirm={() => {

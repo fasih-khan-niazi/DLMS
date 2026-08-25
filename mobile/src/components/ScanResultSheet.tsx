@@ -1,6 +1,7 @@
 import React from "react";
 import { Modal, View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { Button } from "./ui/Button";
 import { useTheme } from "../theme";
 import { formatShortDate } from "../utils/loanDates";
@@ -32,10 +33,15 @@ export function ScanResultSheet({ result, onDismiss, onRetry }: Props) {
 
   const success = result.kind === "success";
 
+  const onBackdropPress = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  };
+
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onDismiss}>
-      <Pressable style={styles.backdrop} onPress={onDismiss}>
-        <Pressable
+      <View style={styles.backdrop}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onBackdropPress} />
+        <View
           style={[
             styles.sheet,
             {
@@ -44,7 +50,6 @@ export function ScanResultSheet({ result, onDismiss, onRetry }: Props) {
               borderTopRightRadius: radius.lg,
             },
           ]}
-          onPress={(e) => e.stopPropagation()}
         >
           <View style={styles.iconRow}>
             <Ionicons
@@ -89,7 +94,7 @@ export function ScanResultSheet({ result, onDismiss, onRetry }: Props) {
               lineHeight: 22,
             }}
           >
-            {result.kind === "success" ? result.message : result.message}
+            {result.message}
           </Text>
 
           {success && result.dueDate ? (
@@ -116,8 +121,8 @@ export function ScanResultSheet({ result, onDismiss, onRetry }: Props) {
               onPress={onDismiss}
             />
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }

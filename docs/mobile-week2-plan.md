@@ -34,7 +34,8 @@ No em dashes in UI copy.
 | 10 | Profile and settings | 15, 7, 5 (dark toggle) | Low |
 | 11 | Notifications polish | 16 | Low |
 | R | Reservation harden | return→queue→ready | High — **PARKED incomplete** |
-| B | Auth + modals + profile | extras | Low |
+| B | Auth + modals + profile | extras | Done |
+| B2 | UX harden + lockout + reviews | extras | Medium |
 | C | Available Copies UI | extras | Low |
 | D | Admin configs | extras | Medium |
 | 12 | Onboarding | 19 | Low |
@@ -364,9 +365,9 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 
 ---
 
-## Extras B / C / D (above Phase 12) — parked until you say start
+## Extras B / C / D (above Phase 12)
 
-Order when you resume: **B → C → D**, then Phases **12+**, then **Phase R** again.
+Order: **B (done) → Phase B2 (this polish) → C → D**, then Phases **12+**, then **Phase R**.
 
 ### B — Auth polish + modals + profile refresh
 
@@ -384,17 +385,70 @@ Order when you resume: **B → C → D**, then Phases **12+**, then **Phase R** 
 
 **Git:** `feat(mobile): auth polish, AppModals, reservation cancel, profile refresh`
 
+### Phase B2 — UX harden + auth lock + reviews (before C)
+
+**Status:** Implemented (2026-08-26).
+
+**Decisions locked**
+- Password reset **email**: Firebase Console template only (copy below). No custom domain this sprint.
+- Login failures: **API-backed** attempt lock + top toast + lockout bottom sheet.
+
+#### Delivered
+- [x] `dangerSoft` on cancel reservation / sign-out / remove shelf / lock sheet
+- [x] Shared `BackButton` (chevron) across detail / add / upload / search / bookshelf
+- [x] AppModal + scan/filter/settings sheets: no outside dismiss; light haptic on outside tap
+- [x] `AppToast` (3s, top overlay, X dismiss) via `ToastProvider`
+- [x] API `GET /api/auth/login-lock` + `POST /api/auth/login-attempt` (`loginLocks` collection)
+- [x] Login: toast on wrong password + attempts left; sheet on 3rd fail; toast if try while locked
+- [x] Forgot: press glow; no “Firebase” in UI copy
+- [x] Browse catalog → Catalog tab (`goToCatalogTab`)
+- [x] Reservation chips: Cancelled vs Expired
+- [x] Book detail skeleton; reviews `★ avg` + NPS word band; clearer recommend line
+- [x] Dark mode still hydrates from AsyncStorage before UI (ThemeProvider `ready`)
+
+#### Firebase email template (you — Console)
+
+Authentication → Templates → Password reset:
+
+- **Subject:** Reset your DLMS password
+- **Body:** Hello, follow this link to reset the password for your DLMS account. If you did not request a reset, you can ignore this email.
+- **Closing:** Thanks, The DLMS team
+- **From name:** DLMS (if available)
+
+#### VnV — reservationHoldHours
+
+1. Admin → Config → set hold hours to a low test value (e.g. 1).
+2. Create waiting reservation; return a copy so it becomes **ready** (after Phase R fix, or assign path).
+3. Confirm `expiresAt` ≈ now + configured hours on the reservation / copy.
+4. Cron expiry (`expireReadyReservationHolds`) should expire after that time → status **Expired**, not Cancelled.
+
+**Git:** `feat(api): login attempt lockout` + `feat(mobile): B2 toasts lockout UX harden`
+
+---
+
 ### C — Available Copies UI
 
-- Rename **Manage copies** → **Available Copies**
-- Show the section to **students** too (status / availability)
-- QR / print / View QR label: **staff only**
-- Still no in-app borrow/return/claim on expand (scan-only stays)
+**Status:** Next after B2.
+
+- [ ] Rename **Manage copies** → **Available Copies**
+- [ ] Show section to **students** (status / availability only)
+- [ ] Expand: students see status; staff keep **View QR / Print label**
+- [ ] No in-app borrow / return / claim (scan-only stays)
+- [ ] Helper text: borrow/return via Scan
+
+**Regression:** Student sees copies list; staff QR still works; scan borrow/return unchanged.
+
+**Git:** `feat(mobile): Available Copies for students`
+
+---
 
 ### D — Admin configs + librarian borrow harden
 
-- Admin toggle `allowInAppCopyBorrow` (future in-app borrow for everyone when on; default off / scan-only)
-- Harden `librariansCanBorrow`: block new borrow+reserve when off; keep active loans + scan return; cancel waiting/ready when toggle turns off; admin always full; digital bookshelf unrestricted for librarians; same fines
+**Status:** After C (unchanged scope).
+
+- Admin toggle `allowInAppCopyBorrow` (default off / scan-only)
+- Harden `librariansCanBorrow`: block new borrow+reserve when off; keep active loans + scan return; cancel waiting/ready when toggle turns off; admin always full; digital OK for librarians; same fines
+- Optional: admin unlock locked login emails
 
 ---
 

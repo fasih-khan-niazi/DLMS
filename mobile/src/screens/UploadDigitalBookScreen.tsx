@@ -10,7 +10,7 @@ import * as DocumentPicker from "expo-document-picker";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { API_BASE_URL } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
-import { Button, Input } from "../components/ui";
+import { Button, Input, BackButton } from "../components/ui";
 import { AppModal } from "../components/AppModal";
 import { invalidateDigitalCache } from "../utils/digitalCache";
 import { getAppConfig, hydrateAppConfig, peekMaxPdfSizeMb } from "../utils/appConfig";
@@ -133,11 +133,7 @@ export default function UploadDigitalBookScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          <Pressable onPress={() => navigation.goBack()} style={{ marginBottom: space.md }}>
-            <Text style={{ color: colors.amberDark, fontFamily: fontFamily.bodySemiBold }}>
-              ← Back
-            </Text>
-          </Pressable>
+          <BackButton onPress={() => navigation.goBack()} style={{ marginBottom: space.sm, marginLeft: -8 }} />
 
           <Text
             style={{

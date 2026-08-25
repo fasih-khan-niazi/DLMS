@@ -41,8 +41,8 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
       await sendPasswordResetEmail(firebaseAuth, trimmed);
       setFeedback({
         variant: "success",
-        title: "Check your email",
-        message: `If an account exists for ${trimmed}, Firebase sent a password reset link. Check inbox and spam, then choose a new password.`,
+        title: "Check your inbox",
+        message: `If an account exists for ${trimmed}, a password reset link has been sent. Open it to choose a new password.`,
       });
     } catch (error: any) {
       const code = error?.code || "";
@@ -69,7 +69,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
       <AuthLayout
         brandLine="Reset your password securely"
         panelTitle="Forgot password"
-        panelHint="We email you a secure Firebase reset link"
+        panelHint="An email with a reset link will be sent to your inbox"
         footer={
           <AuthLink label="Back to sign in" onDark onPress={() => navigation.goBack()} />
         }
@@ -83,7 +83,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
             lineHeight: 20,
           }}
         >
-          Open the link in your inbox to choose a new password.
+          Open the link in your email to choose a new password.
         </Text>
 
         <Input

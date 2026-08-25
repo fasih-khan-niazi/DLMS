@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import { Pressable, Text } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { firebaseAuth } from "../config/firebase";
+import api from "../config/api";
 import { AppModal } from "../components/AppModal";
+import { useToast } from "../components/AppToast";
 import { AuthLayout, AuthLink, Button, Input } from "../components/ui";
 import { useTheme } from "../theme";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -11,45 +13,85 @@ type Props = {
   navigation: NativeStackNavigationProp<any>;
 };
 
-type Feedback = {
-  variant: "error" | "info";
+type LockSheet = {
   title: string;
   message: string;
 } | null;
 
+function formatLockMinutes(seconds: number) {
+  const m = Math.max(1, Math.ceil(seconds / 60));
+  return m === 1 ? "1 minute" : `${m} minutes`;
+}
+
 export default function LoginScreen({ navigation }: Props) {
   const { colors, fontFamily, type, space } = useTheme();
+  const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [feedback, setFeedback] = useState<Feedback>(null);
+  const [missingOpen, setMissingOpen] = useState(false);
+  const [lockSheet, setLockSheet] = useState<LockSheet>(null);
+  const [forgotPressed, setForgotPressed] = useState(false);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password) {
-      setFeedback({
-        variant: "info",
-        title: "Missing details",
-        message: "Enter your email and password to sign in.",
-      });
+    const trimmed = email.trim();
+    if (!trimmed || !password) {
+      setMissingOpen(true);
       return;
     }
 
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
-    } catch (error: any) {
-      const invalid =
-        error.code === "auth/invalid-credential" ||
-        error.code === "auth/wrong-password" ||
-        error.code === "auth/user-not-found" ||
-        error.code === "auth/invalid-email";
-      setFeedback({
-        variant: "error",
-        title: invalid ? "Invalid password" : "Sign in failed",
-        message: invalid
-          ? "That email or password is not correct. Try again, or reset your password."
-          : error.message || "Could not sign in. Try again.",
-      });
+      const lockRes = await api.get("/api/auth/login-lock", { params: { email: trimmed } });
+      if (lockRes.data?.locked) {
+        const secs = Number(lockRes.data.lockedForSeconds) || 0;
+        showToast(`Account locked. Try again in ${formatLockMinutes(secs)}.`);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        await signInWithEmailAndPassword(firebaseAuth, trimmed, password);
+        await api.post("/api/auth/login-attempt", { email: trimmed, success: true }).catch(() => {});
+      } catch (error: any) {
+        const invalid =
+          error.code === "auth/invalid-credential" ||
+          error.code === "auth/wrong-password" ||
+          error.code === "auth/user-not-found" ||
+          error.code === "auth/invalid-email";
+
+        if (!invalid) {
+          showToast(error.message || "Could not sign in. Try again.");
+          return;
+        }
+
+        const attempt = await api
+          .post("/api/auth/login-attempt", { email: trimmed, success: false })
+          .then((r) => r.data)
+          .catch(() => null);
+
+        if (attempt?.locked) {
+          const secs = Number(attempt.lockedForSeconds) || 15 * 60;
+          setLockSheet({
+            title: "Account temporarily locked",
+            message: `Too many incorrect sign-in attempts. Try again in ${formatLockMinutes(secs)}.`,
+          });
+          return;
+        }
+
+        const left = Number(attempt?.attemptsRemaining);
+        if (Number.isFinite(left) && left > 0) {
+          showToast(
+            left === 1
+              ? "Incorrect email or password. 1 attempt left."
+              : `Incorrect email or password. ${left} attempts left.`
+          );
+        } else {
+          showToast("Incorrect email or password.");
+        }
+      }
+    } catch {
+      showToast("Could not reach the server. Check your connection.");
     } finally {
       setLoading(false);
     }
@@ -93,14 +135,25 @@ export default function LoginScreen({ navigation }: Props) {
 
         <Pressable
           onPress={() => navigation.navigate("ForgotPassword", { email: email.trim() })}
+          onPressIn={() => setForgotPressed(true)}
+          onPressOut={() => setForgotPressed(false)}
           hitSlop={8}
-          style={{ alignSelf: "flex-end", marginTop: space.sm, marginBottom: space.md }}
+          style={{
+            alignSelf: "flex-end",
+            marginTop: space.sm,
+            marginBottom: space.md,
+            paddingVertical: 4,
+            paddingHorizontal: 8,
+            borderRadius: 8,
+            backgroundColor: forgotPressed ? "rgba(232, 168, 56, 0.22)" : "transparent",
+          }}
         >
           <Text
             style={{
-              color: colors.amberDark,
+              color: forgotPressed ? colors.amberDark : colors.amberDark,
               fontSize: type.small,
               fontFamily: fontFamily.bodySemiBold,
+              textDecorationLine: forgotPressed ? "underline" : "none",
             }}
           >
             Forgot password?
@@ -111,12 +164,23 @@ export default function LoginScreen({ navigation }: Props) {
       </AuthLayout>
 
       <AppModal
-        visible={!!feedback}
-        variant={feedback?.variant || "error"}
-        title={feedback?.title || ""}
-        message={feedback?.message || ""}
-        confirmLabel="Try again"
-        onClose={() => setFeedback(null)}
+        visible={missingOpen}
+        variant="info"
+        title="Missing details"
+        message="Enter your email and password to sign in."
+        confirmLabel="OK"
+        onClose={() => setMissingOpen(false)}
+      />
+
+      <AppModal
+        visible={!!lockSheet}
+        variant="danger"
+        presentation="sheet"
+        title={lockSheet?.title || ""}
+        message={lockSheet?.message || ""}
+        confirmLabel="OK"
+        confirmVariant="dangerSoft"
+        onClose={() => setLockSheet(null)}
       />
     </>
   );

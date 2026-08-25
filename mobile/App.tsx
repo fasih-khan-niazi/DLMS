@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import AppNavigator from "./src/navigation/AppNavigator";
 import { ThemeProvider, useTheme } from "./src/theme";
+import { ToastProvider } from "./src/components/AppToast";
 import { getAppConfig, hydrateAppConfig } from "./src/utils/appConfig";
 
 function StatusBarSync() {
@@ -16,10 +17,10 @@ function Root() {
   }, []);
 
   return (
-    <>
+    <ToastProvider>
       <StatusBarSync />
       <AppNavigator />
-    </>
+    </ToastProvider>
   );
 }
 

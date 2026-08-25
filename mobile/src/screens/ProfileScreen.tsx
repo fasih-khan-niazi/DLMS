@@ -363,7 +363,7 @@ export default function ProfileScreen({ navigation }: Props) {
         title="Sign out?"
         message="You will need to sign in again to use the library app."
         confirmLabel="Sign out"
-        confirmVariant="danger"
+        confirmVariant="dangerSoft"
         cancelLabel="Stay signed in"
         onClose={() => setSignOutOpen(false)}
         onConfirm={() => {

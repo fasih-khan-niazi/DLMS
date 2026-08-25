@@ -1,7 +1,7 @@
 import React, { type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../../theme";
+import { BackButton } from "./BackButton";
 
 type Props = {
   title: string;
@@ -16,9 +16,7 @@ export function ScreenHeader({ title, subtitle, onBack, right }: Props) {
   return (
     <View style={[styles.row, { marginBottom: space.md }]}>
       {onBack ? (
-        <Pressable onPress={onBack} hitSlop={12} style={styles.back}>
-          <Ionicons name="chevron-back" size={24} color={colors.navy} />
-        </Pressable>
+        <BackButton onPress={onBack} style={styles.back} />
       ) : (
         <View style={styles.backSpacer} />
       )}
@@ -57,6 +55,7 @@ const styles = StyleSheet.create({
   },
   back: {
     width: 36,
+    marginLeft: -6,
   },
   backSpacer: {
     width: 36,

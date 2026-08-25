@@ -61,6 +61,31 @@ export function SkeletonList({ rows = 5 }: { rows?: number }) {
   );
 }
 
+/** Matches physical / digital book detail layout while loading. */
+export function BookDetailSkeleton() {
+  return (
+    <View style={styles.bookDetail}>
+      <Skeleton height={28} width={40} borderRadius={20} style={{ marginBottom: 16 }} />
+      <View style={{ alignItems: "center", marginBottom: 20 }}>
+        <Skeleton height={220} width={150} borderRadius={12} />
+      </View>
+      <Skeleton height={26} width="78%" style={{ alignSelf: "center" }} />
+      <Skeleton height={14} width="42%" style={{ alignSelf: "center", marginTop: 10 }} />
+      <Skeleton height={12} width="28%" style={{ alignSelf: "center", marginTop: 8 }} />
+      <Skeleton height={52} width="100%" style={{ marginTop: 20 }} />
+      <Skeleton height={52} width="100%" style={{ marginTop: 10 }} />
+      <View style={[styles.row, { marginTop: 20 }]}>
+        <Skeleton height={14} width="30%" />
+        <Skeleton height={72} width="100%" style={{ marginTop: 12 }} />
+      </View>
+      <View style={[styles.row, { marginTop: 12 }]}>
+        <Skeleton height={14} width="40%" />
+        <Skeleton height={96} width="100%" style={{ marginTop: 12 }} />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   base: {
     backgroundColor: colors.creamDark,
@@ -75,5 +100,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  bookDetail: {
+    flex: 1,
+    paddingTop: 56,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
 });

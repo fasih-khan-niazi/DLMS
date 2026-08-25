@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
 import { SearchBar } from "../components/SearchBar";
@@ -410,11 +411,14 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
       ) : null}
 
       <Modal visible={filtersOpen} transparent animationType="slide" onRequestClose={() => setFiltersOpen(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setFiltersOpen(false)}>
+        <View style={styles.modalBackdrop}>
           <Pressable
-            style={[styles.modalCard, { backgroundColor: colors.cream }]}
-            onPress={(e) => e.stopPropagation()}
-          >
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }}
+          />
+          <View style={[styles.modalCard, { backgroundColor: colors.cream }]}>
             <Text style={{ fontFamily: fontFamily.display, fontSize: type.titleSm, color: colors.navy }}>
               Filters
             </Text>
@@ -478,8 +482,8 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
               <Button title="Apply filters" onPress={applyFilters} />
               <Button title="Reset" variant="ghost" onPress={resetFilters} />
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );
