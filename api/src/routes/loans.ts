@@ -49,6 +49,14 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
     }
 
     const config = await getSystemConfig();
+
+    if (req.body.copyId && !req.body.qrPayload && config.allowInAppCopyBorrow !== true) {
+      res.status(403).json({
+        error: "In-app borrow is disabled. Use the Scan tab to borrow this copy.",
+      });
+      return;
+    }
+
     const userRef = db.collection("users").doc(req.uid!);
     const copyRef = db.collection("bookCopies").doc(copyId);
 
@@ -322,6 +330,14 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
     }
 
     const config = await getSystemConfig();
+
+    if (req.body.copyId && !req.body.qrPayload && config.allowInAppCopyBorrow !== true) {
+      res.status(403).json({
+        error: "In-app return is disabled. Use the Scan tab to return this copy.",
+      });
+      return;
+    }
+
     const finePerDay = Number(config.finePerDayRs || 50);
     const copyRef = db.collection("bookCopies").doc(copyId);
 
