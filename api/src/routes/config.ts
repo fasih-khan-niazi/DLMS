@@ -19,6 +19,8 @@ router.get("/app", authenticate, async (_req: AuthRequest, res: Response) => {
       catalogPageSize: clampCatalogPageSize(config.catalogPageSize),
       maxPdfSizeMb: Number.isFinite(maxPdfSizeMb) && maxPdfSizeMb > 0 ? maxPdfSizeMb : 25,
       allowInAppCopyBorrow: config.allowInAppCopyBorrow === true,
+      // Default true when unset so existing deployments keep librarian borrow allowed
+      librariansCanBorrow: config.librariansCanBorrow !== false,
     });
   } catch (error) {
     console.error("App config read error:", error);

@@ -107,6 +107,7 @@ export function ConfigPage() {
         workingDaysOff,
         maxPdfSizeMb: form.maxPdfSizeMb,
         librariansCanBorrow: !!form.librariansCanBorrow,
+        allowInAppCopyBorrow: !!form.allowInAppCopyBorrow,
         timezone: form.timezone || "Asia/Karachi",
         catalogPageSize: form.catalogPageSize,
       };
