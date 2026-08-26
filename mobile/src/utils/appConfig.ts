@@ -10,6 +10,7 @@ type AppConfig = {
   catalogPageSize: number;
   maxPdfSizeMb: number;
   allowInAppCopyBorrow: boolean;
+  librariansCanBorrow: boolean;
   fetchedAt: number;
 };
 
@@ -52,6 +53,7 @@ export async function getAppConfig(force = false): Promise<{
   catalogPageSize: number;
   maxPdfSizeMb: number;
   allowInAppCopyBorrow: boolean;
+  librariansCanBorrow: boolean;
 }> {
   await hydrateAppConfig();
 
@@ -60,6 +62,7 @@ export async function getAppConfig(force = false): Promise<{
       catalogPageSize: memory.catalogPageSize,
       maxPdfSizeMb: memory.maxPdfSizeMb,
       allowInAppCopyBorrow: memory.allowInAppCopyBorrow,
+      librariansCanBorrow: memory.librariansCanBorrow,
     };
   }
 
@@ -68,18 +71,32 @@ export async function getAppConfig(force = false): Promise<{
       catalogPageSize: number;
       maxPdfSizeMb?: number;
       allowInAppCopyBorrow?: boolean;
+      librariansCanBorrow?: boolean;
     }>("/api/config/app");
     const catalogPageSize = Number(response.data.catalogPageSize) || FALLBACK_PAGE_SIZE;
     const maxPdfSizeMb = Number(response.data.maxPdfSizeMb) || FALLBACK_MAX_PDF_MB;
     const allowInAppCopyBorrow = response.data.allowInAppCopyBorrow === true;
-    memory = { catalogPageSize, maxPdfSizeMb, allowInAppCopyBorrow, fetchedAt: Date.now() };
+    const librariansCanBorrow = response.data.librariansCanBorrow !== false;
+    memory = {
+      catalogPageSize,
+      maxPdfSizeMb,
+      allowInAppCopyBorrow,
+      librariansCanBorrow,
+      fetchedAt: Date.now(),
+    };
     await writeStoredConfig(memory);
-    return { catalogPageSize, maxPdfSizeMb, allowInAppCopyBorrow };
+    return {
+      catalogPageSize,
+      maxPdfSizeMb,
+      allowInAppCopyBorrow,
+      librariansCanBorrow,
+    };
   } catch {
     return {
       catalogPageSize: memory?.catalogPageSize ?? FALLBACK_PAGE_SIZE,
       maxPdfSizeMb: memory?.maxPdfSizeMb ?? FALLBACK_MAX_PDF_MB,
       allowInAppCopyBorrow: memory?.allowInAppCopyBorrow ?? false,
+      librariansCanBorrow: memory?.librariansCanBorrow ?? true,
     };
   }
 }
@@ -99,6 +116,11 @@ export async function getAllowInAppCopyBorrow(force = false): Promise<boolean> {
   return config.allowInAppCopyBorrow;
 }
 
+export async function getLibrariansCanBorrow(force = false): Promise<boolean> {
+  const config = await getAppConfig(force);
+  return config.librariansCanBorrow;
+}
+
 /** Returns cached max PDF size immediately when available (no network). */
 export function peekMaxPdfSizeMb(): number | null {
   return memory?.maxPdfSizeMb ?? null;
@@ -106,6 +128,10 @@ export function peekMaxPdfSizeMb(): number | null {
 
 export function peekAllowInAppCopyBorrow(): boolean | null {
   return memory?.allowInAppCopyBorrow ?? null;
+}
+
+export function peekLibrariansCanBorrow(): boolean | null {
+  return memory?.librariansCanBorrow ?? null;
 }
 
 export function invalidateAppConfigCache(): void {

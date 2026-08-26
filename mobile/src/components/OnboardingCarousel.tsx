@@ -1,14 +1,5 @@
-import React, { useMemo, useRef, useState } from "react";
-import {
-  Modal,
-  View,
-  Text,
-  FlatList,
-  Dimensions,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  StyleSheet,
-} from "react-native";
+import React, { useEffect, useState } from "react";
+import { Modal, View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
 import { Button } from "./ui/Button";
@@ -29,25 +20,25 @@ const SLIDES: Slide[] = [
     key: "scan-borrow",
     icon: "qr-code-outline",
     title: "Scan to borrow",
-    body: "Open the Scan tab, point your camera at a shelf QR label, and borrow in one tap.",
+    body: "Open the Scan tab at the bottom of the app. Choose Borrow, then point your camera at the QR sticker on a shelf copy. Hold steady until the app confirms the loan.",
   },
   {
     key: "scan-return",
     icon: "return-down-back-outline",
     title: "Return via Scan",
-    body: "Switch to Return mode on the Scan tab and scan the same copy label when you bring a book back.",
+    body: "When you bring a book back, open Scan and switch to Return. Scan the same copy QR. The copy is marked available again and any fine is calculated automatically.",
   },
   {
     key: "reserve",
     icon: "bookmark-outline",
     title: "Reserve when unavailable",
-    body: "If every copy is checked out, reserve the title from Catalog. We will notify you when a copy is ready.",
+    body: "If every physical copy is checked out, open the title in Catalog and tap Reserve. You join a queue and get a notification when a copy is ready to claim within the hold window.",
   },
   {
     key: "fines",
     icon: "alert-circle-outline",
     title: "Fines block new loans",
-    body: "Unpaid fines must be cleared at the desk before you can borrow or reserve again.",
+    body: "Late returns may add a fine. Unpaid fines block new borrows and reservations until staff clear them at the desk. You can still return books you already have.",
   },
 ];
 
@@ -58,21 +49,18 @@ type Props = {
 
 export function OnboardingCarousel({ visible, onClose }: Props) {
   const { colors, fontFamily, space, type, radius, mode } = useTheme();
-  const width = Dimensions.get("window").width;
-  const listRef = useRef<FlatList<Slide>>(null);
   const [index, setIndex] = useState(0);
 
-  const slides = useMemo(() => SLIDES, []);
-  const last = index === slides.length - 1;
+  useEffect(() => {
+    if (visible) setIndex(0);
+  }, [visible]);
+
+  const slide = SLIDES[index];
+  const last = index === SLIDES.length - 1;
 
   const finish = async () => {
     await setOnboardingDone();
     onClose();
-  };
-
-  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const next = Math.round(event.nativeEvent.contentOffset.x / width);
-    if (next !== index) setIndex(next);
   };
 
   const goNext = () => {
@@ -80,9 +68,10 @@ export function OnboardingCarousel({ visible, onClose }: Props) {
       void finish();
       return;
     }
-    listRef.current?.scrollToIndex({ index: index + 1, animated: true });
     setIndex((i) => i + 1);
   };
+
+  if (!slide) return null;
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={() => void finish()}>
@@ -97,60 +86,52 @@ export function OnboardingCarousel({ visible, onClose }: Props) {
             },
           ]}
         >
-          <FlatList
-            ref={listRef}
-            data={slides}
-            keyExtractor={(item) => item.key}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={onScroll}
-            renderItem={({ item }) => (
-              <View style={{ width: width - 48, paddingHorizontal: 8, alignItems: "center" }}>
-                <View
-                  style={{
-                    width: 72,
-                    height: 72,
-                    borderRadius: 36,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: mode === "dark" ? "rgba(232,168,56,0.15)" : "rgba(26,42,62,0.08)",
-                    marginBottom: space.md,
-                  }}
-                >
-                  <Ionicons name={item.icon} size={36} color={mode === "dark" ? colors.amber : colors.navy} />
-                </View>
-                <Text
-                  style={{
-                    fontFamily: fontFamily.display,
-                    fontSize: type.titleSm,
-                    color: colors.navy,
-                    textAlign: "center",
-                  }}
-                >
-                  {item.title}
-                </Text>
-                <Text
-                  style={{
-                    marginTop: space.sm,
-                    fontFamily: fontFamily.body,
-                    fontSize: type.body,
-                    color: colors.muted,
-                    textAlign: "center",
-                    lineHeight: 24,
-                    paddingHorizontal: 8,
-                  }}
-                >
-                  {item.body}
-                </Text>
-              </View>
-            )}
-          />
+          <View style={styles.content}>
+            <View
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: 36,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: mode === "dark" ? "rgba(232,168,56,0.15)" : "rgba(26,42,62,0.08)",
+                marginBottom: space.md,
+              }}
+            >
+              <Ionicons
+                name={slide.icon}
+                size={36}
+                color={mode === "dark" ? colors.amber : colors.navy}
+              />
+            </View>
+            <Text
+              style={{
+                fontFamily: fontFamily.display,
+                fontSize: type.titleSm,
+                color: colors.navy,
+                textAlign: "center",
+              }}
+            >
+              {slide.title}
+            </Text>
+            <Text
+              style={{
+                marginTop: space.sm,
+                fontFamily: fontFamily.body,
+                fontSize: type.body,
+                color: colors.muted,
+                textAlign: "center",
+                lineHeight: 24,
+              }}
+            >
+              {slide.body}
+            </Text>
+          </View>
 
           <View style={styles.dots}>
-            {slides.map((slide, i) => (
+            {SLIDES.map((item, i) => (
               <View
-                key={slide.key}
+                key={item.key}
                 style={{
                   width: i === index ? 18 : 7,
                   height: 7,
@@ -162,7 +143,7 @@ export function OnboardingCarousel({ visible, onClose }: Props) {
             ))}
           </View>
 
-          <View style={{ marginTop: space.md, gap: space.sm }}>
+          <View style={{ marginTop: space.md, gap: space.sm, width: "100%" }}>
             <Button title={last ? "Done" : "Next"} onPress={goNext} />
             <Button title="Skip" variant="softOutline" onPress={() => void finish()} />
           </View>
@@ -181,12 +162,22 @@ const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
     paddingVertical: 28,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    maxWidth: 400,
+    width: "100%",
+    alignSelf: "center",
+  },
+  content: {
+    width: "100%",
+    alignItems: "center",
+    minHeight: 200,
+    justifyContent: "center",
   },
   dots: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 8,
+    marginTop: 16,
   },
 });

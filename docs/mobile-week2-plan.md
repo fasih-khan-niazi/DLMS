@@ -502,6 +502,16 @@ Authentication → Templates → Password reset:
 - [x] Reset buttons: `ghostOutline` in catalog/digital filters + PDF reader settings
 - [x] API gates in-app borrow/return by `copyId` when toggle off
 
+### Polish pass 2 (2026-08-26 evening)
+
+- [x] Outline buttons: remove resting elevation/halo (Stay signed in / Keep reservation / Reset)
+- [x] Onboarding: no swipe; forward-only via Next/Done; centered content; richer copy
+- [x] Scan tip text says **below**; tip bar is a **coach tooltip** (not a toast)
+- [x] Chip pills: press scale + haptic + brief glow
+- [x] Admin Config: include `allowInAppCopyBorrow` in save payload (was dropped → appeared to flip off)
+- [x] Librarian Scan gate: toast + haptic when borrow disabled and no active loans; return-only Scan when loans remain
+- [x] `/api/config/app` exposes `librariansCanBorrow`
+
 ---
 
 ## Phase 13: Motion, haptics, global UX (4, 17, 18)

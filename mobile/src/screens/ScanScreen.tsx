@@ -23,6 +23,7 @@ import {
   type ScanHistoryEntry,
 } from "../utils/scanHistory";
 import { dismissScanCoach, isScanCoachDismissed } from "../utils/onboarding";
+import { getAppConfig } from "../utils/appConfig";
 
 type Mode = "borrow" | "return";
 
@@ -68,7 +69,7 @@ export default function ScanScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const { colors, fontFamily, space, type, radius } = useTheme();
-  const { isStaff } = useProfile();
+  const { isStaff, profile } = useProfile();
   const [permission, requestPermission] = useCameraPermissions();
   const [mode, setMode] = useState<Mode>("borrow");
   const [torchOn, setTorchOn] = useState(false);
@@ -78,6 +79,7 @@ export default function ScanScreen({ navigation }: Props) {
   const [history, setHistory] = useState<ScanHistoryEntry[]>([]);
   const [lastPayload, setLastPayload] = useState<string | null>(null);
   const [showScanCoach, setShowScanCoach] = useState(false);
+  const [returnOnly, setReturnOnly] = useState(false);
 
   const loadHistory = useCallback(async () => {
     if (!isStaff) return;
@@ -94,6 +96,17 @@ export default function ScanScreen({ navigation }: Props) {
   useEffect(() => {
     if (isFocused) void loadHistory();
   }, [isFocused, loadHistory]);
+
+  useEffect(() => {
+    if (!isFocused) return;
+    void (async () => {
+      const config = await getAppConfig(true);
+      const librarianBlocked =
+        profile?.role === "librarian" && config.librariansCanBorrow === false;
+      setReturnOnly(librarianBlocked);
+      if (librarianBlocked) setMode("return");
+    })();
+  }, [isFocused, profile?.role]);
 
   useEffect(() => {
     if (isFocused) {
@@ -254,7 +267,7 @@ export default function ScanScreen({ navigation }: Props) {
               color: colors.navy,
             }}
           >
-            Tip: switch Borrow / Return above, then scan the shelf QR inside the frame.
+            Tip: use Borrow / Return below the camera frame, then scan the shelf QR inside the brackets.
           </Text>
           <Pressable
             onPress={() => {
@@ -277,33 +290,62 @@ export default function ScanScreen({ navigation }: Props) {
       ) : null}
 
       <View style={[styles.bottomPanel, { paddingBottom: insets.bottom + 16 }]}>
-        <View style={[styles.modeRow, { backgroundColor: "rgba(255,255,255,0.12)", borderRadius: radius.md }]}>
-          {(["borrow", "return"] as Mode[]).map((item) => {
-            const active = mode === item;
-            return (
-              <Pressable
-                key={item}
-                onPress={() => setMode(item)}
-                style={[
-                  styles.modeBtn,
-                  { borderRadius: radius.sm },
-                  active && { backgroundColor: colors.amber },
-                ]}
-              >
-                <Text
-                  style={{
-                    fontFamily: fontFamily.bodyBold,
-                    fontSize: type.small,
-                    color: active ? colors.navy : colors.white,
-                    textTransform: "capitalize",
+        {returnOnly ? (
+          <View
+            style={[
+              styles.modeRow,
+              {
+                backgroundColor: "rgba(255,255,255,0.12)",
+                borderRadius: radius.md,
+                justifyContent: "center",
+                paddingVertical: 12,
+              },
+            ]}
+          >
+            <Text
+              style={{
+                fontFamily: fontFamily.bodyBold,
+                fontSize: type.small,
+                color: colors.amber,
+                textAlign: "center",
+              }}
+            >
+              Return only · librarian borrowing is disabled
+            </Text>
+          </View>
+        ) : (
+          <View style={[styles.modeRow, { backgroundColor: "rgba(255,255,255,0.12)", borderRadius: radius.md }]}>
+            {(["borrow", "return"] as Mode[]).map((item) => {
+              const active = mode === item;
+              return (
+                <Pressable
+                  key={item}
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                    setMode(item);
                   }}
+                  style={({ pressed }) => [
+                    styles.modeBtn,
+                    { borderRadius: radius.sm },
+                    active && { backgroundColor: colors.amber },
+                    pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] },
+                  ]}
                 >
-                  {item}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+                  <Text
+                    style={{
+                      fontFamily: fontFamily.bodyBold,
+                      fontSize: type.small,
+                      color: active ? colors.navy : colors.white,
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    {item}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
 
         <Text
           style={{

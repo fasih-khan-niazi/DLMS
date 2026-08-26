@@ -30,6 +30,8 @@ type Props = PressableProps & {
   style?: ViewStyle;
 };
 
+const OUTLINE_VARIANTS = new Set<Variant>(["softOutline", "ghostOutline", "ghost"]);
+
 export function Button({
   title,
   variant = "primary",
@@ -45,6 +47,7 @@ export function Button({
   const { colors, radius, fontFamily, type, mode } = useTheme();
   const isDisabled = disabled || loading;
   const isDark = mode === "dark";
+  const isOutline = OUTLINE_VARIANTS.has(variant);
 
   const palette: Record<Variant, { bg: string; text: string; border?: string; glow?: string }> = {
     primary: isDark
@@ -64,7 +67,7 @@ export function Button({
       : { bg: "#E8F5EC", text: colors.success, border: "#BBF7D0", glow: colors.success },
     amber: { bg: colors.amber, text: isDark ? "#1A2834" : colors.navy, glow: colors.amber },
     softOutline: isDark
-      ? { bg: "transparent", text: colors.amber, border: "rgba(232, 168, 56, 0.55)", glow: colors.amber }
+      ? { bg: "transparent", text: colors.amber, border: "rgba(232, 168, 56, 0.65)", glow: colors.amber }
       : { bg: "transparent", text: colors.navy, border: colors.amber, glow: colors.amber },
   };
   const p = palette[variant];
@@ -80,28 +83,33 @@ export function Button({
         onPressIn?.(event);
       }}
       onPressOut={onPressOut}
-      style={({ pressed }) => [
-        {
-          backgroundColor: p.bg,
-          borderRadius: radius.md,
-          borderColor: p.border || "transparent",
-          borderWidth: p.border ? 1 : 0,
-          opacity: isDisabled ? 0.65 : 1,
-          alignSelf: fullWidth ? "stretch" : "flex-start",
-          paddingVertical: 16,
-          paddingHorizontal: 20,
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 52,
-          transform: [{ scale: pressed && !isDisabled ? 0.97 : 1 }],
-          shadowColor: p.glow || p.bg,
-          shadowOpacity: pressed && !isDisabled ? 0.38 : 0.1,
-          shadowRadius: pressed && !isDisabled ? 14 : 5,
-          shadowOffset: { width: 0, height: 0 },
-          elevation: pressed && !isDisabled ? 8 : 3,
-        },
-        style,
-      ]}
+      style={({ pressed }) => {
+        const active = pressed && !isDisabled;
+        return [
+          {
+            backgroundColor: p.bg,
+            borderRadius: radius.md,
+            borderColor: p.border || "transparent",
+            borderWidth: p.border ? 1.5 : 0,
+            opacity: isDisabled ? 0.65 : active ? 0.88 : 1,
+            alignSelf: fullWidth ? "stretch" : "flex-start",
+            paddingVertical: 16,
+            paddingHorizontal: 20,
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 52,
+            transform: [{ scale: active ? 0.97 : 1 }],
+            // Outline buttons: no resting halo (that looked like a nested box).
+            // Filled buttons: soft glow only while pressed.
+            shadowColor: p.glow || p.bg,
+            shadowOpacity: isOutline ? 0 : active ? 0.32 : 0,
+            shadowRadius: isOutline ? 0 : active ? 12 : 0,
+            shadowOffset: { width: 0, height: 0 },
+            elevation: isOutline ? 0 : active ? 6 : 0,
+          },
+          style,
+        ];
+      }}
     >
       {loading ? (
         <ActivityIndicator color={p.text} />

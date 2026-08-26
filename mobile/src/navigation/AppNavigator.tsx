@@ -9,9 +9,13 @@ import type { ComponentProps } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { firebaseAuth } from "../config/firebase";
 import { registerForPushNotifications } from "../utils/notifications";
-import { ProfileProvider } from "../context/ProfileContext";
+import api from "../config/api";
+import { ProfileProvider, useProfile } from "../context/ProfileContext";
 import { OnboardingProvider } from "../context/OnboardingContext";
+import { useToast } from "../components/AppToast";
 import { useTheme } from "../theme";
+import { getAppConfig, invalidateAppConfigCache } from "../utils/appConfig";
+import * as Haptics from "expo-haptics";
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
@@ -131,118 +135,160 @@ function ProfileStackNavigator() {
 }
 
 function MainTabs() {
-  const insets = useSafeAreaInsets();
-  const bottomPad = Math.max(insets.bottom, 8);
-  const { colors, mode } = useTheme();
-
   return (
     <OnboardingProvider>
       <ProfileProvider>
-        <Tab.Navigator
-        detachInactiveScreens={true}
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: mode === "dark" ? colors.amber : colors.navy,
-          tabBarInactiveTintColor: colors.muted,
-          tabBarLabelStyle: {
-            fontSize: 11,
-            fontWeight: "700",
-            marginBottom: 2,
-          },
-          tabBarStyle: {
-            backgroundColor: colors.white,
-            borderTopColor: colors.border,
-            borderTopWidth: 1,
-            height: 56 + bottomPad,
-            paddingTop: 6,
-            paddingBottom: bottomPad,
-            elevation: 8,
-          },
-        }}
-      >
-        <Tab.Screen
-          name="Home"
-          component={HomeStackNavigator}
-          options={{
-            title: "Home",
-            tabBarIcon: ({ color, size, focused }) => (
-              <TabBarIcon
-                focused={focused}
-                color={color}
-                size={size}
-                outline="home-outline"
-                solid="home"
-              />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Catalog"
-          component={CatalogStackNavigator}
-          options={{
-            title: "Catalog",
-            tabBarIcon: ({ color, size, focused }) => (
-              <TabBarIcon
-                focused={focused}
-                color={color}
-                size={size}
-                outline="library-outline"
-                solid="library"
-              />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Scan"
-          component={ScanScreen}
-          options={{
-            title: "Scan",
-            tabBarIcon: ({ color, size, focused }) => (
-              <TabBarIcon
-                focused={focused}
-                color={color}
-                size={size}
-                outline="qr-code-outline"
-                solid="qr-code"
-              />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Activity"
-          component={ActivityScreen}
-          options={{
-            title: "Activity",
-            tabBarIcon: ({ color, size, focused }) => (
-              <TabBarIcon
-                focused={focused}
-                color={color}
-                size={size}
-                outline="time-outline"
-                solid="time"
-              />
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Profile"
-          component={ProfileStackNavigator}
-          options={{
-            title: "Profile",
-            tabBarIcon: ({ color, size, focused }) => (
-              <TabBarIcon
-                focused={focused}
-                color={color}
-                size={size}
-                outline="person-outline"
-                solid="person"
-              />
-            ),
-          }}
-        />
-      </Tab.Navigator>
+        <MainTabNavigator />
       </ProfileProvider>
     </OnboardingProvider>
+  );
+}
+
+function MainTabNavigator() {
+  const insets = useSafeAreaInsets();
+  const bottomPad = Math.max(insets.bottom, 8);
+  const { colors, mode } = useTheme();
+  const { profile, refresh } = useProfile();
+  const { showToast } = useToast();
+
+  const guardLibrarianScan = async (): Promise<boolean> => {
+    if (profile?.role !== "librarian") return true;
+
+    invalidateAppConfigCache();
+    const config = await getAppConfig(true);
+    if (config.librariansCanBorrow) return true;
+
+    let activeLoans = Number(profile?.activeBorrowCount) || 0;
+    try {
+      const me = await api.get("/api/auth/me");
+      activeLoans = Number(me.data?.activeBorrowCount) || 0;
+      await refresh();
+    } catch {
+      // keep cached count
+    }
+
+    if (activeLoans > 0) return true;
+
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+    showToast(
+      "Librarian borrowing is disabled. Scan is locked until you have a book to return, or an admin turns borrowing back on."
+    );
+    return false;
+  };
+
+  return (
+    <Tab.Navigator
+      detachInactiveScreens={true}
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: mode === "dark" ? colors.amber : colors.navy,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "700",
+          marginBottom: 2,
+        },
+        tabBarStyle: {
+          backgroundColor: colors.white,
+          borderTopColor: colors.border,
+          borderTopWidth: 1,
+          height: 56 + bottomPad,
+          paddingTop: 6,
+          paddingBottom: bottomPad,
+          elevation: 8,
+        },
+      }}
+    >
+      <Tab.Screen
+        name="Home"
+        component={HomeStackNavigator}
+        options={{
+          title: "Home",
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabBarIcon
+              focused={focused}
+              color={color}
+              size={size}
+              outline="home-outline"
+              solid="home"
+            />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Catalog"
+        component={CatalogStackNavigator}
+        options={{
+          title: "Catalog",
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabBarIcon
+              focused={focused}
+              color={color}
+              size={size}
+              outline="library-outline"
+              solid="library"
+            />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Scan"
+        component={ScanScreen}
+        options={{
+          title: "Scan",
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabBarIcon
+              focused={focused}
+              color={color}
+              size={size}
+              outline="qr-code-outline"
+              solid="qr-code"
+            />
+          ),
+        }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            void (async () => {
+              const allowed = await guardLibrarianScan();
+              if (allowed) navigation.navigate("Scan");
+            })();
+          },
+        })}
+      />
+      <Tab.Screen
+        name="Activity"
+        component={ActivityScreen}
+        options={{
+          title: "Activity",
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabBarIcon
+              focused={focused}
+              color={color}
+              size={size}
+              outline="time-outline"
+              solid="time"
+            />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileStackNavigator}
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabBarIcon
+              focused={focused}
+              color={color}
+              size={size}
+              outline="person-outline"
+              solid="person"
+            />
+          ),
+        }}
+      />
+    </Tab.Navigator>
   );
 }
 

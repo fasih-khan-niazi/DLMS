@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
@@ -59,12 +60,17 @@ export default function CatalogHubScreen({ navigation, route }: Props) {
             <Pressable
               key={id}
               onPress={() => setTab(id)}
-              style={[
+              onPressIn={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              }}
+              style={({ pressed }) => [
                 styles.segment,
                 {
                   backgroundColor: selected ? colors.navy : colors.white,
                   borderColor: selected ? colors.navy : colors.border,
                   borderRadius: radius.pill,
+                  opacity: pressed ? 0.9 : 1,
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
                 },
               ]}
             >
