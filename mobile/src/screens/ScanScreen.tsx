@@ -23,7 +23,12 @@ import {
   type ScanHistoryEntry,
 } from "../utils/scanHistory";
 import { dismissScanCoach, isScanCoachDismissed } from "../utils/onboarding";
-import { getAppConfig } from "../utils/appConfig";
+import { invalidateCatalogCache } from "../utils/catalogCache";
+import {
+  getAppConfig,
+  invalidateAppConfigCache,
+  peekLibrariansCanBorrow,
+} from "../utils/appConfig";
 
 type Mode = "borrow" | "return";
 
@@ -71,7 +76,10 @@ export default function ScanScreen({ navigation }: Props) {
   const { colors, fontFamily, space, type, radius } = useTheme();
   const { isStaff, profile } = useProfile();
   const [permission, requestPermission] = useCameraPermissions();
-  const [mode, setMode] = useState<Mode>("borrow");
+  const initialReturnOnly =
+    profile?.role === "librarian" && peekLibrariansCanBorrow() === false;
+  const [returnOnly, setReturnOnly] = useState(initialReturnOnly);
+  const [mode, setMode] = useState<Mode>(initialReturnOnly ? "return" : "borrow");
   const [torchOn, setTorchOn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [scanned, setScanned] = useState(false);
@@ -79,7 +87,6 @@ export default function ScanScreen({ navigation }: Props) {
   const [history, setHistory] = useState<ScanHistoryEntry[]>([]);
   const [lastPayload, setLastPayload] = useState<string | null>(null);
   const [showScanCoach, setShowScanCoach] = useState(false);
-  const [returnOnly, setReturnOnly] = useState(false);
 
   const loadHistory = useCallback(async () => {
     if (!isStaff) return;
@@ -133,13 +140,25 @@ export default function ScanScreen({ navigation }: Props) {
       const response = await api.post(endpoint, { qrPayload: data });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
+      // Invalidate catalog & profile cache immediately so UI reflects updated copy counts & loans
+      invalidateCatalogCache();
+      invalidateAppConfigCache();
+      void refresh();
+
       const title = response.data.title || "Book";
+      const isLibrarianReturnBlocked =
+        profile?.role === "librarian" && (returnOnly || !peekLibrariansCanBorrow());
+      const loansBeforeReturn = Number(profile?.activeBorrowCount) || 0;
+      const isLastReturnForLibrarian =
+        mode === "return" && isLibrarianReturnBlocked && loansBeforeReturn <= 1;
+
       setResult({
         kind: "success",
         title,
         message: response.data.message || "Done",
         dueDate: response.data.dueDate,
         mode,
+        isLastReturnForLibrarian,
       });
 
       if (isStaff && parsed.copyId && parsed.isbn) {
@@ -417,6 +436,10 @@ export default function ScanScreen({ navigation }: Props) {
         result={result}
         onDismiss={dismissResult}
         onRetry={result?.kind === "error" ? retryScan : undefined}
+        onGoHome={() => {
+          dismissResult();
+          navigation.navigate("Home");
+        }}
       />
     </View>
   );

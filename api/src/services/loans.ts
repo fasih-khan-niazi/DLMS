@@ -18,24 +18,28 @@ function getWeekdayName(date: Date, timeZone: string): string {
   }).format(date);
 }
 
+const DEFAULT_SYSTEM_CONFIG = {
+  timezone: "Asia/Karachi",
+  maxBorrowLimit: 5,
+  loanPeriodDays: 14,
+  finePerDayRs: 50,
+  reservationHoldHours: 72,
+  blockCheckoutIfUnpaidFine: true,
+  workingDaysOff: ["Sunday"],
+  librariansCanBorrow: true,
+  allowInAppCopyBorrow: false,
+  maxPdfSizeMb: 25,
+  reminderDaysBefore: [2, 1],
+  catalogPageSize: 10,
+};
+
 export async function getSystemConfig() {
   const snap = await db.collection("config").doc("system").get();
-  return (
-    snap.data() || {
-      timezone: "Asia/Karachi",
-      maxBorrowLimit: 5,
-      loanPeriodDays: 14,
-      finePerDayRs: 50,
-      reservationHoldHours: 72,
-      blockCheckoutIfUnpaidFine: true,
-      workingDaysOff: ["Sunday"],
-      librariansCanBorrow: true,
-      allowInAppCopyBorrow: false,
-      maxPdfSizeMb: 25,
-      reminderDaysBefore: [2, 1],
-      catalogPageSize: 10,
-    }
-  );
+  if (!snap.exists) return { ...DEFAULT_SYSTEM_CONFIG };
+  return {
+    ...DEFAULT_SYSTEM_CONFIG,
+    ...(snap.data() || {}),
+  };
 }
 
 export function clampCatalogPageSize(value: unknown): number {

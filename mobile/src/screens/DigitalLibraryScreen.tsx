@@ -26,6 +26,10 @@ import {
   invalidateDigitalCache,
   setDigitalCache,
 } from "../utils/digitalCache";
+import {
+  getDigitalCatalogViewMode,
+  setDigitalCatalogViewMode,
+} from "../utils/catalogViewMode";
 import { useTheme } from "../theme";
 
 type DigitalBook = {
@@ -75,6 +79,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
 
   useEffect(() => {
     void getCatalogPageSize().then(setPageSize);
+    void getDigitalCatalogViewMode().then(setViewMode);
   }, []);
 
   const load = useCallback(
@@ -265,17 +270,55 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
 
         <View style={styles.toolbar}>
           <View style={styles.toolbarLeft}>
+          <Pressable
+            onPress={openFilters}
+            onPressIn={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }}
+            style={({ pressed }) => [
+              styles.filtersBtn,
+              {
+                backgroundColor: colors.white,
+                borderColor: filtersActive ? colors.navy : colors.border,
+                opacity: pressed ? 0.9 : 1,
+                transform: [{ scale: pressed ? 0.97 : 1 }],
+              },
+            ]}
+          >
+            <Ionicons name="options-outline" size={18} color={colors.navy} />
+            <Text
+              style={{
+                marginLeft: 6,
+                fontFamily: fontFamily.bodySemiBold,
+                fontSize: type.small,
+                color: colors.navy,
+              }}
+            >
+              Filters
+            </Text>
+            {filtersActive ? (
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: colors.amber,
+                  marginLeft: 6,
+                }}
+              />
+            ) : null}
+          </Pressable>
+
+          {/* Upload PDF lives under Profile for staff — keep catalog free of add-book CTAs
+          {isStaff ? (
             <Pressable
-              onPress={openFilters}
+              onPress={() => navigation.navigate("UploadDigitalBook")}
               style={[
-                styles.filtersBtn,
-                {
-                  backgroundColor: colors.white,
-                  borderColor: filtersActive ? colors.navy : colors.border,
-                },
+                styles.uploadBtn,
+                { backgroundColor: colors.amber, borderRadius: 999 },
               ]}
             >
-              <Ionicons name="options-outline" size={18} color={colors.navy} />
+              <Ionicons name="cloud-upload-outline" size={18} color={colors.navy} />
               <Text
                 style={{
                   marginLeft: 6,
@@ -284,62 +327,47 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
                   color: colors.navy,
                 }}
               >
-                Filters
+                Upload PDF
               </Text>
-              {filtersActive ? (
-                <View
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: colors.amber,
-                    marginLeft: 6,
-                  }}
-                />
-              ) : null}
             </Pressable>
+          ) : null}
+          */}
+        </View>
 
-            {/* Upload PDF lives under Profile for staff — keep catalog free of add-book CTAs
-            {isStaff ? (
-              <Pressable
-                onPress={() => navigation.navigate("UploadDigitalBook")}
-                style={[
-                  styles.uploadBtn,
-                  { backgroundColor: colors.amber, borderRadius: 999 },
-                ]}
-              >
-                <Ionicons name="cloud-upload-outline" size={18} color={colors.navy} />
-                <Text
-                  style={{
-                    marginLeft: 6,
-                    fontFamily: fontFamily.bodySemiBold,
-                    fontSize: type.small,
-                    color: colors.navy,
-                  }}
-                >
-                  Upload PDF
-                </Text>
-              </Pressable>
-            ) : null}
-            */}
-          </View>
-
-          <View style={styles.viewToggle}>
-            <Pressable onPress={() => setViewMode("list")} hitSlop={8}>
-              <Ionicons
-                name="list"
-                size={22}
-                color={viewMode === "list" ? colors.navy : colors.muted}
-              />
-            </Pressable>
-            <Pressable onPress={() => setViewMode("grid")} hitSlop={8}>
-              <Ionicons
-                name="grid"
-                size={22}
-                color={viewMode === "grid" ? colors.navy : colors.muted}
-              />
-            </Pressable>
-          </View>
+        <View style={styles.viewToggle}>
+          <Pressable
+            onPress={() => {
+              setViewMode("list");
+              void setDigitalCatalogViewMode("list");
+            }}
+            onPressIn={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }}
+            hitSlop={8}
+          >
+            <Ionicons
+              name="list"
+              size={22}
+              color={viewMode === "list" ? colors.navy : colors.muted}
+            />
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setViewMode("grid");
+              void setDigitalCatalogViewMode("grid");
+            }}
+            onPressIn={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }}
+            hitSlop={8}
+          >
+            <Ionicons
+              name="grid"
+              size={22}
+              color={viewMode === "grid" ? colors.navy : colors.muted}
+            />
+          </Pressable>
+        </View>
         </View>
       </View>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -81,6 +81,29 @@ function TabBarIcon({
   );
 }
 
+function CustomTabBarButton(props: any) {
+  const { onPress, onLongPress, style, children, ...rest } = props;
+  return (
+    <Pressable
+      {...rest}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      onPressIn={() => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }}
+      style={({ pressed }) => [
+        style,
+        {
+          opacity: pressed ? 0.75 : 1,
+          transform: [{ scale: pressed ? 0.94 : 1 }],
+        },
+      ]}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
 function HomeStackNavigator() {
   return (
     <HomeStackNav.Navigator screenOptions={{ headerShown: false }}>
@@ -154,11 +177,19 @@ function MainTabNavigator() {
   const guardLibrarianScan = async (): Promise<boolean> => {
     if (profile?.role !== "librarian") return true;
 
+    // Show immediate feedback toast first if memory says borrowing is blocked and no loans
+    const cachedConfig = await getAppConfig(false);
+    const cachedLoans = Number(profile?.activeBorrowCount) || 0;
+    if (cachedConfig.librariansCanBorrow === false && cachedLoans === 0) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      showToast("Borrowing is disabled for librarians.");
+    }
+
     invalidateAppConfigCache();
     const config = await getAppConfig(true);
     if (config.librariansCanBorrow) return true;
 
-    let activeLoans = Number(profile?.activeBorrowCount) || 0;
+    let activeLoans = cachedLoans;
     try {
       const me = await api.get("/api/auth/me");
       activeLoans = Number(me.data?.activeBorrowCount) || 0;
@@ -170,9 +201,7 @@ function MainTabNavigator() {
     if (activeLoans > 0) return true;
 
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-    showToast(
-      "Librarian borrowing is disabled. Scan is locked until you have a book to return, or an admin turns borrowing back on."
-    );
+    showToast("Borrowing is disabled for librarians.");
     return false;
   };
 
@@ -181,6 +210,7 @@ function MainTabNavigator() {
       detachInactiveScreens={true}
       screenOptions={{
         headerShown: false,
+        tabBarButton: (props) => <CustomTabBarButton {...props} />,
         tabBarActiveTintColor: mode === "dark" ? colors.amber : colors.navy,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: {

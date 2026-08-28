@@ -310,8 +310,17 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
               setDraftZoom(zoomPercent);
               setSettingsOpen(true);
             }}
+            onPressIn={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }}
             hitSlop={10}
-            style={styles.iconBtnCompact}
+            style={({ pressed }) => [
+              styles.iconBtnCompact,
+              {
+                opacity: pressed ? 0.7 : 1,
+                transform: [{ scale: pressed ? 0.94 : 1 }],
+              },
+            ]}
           >
             <Ionicons name="settings-outline" size={22} color={colors.navy} />
           </Pressable>
@@ -330,12 +339,7 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
       />
 
       <Modal visible={settingsOpen} transparent animationType="slide" onRequestClose={() => setSettingsOpen(false)}>
-        <View
-          style={[
-            styles.modalBackdrop,
-            isLandscape && { justifyContent: "center", paddingHorizontal: 16 },
-          ]}
-        >
+        <View style={styles.modalBackdrop}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => {
@@ -347,10 +351,14 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
               styles.modalCard,
               {
                 backgroundColor: colors.cream,
-                borderRadius: radius.lg,
-                width: isLandscape ? Math.min(windowWidth - 32, 760) : undefined,
-                alignSelf: isLandscape ? "center" : undefined,
+                borderTopLeftRadius: radius.lg,
+                borderTopRightRadius: radius.lg,
+                borderBottomLeftRadius: 0,
+                borderBottomRightRadius: 0,
+                width: "100%",
                 maxWidth: "100%",
+                alignSelf: "stretch",
+                paddingBottom: Math.max(insets.bottom, 16),
               },
             ]}
           >

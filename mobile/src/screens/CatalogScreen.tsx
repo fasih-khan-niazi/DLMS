@@ -27,6 +27,10 @@ import {
   invalidateCatalogCache,
   setCatalogCache,
 } from "../utils/catalogCache";
+import {
+  getPhysicalCatalogViewMode,
+  setPhysicalCatalogViewMode,
+} from "../utils/catalogViewMode";
 import { useTheme } from "../theme";
 
 type CatalogBook = {
@@ -78,6 +82,7 @@ export default function CatalogScreen({
 
   useEffect(() => {
     void getCatalogPageSize().then(setPageSize);
+    void getPhysicalCatalogViewMode().then(setViewMode);
   }, []);
 
   useEffect(() => {
@@ -351,11 +356,16 @@ export default function CatalogScreen({
         <View style={styles.toolbar}>
           <Pressable
             onPress={openFilters}
-            style={[
+            onPressIn={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            }}
+            style={({ pressed }) => [
               styles.filtersBtn,
               {
                 backgroundColor: colors.white,
                 borderColor: filtersActive ? colors.navy : colors.border,
+                opacity: pressed ? 0.9 : 1,
+                transform: [{ scale: pressed ? 0.97 : 1 }],
               },
             ]}
           >
@@ -384,14 +394,32 @@ export default function CatalogScreen({
           </Pressable>
 
           <View style={styles.viewToggle}>
-            <Pressable onPress={() => setViewMode("list")} hitSlop={8}>
+            <Pressable
+              onPress={() => {
+                setViewMode("list");
+                void setPhysicalCatalogViewMode("list");
+              }}
+              onPressIn={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              }}
+              hitSlop={8}
+            >
               <Ionicons
                 name="list"
                 size={22}
                 color={viewMode === "list" ? colors.navy : colors.muted}
               />
             </Pressable>
-            <Pressable onPress={() => setViewMode("grid")} hitSlop={8}>
+            <Pressable
+              onPress={() => {
+                setViewMode("grid");
+                void setPhysicalCatalogViewMode("grid");
+              }}
+              onPressIn={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              }}
+              hitSlop={8}
+            >
               <Ionicons
                 name="grid"
                 size={22}

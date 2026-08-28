@@ -216,13 +216,16 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
   };
 
   const addToBookshelf = async () => {
-    if (shelf) return;
+    if (shelf || busy) return;
     setBusy(true);
+    setModal({ visible: false, message: "" });
     try {
       const res = await api.post(`/api/digital-books/${digitalBookId}/bookshelf`);
       setShelf(res.data);
       setAddedModalOpen(true);
+      invalidateDigitalCache();
     } catch (error: any) {
+      setAddedModalOpen(false);
       setModal({
         visible: true,
         message: error.response?.data?.error || "Could not add to bookshelf",
@@ -625,18 +628,9 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
         visible={addedModalOpen}
         variant="success"
         title="Added to bookshelf"
-        message="This book is saved. You can start reading now, or remove it anytime."
-        confirmLabel="Read Book"
-        cancelLabel="Remove from Bookshelf"
+        message="This book is now in your bookshelf. You can read it now or access it anytime from your shelf."
+        confirmLabel="Done"
         onClose={() => setAddedModalOpen(false)}
-        onConfirm={() => {
-          setAddedModalOpen(false);
-          openReader();
-        }}
-        onCancel={() => {
-          setAddedModalOpen(false);
-          setRemoveConfirmOpen(true);
-        }}
       />
       <AppModal
         visible={removeConfirmOpen}

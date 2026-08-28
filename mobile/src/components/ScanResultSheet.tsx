@@ -13,6 +13,7 @@ export type ScanResult =
       message: string;
       dueDate?: unknown;
       mode: "borrow" | "return";
+      isLastReturnForLibrarian?: boolean;
     }
   | {
       kind: "error";
@@ -24,9 +25,10 @@ type Props = {
   result: ScanResult | null;
   onDismiss: () => void;
   onRetry?: () => void;
+  onGoHome?: () => void;
 };
 
-export function ScanResultSheet({ result, onDismiss, onRetry }: Props) {
+export function ScanResultSheet({ result, onDismiss, onRetry, onGoHome }: Props) {
   const { colors, fontFamily, space, type, radius } = useTheme();
 
   if (!result) return null;
@@ -114,6 +116,8 @@ export function ScanResultSheet({ result, onDismiss, onRetry }: Props) {
           <View style={{ marginTop: space.lg, gap: space.sm }}>
             {result.kind === "error" && onRetry ? (
               <Button title="Try again" onPress={onRetry} />
+            ) : result.kind === "success" && result.isLastReturnForLibrarian && onGoHome ? (
+              <Button title="Go to Home" onPress={onGoHome} />
             ) : (
               <Button title="Done" onPress={onDismiss} />
             )}

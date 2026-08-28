@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { isOnboardingDone } from "../utils/onboarding";
 import { OnboardingCarousel } from "../components/OnboardingCarousel";
+import { useProfile } from "./ProfileContext";
 
 type OnboardingContextValue = {
   openOnboarding: () => void;
@@ -11,20 +12,22 @@ const OnboardingContext = createContext<OnboardingContextValue>({
 });
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
+  const { profile } = useProfile();
   const [visible, setVisible] = useState(false);
-  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    void isOnboardingDone().then((done) => {
+    const uid = profile?.uid;
+    if (!uid) return;
+
+    void isOnboardingDone(uid).then((done) => {
       if (cancelled) return;
-      setChecked(true);
       if (!done) setVisible(true);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [profile?.uid]);
 
   const openOnboarding = useCallback(() => setVisible(true), []);
   const value = useMemo(() => ({ openOnboarding }), [openOnboarding]);
@@ -32,9 +35,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   return (
     <OnboardingContext.Provider value={value}>
       {children}
-      {checked ? (
-        <OnboardingCarousel visible={visible} onClose={() => setVisible(false)} />
-      ) : null}
+      <OnboardingCarousel visible={visible} onClose={() => setVisible(false)} />
     </OnboardingContext.Provider>
   );
 }

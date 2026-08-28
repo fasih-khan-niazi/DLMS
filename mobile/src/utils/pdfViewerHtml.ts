@@ -117,7 +117,9 @@ export function buildPdfViewerHtml(input: {
   var authToken = '${token}';
   var startPage = ${startPage};
   var readMode = '${readMode}';
-  var zoom = ${zoomPercent} / 100;
+  var baseSettingsZoom = ${zoomPercent} / 100;
+  var currentZoom = baseSettingsZoom;
+  var zoom = baseSettingsZoom;
   var pdfDoc = null;
   var totalPages = 0;
   var pageNum = startPage;
@@ -132,7 +134,7 @@ export function buildPdfViewerHtml(input: {
   var focusFracY = 0.5;
   var focusScreenX = 0;
   var focusScreenY = 0;
-  var liveZoom = zoom;
+  var liveZoom = baseSettingsZoom;
   var scrollRaf = 0;
   var commitTimer = 0;
   var sizeRaf = 0;
@@ -153,7 +155,7 @@ export function buildPdfViewerHtml(input: {
   }
 
   function cssPageHeight(z) {
-    z = z == null ? zoom : z;
+    z = z == null ? currentZoom : z;
     return Math.max(160, Math.round(basePageHeight * z) + 20);
   }
 
@@ -343,7 +345,7 @@ export function buildPdfViewerHtml(input: {
     root.innerHTML = '';
     rendered = {};
     rendering = {};
-    var h = cssPageHeight(zoom);
+    var h = cssPageHeight(currentZoom);
     for (var i = 1; i <= totalPages; i++) {
       var slot = document.createElement('div');
       slot.className = 'pageSlot' + (i === pageNum ? ' active' : '');
@@ -355,7 +357,7 @@ export function buildPdfViewerHtml(input: {
 
   function visibleRange() {
     var wrap = document.getElementById('scrollWrap');
-    var h = cssPageHeight(zoom);
+    var h = cssPageHeight(currentZoom);
     var top = wrap.scrollTop;
     var bottom = top + wrap.clientHeight;
     return {
@@ -371,7 +373,7 @@ export function buildPdfViewerHtml(input: {
     var range = visibleRange();
     var jobs = [];
     for (var n = range.first; n <= range.last; n++) jobs.push(renderPage(n));
-    var h = cssPageHeight(zoom);
+    var h = cssPageHeight(currentZoom);
     var wrap = document.getElementById('scrollWrap');
     var mid = Math.min(totalPages, Math.max(1, Math.round((wrap.scrollTop + wrap.clientHeight * 0.35) / h) + 1));
     if (mid !== pageNum) {
@@ -384,10 +386,13 @@ export function buildPdfViewerHtml(input: {
   function commitZoom(next, opts) {
     opts = opts || {};
     var target = clampZoom(next);
-    zoom = target;
-    liveZoom = zoom;
-    applyZoomSizes(zoom);
-    post('zoom', { percent: Math.round(zoom * 100) });
+    currentZoom = target;
+    liveZoom = currentZoom;
+    if (readMode === 'scroll' || !opts.fromPinch) {
+      baseSettingsZoom = target;
+    }
+    applyZoomSizes(currentZoom);
+    post('zoom', { percent: Math.round(currentZoom * 100) });
 
     requestAnimationFrame(function () {
       if (readMode === 'page') layoutPageMode();
@@ -400,15 +405,15 @@ export function buildPdfViewerHtml(input: {
     });
   }
 
-  function goToPage(num, resetPageZoom) {
+  function goToPage(num) {
     pageNum = Math.min(Math.max(Math.floor(num), 1), totalPages || 1);
     if (readMode === 'page') {
-      if (resetPageZoom !== false) {
-        zoom = 1;
-        liveZoom = 1;
-        applyZoomSizes(1);
-        post('zoom', { percent: 100 });
-      }
+      // In page-by-page mode: reset temporary page pinch zoom back to the zoom set in settings
+      currentZoom = baseSettingsZoom;
+      liveZoom = baseSettingsZoom;
+      applyZoomSizes(baseSettingsZoom);
+      post('zoom', { percent: Math.round(baseSettingsZoom * 100) });
+
       document.querySelectorAll('.pageSlot').forEach(function (s) {
         s.classList.toggle('active', Number(s.dataset.page) === pageNum);
       });
@@ -420,7 +425,7 @@ export function buildPdfViewerHtml(input: {
     } else {
       notifyPage();
       var wrap = document.getElementById('scrollWrap');
-      wrap.scrollTop = (pageNum - 1) * cssPageHeight(zoom);
+      wrap.scrollTop = (pageNum - 1) * cssPageHeight(currentZoom);
       renderVisible();
     }
   }
@@ -498,43 +503,44 @@ export function buildPdfViewerHtml(input: {
     if (opts.mode && opts.mode !== readMode) {
       readMode = opts.mode;
       document.body.className = readMode + '-mode';
-      zoom = 1;
+      baseSettingsZoom = 1;
+      currentZoom = 1;
       liveZoom = 1;
       needsRebuild = true;
     }
     if (opts.resetZoom) {
-      if (needsRebuild) {
-        zoom = 1;
-        liveZoom = 1;
-      } else {
+      baseSettingsZoom = 1;
+      currentZoom = 1;
+      liveZoom = 1;
+      if (!needsRebuild) {
         commitZoom(1, { keepPage: true });
       }
     } else if (typeof opts.zoomPercent === 'number') {
-      if (needsRebuild) {
-        zoom = clampZoom(opts.zoomPercent / 100);
-        liveZoom = zoom;
-      } else {
-        commitZoom(opts.zoomPercent / 100, { keepPage: true });
+      baseSettingsZoom = clampZoom(opts.zoomPercent / 100);
+      currentZoom = baseSettingsZoom;
+      liveZoom = currentZoom;
+      if (!needsRebuild) {
+        commitZoom(baseSettingsZoom, { keepPage: true });
       }
     }
     if (needsRebuild) {
-      post('zoom', { percent: Math.round(zoom * 100) });
+      post('zoom', { percent: Math.round(baseSettingsZoom * 100) });
       buildSlots();
-      goToPage(pageNum, false);
+      goToPage(pageNum);
     }
   };
 
   window.addEventListener('orientationchange', function () {
     rendered = {};
     setTimeout(function () {
-      applyZoomSizes(zoom);
+      applyZoomSizes(currentZoom);
       renderVisible();
     }, 280);
   });
   window.addEventListener('resize', function () {
     rendered = {};
     setTimeout(function () {
-      applyZoomSizes(zoom);
+      applyZoomSizes(currentZoom);
       renderVisible();
     }, 160);
   });

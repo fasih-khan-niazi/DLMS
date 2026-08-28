@@ -7,7 +7,7 @@ import ReservationsScreen from "./ReservationsScreen";
 import LoanHistoryScreen from "./LoanHistoryScreen";
 import { useTheme } from "../theme";
 
-type ActivityTab = "loans" | "reservations" | "history";
+type ActivityTab = "loans" | "reservations" | "returns";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -21,13 +21,16 @@ export default function ActivityScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     const next = route?.params?.initialTab;
-    if (next) setTab(next);
+    if (next) {
+      if ((next as string) === "history") setTab("returns");
+      else setTab(next);
+    }
   }, [route?.params?.initialTab]);
 
   const tabs: { id: ActivityTab; label: string }[] = [
     { id: "loans", label: "Loans" },
     { id: "reservations", label: "Reservations" },
-    { id: "history", label: "History" },
+    { id: "returns", label: "Returns" },
   ];
 
   return (
