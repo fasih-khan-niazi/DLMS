@@ -31,9 +31,21 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 
   if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("loans", {
+      name: "Loans and due dates",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#E8A838",
+    });
+    await Notifications.setNotificationChannelAsync("reservations", {
+      name: "Reservations",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#E8A838",
+    });
     await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.DEFAULT,
+      name: "Library updates",
+      importance: Notifications.AndroidImportance.HIGH,
     });
   }
 

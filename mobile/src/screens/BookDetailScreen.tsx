@@ -3,9 +3,7 @@ import {
   View,
   Text,
   ScrollView,
-  Alert,
   Pressable,
-  TextInput,
   RefreshControl,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
@@ -19,12 +17,16 @@ import { firebaseAuth } from "../config/firebase";
 import { useProfile } from "../context/ProfileContext";
 import { CopyQrModal } from "../components/CopyQrModal";
 import { AppModal } from "../components/AppModal";
-import { BookCover, Badge, Button, Card, BackButton } from "../components/ui";
+import { BookCover, Badge, Button, Card, BackButton, Input } from "../components/ui";
 import { BookDetailSkeleton } from "../components/Skeleton";
 import { formatIsbn } from "../utils/isbn";
 import { invalidateCatalogCache } from "../utils/catalogCache";
 import { invalidateCoverCache } from "../utils/coverImage";
-import { getAllowInAppCopyBorrow, invalidateAppConfigCache } from "../utils/appConfig";
+import {
+  getAllowInAppCopyBorrow,
+  getLibrariansCanBorrow,
+  invalidateAppConfigCache,
+} from "../utils/appConfig";
 import { extractApiError, runSideEffect } from "../utils/apiError";
 import { useTheme } from "../theme";
 
@@ -64,11 +66,29 @@ export default function BookDetailScreen({ navigation, route }: Props) {
     goActivity?: boolean;
   } | null>(null);
   const [allowInAppCopyBorrow, setAllowInAppCopyBorrow] = useState(false);
+  const [librariansCanBorrow, setLibrariansCanBorrow] = useState(true);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editAuthors, setEditAuthors] = useState("");
+  const [editCategories, setEditCategories] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editPageCount, setEditPageCount] = useState("");
+  const [addCopiesQty, setAddCopiesQty] = useState("1");
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [addingCopies, setAddingCopies] = useState(false);
   const [copyActionId, setCopyActionId] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<{
     variant: "success" | "error";
     title: string;
     message: string;
+  } | null>(null);
+  const [staffModal, setStaffModal] = useState<{
+    variant: "success" | "error" | "info" | "danger";
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    confirmVariant?: "primary" | "dangerSoft";
+    onConfirm?: () => void;
   } | null>(null);
 
   const load = async (opts?: { silent?: boolean }) => {
@@ -83,6 +103,13 @@ export default function BookDetailScreen({ navigation, route }: Props) {
       setBook(bookRes.data);
       setCoverUrlDraft(bookRes.data.thumbnailUrl || "");
       setCoverRevision((n) => n + 1);
+      setEditTitle(bookRes.data.title || "");
+      setEditAuthors((bookRes.data.authors || []).join(", "));
+      setEditCategories((bookRes.data.categories || []).join(", "));
+      setEditDescription(bookRes.data.description || "");
+      setEditPageCount(
+        bookRes.data.pageCount != null ? String(bookRes.data.pageCount) : ""
+      );
 
       const mine = new Set<string>();
       (loansRes.data.loans || []).forEach((loan: any) => {
@@ -101,6 +128,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
   useFocusEffect(
     useCallback(() => {
       void getAllowInAppCopyBorrow(true).then(setAllowInAppCopyBorrow);
+      void getLibrariansCanBorrow(true).then(setLibrariansCanBorrow);
       void load();
     }, [isbn])
   );
@@ -202,17 +230,13 @@ export default function BookDetailScreen({ navigation, route }: Props) {
     const reactivating = book.isActive === false;
 
     if (reactivating) {
-      Alert.alert(
-        "Reactivate title?",
-        "Students will see this book in the catalog again.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Reactivate",
-            onPress: () => void performStatusChange(true),
-          },
-        ]
-      );
+      setStaffModal({
+        variant: "info",
+        title: "Reactivate title?",
+        message: "Students will see this book in the catalog again.",
+        confirmLabel: "Reactivate",
+        onConfirm: () => void performStatusChange(true),
+      });
       return;
     }
 
@@ -220,10 +244,11 @@ export default function BookDetailScreen({ navigation, route }: Props) {
     const onLoan = Number(book.issuedCount) || 0;
 
     if (onLoan > 0) {
-      Alert.alert(
-        "Cannot deactivate",
-        "A copy of this title is currently on loan. Wait until all copies are returned.",
-      );
+      setStaffModal({
+        variant: "error",
+        title: "Cannot deactivate",
+        message: "A copy of this title is currently on loan. Wait until all copies are returned.",
+      });
       return;
     }
 
@@ -232,14 +257,14 @@ export default function BookDetailScreen({ navigation, route }: Props) {
         ? `${pending} student reservation${pending === 1 ? " is" : "s are"} waiting or ready for pickup. Deactivating will cancel ${pending === 1 ? "it" : "them"} and notify the student${pending === 1 ? "" : "s"}.`
         : "Students will no longer see this title in the catalog.";
 
-    Alert.alert("Deactivate title?", reservationNote, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Deactivate",
-        style: "destructive",
-        onPress: () => void performStatusChange(false),
-      },
-    ]);
+    setStaffModal({
+      variant: "danger",
+      title: "Deactivate title?",
+      message: reservationNote,
+      confirmLabel: "Deactivate",
+      confirmVariant: "dangerSoft",
+      onConfirm: () => void performStatusChange(false),
+    });
   };
 
   const performStatusChange = async (isActive: boolean) => {
@@ -252,12 +277,20 @@ export default function BookDetailScreen({ navigation, route }: Props) {
       });
     } catch (error: any) {
       setTogglingStatus(false);
-      Alert.alert("Update failed", extractApiError(error, "Could not update book status"));
+      setStaffModal({
+        variant: "error",
+        title: "Update failed",
+        message: extractApiError(error, "Could not update book status"),
+      });
       return;
     }
 
     setTogglingStatus(false);
-    Alert.alert(isActive ? "Reactivated" : "Deactivated", response.data?.message || "Updated");
+    setStaffModal({
+      variant: "success",
+      title: isActive ? "Reactivated" : "Deactivated",
+      message: response.data?.message || "Updated",
+    });
     runSideEffect(invalidateCatalogCache);
     void load({ silent: true });
   };
@@ -265,7 +298,11 @@ export default function BookDetailScreen({ navigation, route }: Props) {
   const saveCoverUrl = async () => {
     const url = coverUrlDraft.trim();
     if (!url) {
-      Alert.alert("Cover URL required", "Enter an image URL or upload a file.");
+      setStaffModal({
+        variant: "info",
+        title: "Cover URL required",
+        message: "Enter an image URL or upload a file.",
+      });
       return;
     }
 
@@ -280,7 +317,11 @@ export default function BookDetailScreen({ navigation, route }: Props) {
         message: "The book cover was updated. It should appear right away across the catalog.",
       });
     } catch (error: any) {
-      Alert.alert("Save failed", error.response?.data?.error || "Could not save cover URL");
+      setStaffModal({
+        variant: "error",
+        title: "Save failed",
+        message: extractApiError(error, "Could not save cover URL"),
+      });
     } finally {
       setSavingCover(false);
     }
@@ -323,9 +364,80 @@ export default function BookDetailScreen({ navigation, route }: Props) {
         message: "Your image was saved and linked to this book. It should appear right away across the catalog.",
       });
     } catch (error: any) {
-      Alert.alert("Upload failed", error.message || "Could not upload cover");
+      setStaffModal({
+        variant: "error",
+        title: "Upload failed",
+        message: error.message || "Could not upload cover",
+      });
     } finally {
       setUploadingCover(false);
+    }
+  };
+
+  const saveBookDetails = async () => {
+    if (!editTitle.trim()) {
+      setStaffModal({
+        variant: "info",
+        title: "Title required",
+        message: "Enter a title before saving.",
+      });
+      return;
+    }
+    setSavingDetails(true);
+    try {
+      const { data } = await api.patch(`/api/catalog/books/${encodeURIComponent(isbn)}`, {
+        title: editTitle.trim(),
+        authors: editAuthors,
+        categories: editCategories,
+        description: editDescription,
+        pageCount: editPageCount.trim() ? Number(editPageCount) : undefined,
+      });
+      if (data?.book) setBook((prev: any) => ({ ...prev, ...data.book }));
+      runSideEffect(invalidateCatalogCache);
+      setStaffModal({
+        variant: "success",
+        title: "Details saved",
+        message: "Title, authors and other fields were updated.",
+      });
+    } catch (error: any) {
+      setStaffModal({
+        variant: "error",
+        title: "Could not save",
+        message: extractApiError(error, "Failed to update book details"),
+      });
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
+  const addPhysicalCopies = async () => {
+    const qty = Number(addCopiesQty);
+    if (!Number.isInteger(qty) || qty < 1) {
+      setStaffModal({
+        variant: "info",
+        title: "Check the copy count",
+        message: "Number of new copies must be a whole number of 1 or more.",
+      });
+      return;
+    }
+    setAddingCopies(true);
+    try {
+      await api.post("/api/catalog/copies", { isbn, quantity: qty });
+      runSideEffect(invalidateCatalogCache);
+      await load({ silent: true });
+      setStaffModal({
+        variant: "success",
+        title: "Copies added",
+        message: `${qty} new ${qty === 1 ? "copy was" : "copies were"} added. Print labels from Available Copies.`,
+      });
+    } catch (error: any) {
+      setStaffModal({
+        variant: "error",
+        title: "Could not add copies",
+        message: extractApiError(error, "Failed to add copies"),
+      });
+    } finally {
+      setAddingCopies(false);
     }
   };
 
@@ -353,6 +465,9 @@ export default function BookDetailScreen({ navigation, route }: Props) {
         ? "warning"
         : "muted";
 
+  const staffMayBorrow = !isStaff || librariansCanBorrow;
+  const showCirculation = book.isActive !== false && staffMayBorrow;
+
   return (
     <>
       <ScrollView
@@ -366,6 +481,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
               invalidateCatalogCache();
               invalidateAppConfigCache();
               void getAllowInAppCopyBorrow(true).then(setAllowInAppCopyBorrow);
+              void getLibrariansCanBorrow(true).then(setLibrariansCanBorrow);
               void load({ silent: true });
             }}
             tintColor={colors.navy}
@@ -444,7 +560,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
           ) : null}
         </View>
 
-        {!isStaff && book.isActive !== false ? (
+        {showCirculation ? (
           <Card style={{ marginBottom: space.md }}>
             {(book.availableCount || 0) > 0 ? (
               <Button title="Scan to borrow" onPress={goToScan} />
@@ -486,73 +602,146 @@ export default function BookDetailScreen({ navigation, route }: Props) {
           </Card>
         ) : null}
 
-        {isStaff ? (
+        {isStaff && !librariansCanBorrow && book.isActive !== false ? (
           <Card style={{ marginBottom: space.md }}>
-            <Text
-              style={{
-                fontFamily: fontFamily.bodyBold,
-                fontSize: type.body,
-                color: colors.navy,
-                marginBottom: space.sm,
-              }}
-            >
-              Book cover
-            </Text>
             <Text
               style={{
                 fontFamily: fontFamily.body,
                 fontSize: type.small,
                 color: colors.muted,
-                marginBottom: space.sm,
                 lineHeight: 20,
               }}
             >
-              Source: {book.coverImageSource === "manual" ? "Manual" : "Google Books (auto)"}
+              Staff borrowing is off. Use Manage this book to edit details, or the Scan tab if you
+              still have a copy to return.
             </Text>
-            <TextInput
-              value={coverUrlDraft}
-              onChangeText={setCoverUrlDraft}
-              placeholder="https://example.com/cover.jpg"
-              placeholderTextColor={colors.muted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={{
-                backgroundColor: colors.white,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: radius.md,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-                fontFamily: fontFamily.body,
-                fontSize: type.small,
-                color: colors.text,
-                marginBottom: space.sm,
-              }}
-            />
-            <Button
-              title="Save cover URL"
-              variant="primary"
-              onPress={saveCoverUrl}
-              loading={savingCover}
-              style={{ marginBottom: space.sm }}
-            />
-            <Button
-              title="Upload image file"
-              variant="amber"
-              onPress={uploadCoverImage}
-              loading={uploadingCover}
-            />
           </Card>
         ) : null}
 
         {isStaff ? (
           <Card style={{ marginBottom: space.md }}>
-            <Button
-              title={book.isActive === false ? "Reactivate title" : "Deactivate title"}
-              variant={book.isActive === false ? "successSoft" : "dangerSoft"}
-              onPress={toggleCatalogActive}
-              loading={togglingStatus}
-            />
+            <Pressable
+              onPress={() => setManageOpen((open) => !open)}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: fontFamily.bodyBold,
+                  fontSize: type.body,
+                  color: colors.navy,
+                }}
+              >
+                Manage this book
+              </Text>
+              <Ionicons
+                name={manageOpen ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={colors.navy}
+              />
+            </Pressable>
+            {manageOpen ? (
+              <View style={{ marginTop: space.md }}>
+                <Input label="Title" value={editTitle} onChangeText={setEditTitle} />
+                <Input
+                  label="Authors"
+                  value={editAuthors}
+                  onChangeText={setEditAuthors}
+                  placeholder="Separate names with commas"
+                />
+                <Input
+                  label="Categories"
+                  value={editCategories}
+                  onChangeText={setEditCategories}
+                  placeholder="Fiction, Classics"
+                />
+                <Input
+                  label="Page count"
+                  value={editPageCount}
+                  onChangeText={setEditPageCount}
+                  keyboardType="number-pad"
+                />
+                <Input
+                  label="Description"
+                  value={editDescription}
+                  onChangeText={setEditDescription}
+                  multiline
+                />
+                <Button
+                  title="Save details"
+                  onPress={() => void saveBookDetails()}
+                  loading={savingDetails}
+                  style={{ marginBottom: space.md }}
+                />
+
+                <Text
+                  style={{
+                    fontFamily: fontFamily.bodyBold,
+                    fontSize: type.small,
+                    color: colors.navy,
+                    marginBottom: space.sm,
+                  }}
+                >
+                  Cover
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: fontFamily.body,
+                    fontSize: type.caption,
+                    color: colors.muted,
+                    marginBottom: space.sm,
+                  }}
+                >
+                  Source: {book.coverImageSource === "manual" ? "Manual" : "Google Books (auto)"}
+                </Text>
+                <Input
+                  label="Cover image URL"
+                  value={coverUrlDraft}
+                  onChangeText={setCoverUrlDraft}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="https://..."
+                />
+                <Button
+                  title="Save cover URL"
+                  variant="secondary"
+                  onPress={saveCoverUrl}
+                  loading={savingCover}
+                  style={{ marginBottom: space.sm }}
+                />
+                <Button
+                  title="Upload image file"
+                  variant="amber"
+                  onPress={uploadCoverImage}
+                  loading={uploadingCover}
+                  style={{ marginBottom: space.md }}
+                />
+
+                <Input
+                  label="Add physical copies"
+                  value={addCopiesQty}
+                  onChangeText={setAddCopiesQty}
+                  keyboardType="number-pad"
+                />
+                <Button
+                  title="Add copies"
+                  variant="secondary"
+                  onPress={() => void addPhysicalCopies()}
+                  loading={addingCopies}
+                  style={{ marginBottom: space.md }}
+                />
+
+                <Button
+                  title={book.isActive === false ? "Reactivate title" : "Deactivate title"}
+                  variant={book.isActive === false ? "successSoft" : "dangerSoft"}
+                  onPress={toggleCatalogActive}
+                  loading={togglingStatus}
+                />
+              </View>
+            ) : null}
           </Card>
         ) : null}
 
@@ -641,8 +830,11 @@ export default function BookDetailScreen({ navigation, route }: Props) {
                 !!profile?.uid &&
                 String(copy.reservedForUserId || "") === profile.uid;
               const showBorrow =
-                allowInAppCopyBorrow && (copy.status === "available" || heldForMe);
-              const showReturn = allowInAppCopyBorrow && copy.status === "issued" && isMine;
+                allowInAppCopyBorrow &&
+                staffMayBorrow &&
+                (copy.status === "available" || heldForMe);
+              const showReturn =
+                allowInAppCopyBorrow && staffMayBorrow && copy.status === "issued" && isMine;
               const busy = copyActionId === copy.copyId;
 
               const statusBlock = (
@@ -690,7 +882,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
                     statusBlock
                   )}
 
-                  {!isStaff && (showBorrow || showReturn) ? (
+                  {showBorrow || showReturn ? (
                     <View style={{ marginTop: space.sm }}>
                       {showBorrow ? (
                         <Button
@@ -711,36 +903,19 @@ export default function BookDetailScreen({ navigation, route }: Props) {
                     </View>
                   ) : null}
 
-                  {expanded && isStaff ? (
-                    <View style={{ marginTop: space.sm, gap: space.sm }}>
-                      {allowInAppCopyBorrow && showBorrow ? (
-                        <Button
-                          title={heldForMe ? "Borrow reserved copy" : "Borrow copy"}
-                          onPress={() => void runCopyAction(copy.copyId, "borrow", copyLabel)}
-                          loading={busy}
-                        />
-                      ) : null}
-                      {allowInAppCopyBorrow && showReturn ? (
-                        <Button
-                          title="Return copy"
-                          variant="secondary"
-                          onPress={() => void runCopyAction(copy.copyId, "return", copyLabel)}
-                          loading={busy}
-                        />
-                      ) : null}
-                      {!!copy.qrPayload ? (
-                        <Button
-                          title="View QR label"
-                          variant="secondary"
-                          onPress={() =>
-                            setQrModal({
-                              copyLabel,
-                              qrPayload: copy.qrPayload,
-                              authors: book.authors,
-                            })
-                          }
-                        />
-                      ) : null}
+                  {expanded && isStaff && !!copy.qrPayload ? (
+                    <View style={{ marginTop: space.sm }}>
+                      <Button
+                        title="View QR label"
+                        variant="secondary"
+                        onPress={() =>
+                          setQrModal({
+                            copyLabel,
+                            qrPayload: copy.qrPayload,
+                            authors: book.authors,
+                          })
+                        }
+                      />
                     </View>
                   ) : null}
                 </Card>
@@ -778,6 +953,27 @@ export default function BookDetailScreen({ navigation, route }: Props) {
         message={copyFeedback?.message || ""}
         confirmLabel="OK"
         onClose={() => setCopyFeedback(null)}
+      />
+
+      <AppModal
+        visible={!!staffModal}
+        variant={staffModal?.variant || "info"}
+        title={staffModal?.title || ""}
+        message={staffModal?.message || ""}
+        confirmLabel={staffModal?.confirmLabel || "OK"}
+        confirmVariant={staffModal?.confirmVariant || "primary"}
+        cancelLabel={staffModal?.onConfirm ? "Keep as is" : undefined}
+        onClose={() => setStaffModal(null)}
+        onConfirm={
+          staffModal?.onConfirm
+            ? () => {
+                const next = staffModal.onConfirm;
+                setStaffModal(null);
+                next?.();
+              }
+            : () => setStaffModal(null)
+        }
+        onCancel={staffModal?.onConfirm ? () => setStaffModal(null) : undefined}
       />
 
       <AppModal

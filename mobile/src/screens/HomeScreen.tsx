@@ -17,6 +17,7 @@ import {
   setDashboardCache,
   type DashboardSnapshot,
 } from "../utils/dashboardCache";
+import { dueCountdown } from "../utils/loanDates";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -64,7 +65,15 @@ export default function HomeScreen({ navigation }: Props) {
       }).length;
 
       const reservations = resRes.data.reservations || [];
-      const readyReservations = reservations.filter((r: any) => r.status === "ready").length;
+      const readyRows = reservations.filter((r: any) => r.status === "ready");
+      const readyReservations = readyRows.length;
+
+      const datedLoans = loans
+        .map((loan: any) => ({ loan, due: toMs(loan.dueDate) }))
+        .filter((row: { due: number }) => row.due > 0)
+        .sort((a: { due: number }, b: { due: number }) => a.due - b.due);
+      const nextLoan = datedLoans[0];
+      const nextDue = nextLoan ? dueCountdown(nextLoan.loan.dueDate) : null;
 
       const continueReading = (shelfRes.data.items || [])
         .filter((item: any) => Number(item.progress) > 0 && Number(item.progress) < 100)
@@ -76,6 +85,7 @@ export default function HomeScreen({ navigation }: Props) {
           progress: Number(item.progress) || 0,
           lastPage: Number(item.lastPage) || 1,
           totalPages: Number(item.totalPages) || undefined,
+          thumbnailUrl: item.thumbnailUrl,
         }));
 
       const snapshot: DashboardSnapshot = {
@@ -83,6 +93,9 @@ export default function HomeScreen({ navigation }: Props) {
         overdueLoans,
         readyReservations,
         outstandingFines: profile?.totalOutstandingFines ?? 0,
+        nextDueLabel: nextDue?.label,
+        nextDueOverdue: nextDue?.overdue,
+        readyTitle: readyRows[0]?.title,
         continueReading,
         fetchedAt: Date.now(),
       };
@@ -135,7 +148,19 @@ export default function HomeScreen({ navigation }: Props) {
 
   const goToScan = () => navigation.getParent()?.navigate("Scan");
   const goToCatalog = () => navigation.getParent()?.navigate("Catalog");
-  const goToActivity = () => navigation.getParent()?.navigate("Activity");
+  const goToEbooks = () =>
+    navigation.getParent()?.navigate("Catalog", {
+      screen: "CatalogMain",
+      params: { initialTab: "digitalCopies" },
+    });
+  const goToBookshelf = () =>
+    navigation.getParent()?.navigate("Profile", { screen: "Bookshelf" });
+  const goToActivity = (tab?: string) =>
+    navigation.getParent()?.navigate("Activity", tab ? { initialTab: tab } : undefined);
+
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
   return (
     <Screen
@@ -211,7 +236,7 @@ export default function HomeScreen({ navigation }: Props) {
           marginBottom: space.lg,
         }}
       >
-        Hello, {displayName}
+        {greeting}, {displayName}
       </Text>
 
       <View style={{ marginBottom: space.lg }}>
@@ -226,70 +251,79 @@ export default function HomeScreen({ navigation }: Props) {
         />
       </View>
 
-      <Card style={{ marginBottom: space.md }}>
-        <Text
-          style={{
-            fontFamily: fontFamily.bodyBold,
-            fontSize: type.body,
-            color: colors.navy,
-            marginBottom: space.sm,
-          }}
-        >
-          At a glance
-        </Text>
+      <View style={{ gap: space.sm, marginBottom: space.md }}>
         {loading && !summary ? (
-          <Text style={{ fontFamily: fontFamily.body, color: colors.muted, fontSize: type.small }}>
-            Loading your library summary...
-          </Text>
+          <Card>
+            <Text style={{ fontFamily: fontFamily.body, color: colors.muted, fontSize: type.small }}>
+              Loading your library summary...
+            </Text>
+          </Card>
         ) : (
-          <View style={{ gap: space.sm }}>
-            <Pressable onPress={goToActivity}>
-              <Text style={{ fontFamily: fontFamily.body, fontSize: type.body, color: colors.text }}>
-                {summary?.activeLoans ?? 0} active loan{(summary?.activeLoans ?? 0) === 1 ? "" : "s"}
-              </Text>
+          <>
+            <Pressable onPress={() => goToActivity("loans")}>
+              <Card>
+                <Text style={{ fontFamily: fontFamily.bodyBold, fontSize: type.body, color: colors.navy }}>
+                  {(summary?.activeLoans ?? 0) === 1
+                    ? "1 active loan"
+                    : `${summary?.activeLoans ?? 0} active loans`}
+                </Text>
+                {summary?.nextDueLabel ? (
+                  <Text
+                    style={{
+                      marginTop: 6,
+                      fontFamily: fontFamily.bodySemiBold,
+                      fontSize: type.small,
+                      color: summary.nextDueOverdue ? colors.danger : colors.muted,
+                    }}
+                  >
+                    {summary.nextDueLabel}
+                  </Text>
+                ) : (
+                  <Text style={{ marginTop: 6, fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
+                    Nothing on loan. Scan a copy to borrow.
+                  </Text>
+                )}
+              </Card>
             </Pressable>
-            {(summary?.overdueLoans ?? 0) > 0 ? (
-              <Pressable onPress={goToActivity}>
-                <Text
-                  style={{
-                    fontFamily: fontFamily.bodySemiBold,
-                    fontSize: type.body,
-                    color: colors.danger,
-                  }}
-                >
-                  {summary?.overdueLoans} overdue — return soon
-                </Text>
+
+            {(summary?.overdueLoans ?? 0) > 0 || (summary?.outstandingFines ?? 0) > 0 ? (
+              <Pressable onPress={() => goToActivity("loans")}>
+                <Card style={{ borderWidth: 1, borderColor: colors.danger }}>
+                  <Text style={{ fontFamily: fontFamily.bodyBold, fontSize: type.body, color: colors.danger }}>
+                    {(summary?.overdueLoans ?? 0) > 0
+                      ? `${summary?.overdueLoans} overdue ${summary?.overdueLoans === 1 ? "loan" : "loans"}`
+                      : "Unpaid fines"}
+                  </Text>
+                  {(summary?.outstandingFines ?? 0) > 0 ? (
+                    <Text style={{ marginTop: 6, fontFamily: fontFamily.body, fontSize: type.small, color: colors.text }}>
+                      Outstanding fines: Rs {summary?.outstandingFines}
+                    </Text>
+                  ) : (
+                    <Text style={{ marginTop: 6, fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
+                      Return soon to avoid extra charges.
+                    </Text>
+                  )}
+                </Card>
               </Pressable>
             ) : null}
+
             {(summary?.readyReservations ?? 0) > 0 ? (
-              <Pressable onPress={goToActivity}>
-                <Text
-                  style={{
-                    fontFamily: fontFamily.bodySemiBold,
-                    fontSize: type.body,
-                    color: colors.amberDark,
-                  }}
-                >
-                  {summary?.readyReservations} reservation ready for pickup
-                </Text>
+              <Pressable onPress={() => goToActivity("reservations")}>
+                <Card style={{ borderWidth: 1, borderColor: colors.amber }}>
+                  <Text style={{ fontFamily: fontFamily.bodyBold, fontSize: type.body, color: colors.navy }}>
+                    Ready for pickup
+                  </Text>
+                  <Text style={{ marginTop: 6, fontFamily: fontFamily.body, fontSize: type.small, color: colors.text }}>
+                    {summary?.readyTitle
+                      ? `"${summary.readyTitle}" is waiting at the desk.`
+                      : `${summary?.readyReservations} reservation ready. Scan the copy to claim it.`}
+                  </Text>
+                </Card>
               </Pressable>
             ) : null}
-            {(summary?.outstandingFines ?? 0) > 0 ? (
-              <Text style={{ fontFamily: fontFamily.body, fontSize: type.body, color: colors.text }}>
-                Outstanding fines: Rs {summary?.outstandingFines}
-              </Text>
-            ) : null}
-            {!summary?.overdueLoans &&
-            !summary?.readyReservations &&
-            !(summary?.outstandingFines ?? 0) &&
-            !(summary?.activeLoans ?? 0) ? (
-              <Text style={{ fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
-                All clear. Browse the catalog or scan a book to get started.
-              </Text>
-            ) : null}
-          </View>
+          </>
         )}
-      </Card>
+      </View>
 
       <Card style={{ marginBottom: space.md }}>
         <Text
@@ -304,13 +338,10 @@ export default function HomeScreen({ navigation }: Props) {
         </Text>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
           {[
-            { label: "Scan", icon: "qr-code-outline" as const, onPress: goToScan },
+            { label: "Scan QR", icon: "qr-code-outline" as const, onPress: goToScan },
             { label: "Catalog", icon: "library-outline" as const, onPress: goToCatalog },
-            {
-              label: "Search",
-              icon: "search-outline" as const,
-              onPress: () => openUnifiedSearch(quickSearch),
-            },
+            { label: "E-books", icon: "tablet-portrait-outline" as const, onPress: goToEbooks },
+            { label: "Bookshelf", icon: "bookmarks-outline" as const, onPress: goToBookshelf },
           ].map((action) => (
             <Pressable
               key={action.label}
@@ -385,7 +416,12 @@ export default function HomeScreen({ navigation }: Props) {
                   borderRadius: radius.md,
                 }}
               >
-                <BookCover width={116} height={72} style={{ alignSelf: "center" }} />
+                <BookCover
+                  uri={item.thumbnailUrl}
+                  width={116}
+                  height={72}
+                  style={{ alignSelf: "center" }}
+                />
                 <Text
                   numberOfLines={2}
                   style={{

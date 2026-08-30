@@ -7,11 +7,11 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Button } from "./ui/Button";
+import { AppModal } from "./AppModal";
 import { exportCopyQrLabelPdf, formatAuthors, qrImageUrl } from "../utils/qrLabelPdf";
 import { useTheme } from "../theme";
 
@@ -36,6 +36,7 @@ export function CopyQrModal({
 }: Props) {
   const { colors, fontFamily, space, type, radius } = useTheme();
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   const authorLine = formatAuthors(authors);
 
   const savePdf = async () => {
@@ -43,7 +44,7 @@ export function CopyQrModal({
     try {
       await exportCopyQrLabelPdf({ title, authors, isbn, copyLabel, qrPayload });
     } catch (error: any) {
-      Alert.alert("Export failed", error.message || "Could not create PDF");
+      setExportError(error.message || "Could not create PDF");
     } finally {
       setExporting(false);
     }
@@ -56,6 +57,7 @@ export function CopyQrModal({
   };
 
   return (
+    <>
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onBackdropPress} />
@@ -149,6 +151,15 @@ export function CopyQrModal({
         </View>
       </View>
     </Modal>
+    <AppModal
+      visible={!!exportError}
+      variant="error"
+      title="Export failed"
+      message={exportError}
+      confirmLabel="OK"
+      onClose={() => setExportError("")}
+    />
+    </>
   );
 }
 

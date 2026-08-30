@@ -8,6 +8,9 @@ export type DashboardSnapshot = {
   overdueLoans: number;
   readyReservations: number;
   outstandingFines: number;
+  nextDueLabel?: string;
+  nextDueOverdue?: boolean;
+  readyTitle?: string;
   continueReading: Array<{
     digitalBookId: string;
     title: string;
@@ -15,6 +18,7 @@ export type DashboardSnapshot = {
     progress: number;
     lastPage?: number;
     totalPages?: number;
+    thumbnailUrl?: string;
   }>;
   fetchedAt: number;
 };

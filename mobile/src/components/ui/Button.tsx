@@ -53,7 +53,9 @@ export function Button({
     primary: isDark
       ? { bg: colors.amber, text: "#1A2834", glow: colors.amber }
       : { bg: colors.navy, text: "#FFFFFF", glow: colors.navy },
-    secondary: { bg: colors.white, text: colors.navy, border: colors.border, glow: colors.navy },
+    secondary: isDark
+      ? { bg: colors.creamDark, text: colors.navy, border: colors.navyDark, glow: colors.navy }
+      : { bg: colors.white, text: colors.navy, border: colors.border, glow: colors.navy },
     ghost: { bg: "transparent", text: colors.navy },
     ghostOutline: isDark
       ? { bg: "transparent", text: colors.muted, border: colors.border, glow: colors.amber }

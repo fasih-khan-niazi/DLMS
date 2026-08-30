@@ -77,8 +77,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   if (!loaded || !ready) {
     return (
-      <View style={[styles.boot, { backgroundColor: lightTheme.colors.cream }]}>
-        <ActivityIndicator size="large" color={lightTheme.colors.navy} />
+      <View style={[styles.boot, { backgroundColor: "#2E4A62" }]}>
+        <ActivityIndicator size="large" color="#E8A838" />
       </View>
     );
   }

@@ -84,7 +84,7 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
     setFeedback({
       variant: "success",
       title: "Reservation cancelled",
-      message: "You left the waiting queue for this title.",
+      message: "The hold is released. If someone else is waiting, they get the copy next.",
     });
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
@@ -114,6 +114,7 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
         }}
       >
         When status is Ready, scan that copy&apos;s QR (Borrow mode) within the hold window.
+        You can cancel a ready hold if you no longer need the book.
       </Text>
 
       {loading ? (
@@ -212,7 +213,7 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
                   Created {formatShortDate(item.createdAt)}
                 </Text>
 
-                {item.status === "waiting" && (
+                {(item.status === "waiting" || item.status === "ready") && (
                   <Button
                     title="Cancel reservation"
                     variant="dangerSoft"
@@ -231,7 +232,7 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
         variant="danger"
         presentation="sheet"
         title="Cancel reservation?"
-        message="You will leave the waiting queue for this title. You can reserve again later if it is still unavailable."
+        message="You will leave this title. If a copy is held for you, it goes to the next person in the queue or back on the shelf."
         confirmLabel="Yes, cancel"
         confirmVariant="dangerSoft"
         cancelLabel="Keep reservation"
