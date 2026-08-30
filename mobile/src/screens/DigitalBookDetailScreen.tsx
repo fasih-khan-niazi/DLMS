@@ -222,6 +222,7 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
     try {
       const res = await api.post(`/api/digital-books/${digitalBookId}/bookshelf`);
       setShelf(res.data);
+      setModal({ visible: false, message: "" });
       setAddedModalOpen(true);
       invalidateDigitalCache();
     } catch (error: any) {
@@ -237,10 +238,12 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
 
   const removeFromBookshelf = async () => {
     setRemoveConfirmOpen(false);
+    setModal({ visible: false, message: "" });
     setBusy(true);
     try {
       await api.delete(`/api/digital-books/${digitalBookId}/bookshelf`);
       setShelf(null);
+      invalidateDigitalCache();
     } catch (error: any) {
       setModal({
         visible: true,
@@ -253,6 +256,7 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
 
   const submitReview = async () => {
     setConfirmReviewOpen(false);
+    setModal({ visible: false, message: "" });
     setBusy(true);
     try {
       await api.put(`/api/digital-books/${digitalBookId}/reviews`, {
@@ -261,6 +265,7 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
         comment: draftComment.trim(),
       });
       setReviewLocked(true);
+      setModal({ visible: false, message: "" });
       setReviewSuccessOpen(true);
       await load({ silent: true });
     } catch (error: any) {

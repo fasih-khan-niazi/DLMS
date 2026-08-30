@@ -127,6 +127,7 @@ router.get("/users", requireRole("admin"), async (req: AuthRequest, res: Respons
 // Read system config (admin-only)
 router.get("/config", requireRole("admin"), async (_req: AuthRequest, res: Response) => {
   try {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate");
     const config = await getSystemConfig();
     res.json({ config });
   } catch (error) {
@@ -138,6 +139,7 @@ router.get("/config", requireRole("admin"), async (_req: AuthRequest, res: Respo
 // Merge-update system config (admin-only)
 router.put("/config", requireRole("admin"), async (req: AuthRequest, res: Response) => {
   try {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate");
     const body = req.body || {};
     const updates: Record<string, unknown> = {};
 

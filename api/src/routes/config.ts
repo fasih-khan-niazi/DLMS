@@ -13,6 +13,7 @@ function clampCatalogPageSize(value: unknown): number {
 /** Mobile-readable app settings (authenticated users). */
 router.get("/app", authenticate, async (_req: AuthRequest, res: Response) => {
   try {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate");
     const config = await getSystemConfig();
     const maxPdfSizeMb = Number(config.maxPdfSizeMb);
     res.json({

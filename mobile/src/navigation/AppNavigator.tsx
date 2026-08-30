@@ -159,11 +159,11 @@ function ProfileStackNavigator() {
 
 function MainTabs() {
   return (
-    <OnboardingProvider>
-      <ProfileProvider>
+    <ProfileProvider>
+      <OnboardingProvider>
         <MainTabNavigator />
-      </ProfileProvider>
-    </OnboardingProvider>
+      </OnboardingProvider>
+    </ProfileProvider>
   );
 }
 

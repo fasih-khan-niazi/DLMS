@@ -29,11 +29,16 @@ export function AuthLayout({
   footer,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const { colors, fontFamily, type, space, radius } = useTheme();
+  const { colors, fontFamily, type, space, radius, mode } = useTheme();
+  const isDark = mode === "dark";
+  const heroBg = isDark ? colors.creamDark : "#2E4A62";
+  const cardBg = isDark ? colors.cream : colors.cream;
+  const cardTitleColor = isDark ? colors.navy : "#2E4A62";
+  const heroTextColor = isDark ? "rgba(255, 255, 255, 0.78)" : colors.heroText;
 
   return (
     <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: colors.navy }]}
+      style={[styles.root, { backgroundColor: heroBg }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
     >
@@ -54,7 +59,7 @@ export function AuthLayout({
             style={{
               fontFamily: fontFamily.display,
               fontSize: type.brand,
-              color: colors.white,
+              color: "#FFFFFF",
               letterSpacing: 0.5,
             }}
           >
@@ -74,7 +79,7 @@ export function AuthLayout({
               marginTop: space.md,
               fontFamily: fontFamily.body,
               fontSize: type.subtitle,
-              color: colors.heroText,
+              color: heroTextColor,
               lineHeight: 22,
             }}
           >
@@ -84,16 +89,16 @@ export function AuthLayout({
 
         <Card
           style={{
-            backgroundColor: colors.cream,
+            backgroundColor: cardBg,
             borderRadius: radius.lg,
-            borderColor: "rgba(255,255,255,0.12)",
+            borderColor: isDark ? colors.border : "rgba(255,255,255,0.12)",
           }}
         >
           <Text
             style={{
               fontFamily: fontFamily.display,
               fontSize: type.titleSm,
-              color: colors.navy,
+              color: cardTitleColor,
             }}
           >
             {panelTitle}
@@ -133,14 +138,15 @@ export function AuthLink({
   /** Use on navy auth background (footer links). */
   onDark?: boolean;
 }) {
-  const { colors, fontFamily, type, space } = useTheme();
+  const { colors, fontFamily, type, space, mode } = useTheme();
+  const isDark = mode === "dark";
 
   return (
     <Pressable onPress={onPress} hitSlop={8} style={{ marginTop: space.md }}>
       <Text
         style={{
           textAlign: "center",
-          color: onDark ? "#F8F7F4" : colors.navy,
+          color: onDark ? (isDark ? colors.navy : "#F8F7F4") : colors.navy,
           fontFamily: fontFamily.bodySemiBold,
           fontSize: type.small,
         }}

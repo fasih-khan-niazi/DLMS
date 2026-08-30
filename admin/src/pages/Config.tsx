@@ -56,9 +56,17 @@ export function ConfigPage() {
           setLoading(false);
         }
 
-        const { data } = await api.get<{ config: SystemConfig }>("/api/admin/config");
+        const { data } = await api.get<{ config: SystemConfig }>("/api/admin/config", {
+          headers: { "Cache-Control": "no-cache" },
+          params: { _t: Date.now() },
+        });
         if (cancelled) return;
-        const cfg = { ...defaults, ...data.config };
+        const cfg: SystemConfig = {
+          ...defaults,
+          ...data.config,
+          allowInAppCopyBorrow: data.config?.allowInAppCopyBorrow === true,
+          librariansCanBorrow: data.config?.librariansCanBorrow !== false,
+        };
         setForm(cfg);
         sessionStorage.setItem("dlms.admin.config", JSON.stringify(cfg));
         const reminders = Array.isArray(cfg.reminderDaysBefore)
@@ -113,7 +121,12 @@ export function ConfigPage() {
       };
 
       const { data } = await api.put<{ config: SystemConfig }>("/api/admin/config", payload);
-      const cfg = { ...defaults, ...data.config };
+      const cfg: SystemConfig = {
+        ...defaults,
+        ...data.config,
+        allowInAppCopyBorrow: data.config?.allowInAppCopyBorrow === true,
+        librariansCanBorrow: data.config?.librariansCanBorrow !== false,
+      };
       setForm(cfg);
       sessionStorage.setItem("dlms.admin.config", JSON.stringify(cfg));
       setMessage("Configuration saved successfully.");

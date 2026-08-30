@@ -55,15 +55,16 @@ export async function getAppConfig(force = false): Promise<{
   allowInAppCopyBorrow: boolean;
   librariansCanBorrow: boolean;
 }> {
-  await hydrateAppConfig();
-
-  if (!force && memory && Date.now() - memory.fetchedAt < TTL_MS) {
-    return {
-      catalogPageSize: memory.catalogPageSize,
-      maxPdfSizeMb: memory.maxPdfSizeMb,
-      allowInAppCopyBorrow: memory.allowInAppCopyBorrow,
-      librariansCanBorrow: memory.librariansCanBorrow,
-    };
+  if (!force) {
+    await hydrateAppConfig();
+    if (memory && Date.now() - memory.fetchedAt < TTL_MS) {
+      return {
+        catalogPageSize: memory.catalogPageSize,
+        maxPdfSizeMb: memory.maxPdfSizeMb,
+        allowInAppCopyBorrow: memory.allowInAppCopyBorrow,
+        librariansCanBorrow: memory.librariansCanBorrow,
+      };
+    }
   }
 
   try {
@@ -72,7 +73,10 @@ export async function getAppConfig(force = false): Promise<{
       maxPdfSizeMb?: number;
       allowInAppCopyBorrow?: boolean;
       librariansCanBorrow?: boolean;
-    }>("/api/config/app");
+    }>("/api/config/app", {
+      headers: { "Cache-Control": "no-cache" },
+      params: { _t: Date.now() },
+    });
     const catalogPageSize = Number(response.data.catalogPageSize) || FALLBACK_PAGE_SIZE;
     const maxPdfSizeMb = Number(response.data.maxPdfSizeMb) || FALLBACK_MAX_PDF_MB;
     const allowInAppCopyBorrow = response.data.allowInAppCopyBorrow === true;
@@ -137,4 +141,5 @@ export function peekLibrariansCanBorrow(): boolean | null {
 export function invalidateAppConfigCache(): void {
   memory = null;
   hydratePromise = null;
+  void AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
 }

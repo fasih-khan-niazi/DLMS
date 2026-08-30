@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, StyleSheet, View, type ViewStyle } from "react-native";
-import { colors, radius } from "../theme";
+import { useTheme } from "../theme";
 
 type Props = {
   height?: number;
@@ -13,20 +13,22 @@ export function Skeleton({
   height = 16,
   width = "100%",
   style,
-  borderRadius = radius.md,
+  borderRadius,
 }: Props) {
+  const { colors, radius, mode } = useTheme();
   const opacity = useRef(new Animated.Value(0.35)).current;
+  const isDark = mode === "dark";
 
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, {
-          toValue: 0.85,
+          toValue: isDark ? 0.75 : 0.85,
           duration: 700,
           useNativeDriver: true,
         }),
         Animated.timing(opacity, {
-          toValue: 0.35,
+          toValue: isDark ? 0.3 : 0.35,
           duration: 700,
           useNativeDriver: true,
         }),
@@ -34,13 +36,18 @@ export function Skeleton({
     );
     loop.start();
     return () => loop.stop();
-  }, [opacity]);
+  }, [opacity, isDark]);
 
   return (
     <Animated.View
       style={[
-        styles.base,
-        { height, width, borderRadius, opacity },
+        {
+          backgroundColor: isDark ? colors.border : colors.creamDark,
+          height,
+          width,
+          borderRadius: borderRadius ?? radius.md,
+          opacity,
+        },
         style,
       ]}
     />
@@ -48,10 +55,21 @@ export function Skeleton({
 }
 
 export function SkeletonList({ rows = 5 }: { rows?: number }) {
+  const { colors, radius } = useTheme();
   return (
     <View style={styles.list}>
       {Array.from({ length: rows }).map((_, i) => (
-        <View key={i} style={styles.row}>
+        <View
+          key={i}
+          style={[
+            styles.row,
+            {
+              backgroundColor: colors.white,
+              borderColor: colors.border,
+              borderRadius: radius.lg,
+            },
+          ]}
+        >
           <Skeleton height={18} width="72%" />
           <Skeleton height={12} width="48%" style={{ marginTop: 10 }} />
           <Skeleton height={12} width="36%" style={{ marginTop: 8 }} />
@@ -63,6 +81,7 @@ export function SkeletonList({ rows = 5 }: { rows?: number }) {
 
 /** Matches physical / digital book detail layout while loading. */
 export function BookDetailSkeleton() {
+  const { colors, radius } = useTheme();
   return (
     <View style={styles.bookDetail}>
       <Skeleton height={28} width={40} borderRadius={20} style={{ marginBottom: 16 }} />
@@ -74,11 +93,31 @@ export function BookDetailSkeleton() {
       <Skeleton height={12} width="28%" style={{ alignSelf: "center", marginTop: 8 }} />
       <Skeleton height={52} width="100%" style={{ marginTop: 20 }} />
       <Skeleton height={52} width="100%" style={{ marginTop: 10 }} />
-      <View style={[styles.row, { marginTop: 20 }]}>
+      <View
+        style={[
+          styles.row,
+          {
+            backgroundColor: colors.white,
+            borderColor: colors.border,
+            borderRadius: radius.lg,
+            marginTop: 20,
+          },
+        ]}
+      >
         <Skeleton height={14} width="30%" />
         <Skeleton height={72} width="100%" style={{ marginTop: 12 }} />
       </View>
-      <View style={[styles.row, { marginTop: 12 }]}>
+      <View
+        style={[
+          styles.row,
+          {
+            backgroundColor: colors.white,
+            borderColor: colors.border,
+            borderRadius: radius.lg,
+            marginTop: 12,
+          },
+        ]}
+      >
         <Skeleton height={14} width="40%" />
         <Skeleton height={96} width="100%" style={{ marginTop: 12 }} />
       </View>
@@ -87,19 +126,13 @@ export function BookDetailSkeleton() {
 }
 
 const styles = StyleSheet.create({
-  base: {
-    backgroundColor: colors.creamDark,
-  },
   list: {
     gap: 12,
     marginTop: 8,
   },
   row: {
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
     padding: 16,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   bookDetail: {
     flex: 1,
