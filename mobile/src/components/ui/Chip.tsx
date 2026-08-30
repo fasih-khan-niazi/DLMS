@@ -1,6 +1,6 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, type ViewStyle } from "react-native";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "../../utils/haptics";
 import { useTheme } from "../../theme";
 
 type Props = {

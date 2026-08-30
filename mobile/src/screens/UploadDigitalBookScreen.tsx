@@ -7,7 +7,7 @@ import {
   Platform,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "../utils/haptics";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { API_BASE_URL } from "../config/api";
 import { firebaseAuth } from "../config/firebase";

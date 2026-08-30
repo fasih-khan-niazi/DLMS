@@ -72,7 +72,7 @@ function greetingInKarachi(now = new Date()): string {
 
 export default function HomeScreen({ navigation }: Props) {
   const { colors, fontFamily, radius, space, type, mode } = useTheme();
-  const { profile, refresh: refreshProfile, isStaff } = useProfile();
+  const { profile, refresh: refreshProfile } = useProfile();
   const [unread, setUnread] = useState(0);
   const [quickSearch, setQuickSearch] = useState("");
   const [summary, setSummary] = useState<DashboardSnapshot | null>(null);
@@ -415,9 +415,6 @@ export default function HomeScreen({ navigation }: Props) {
             { label: "Catalog", icon: "library-outline" as const, onPress: goToCatalog },
             { label: "E-books", icon: "tablet-portrait-outline" as const, onPress: goToEbooks },
             { label: "Bookshelf", icon: "bookmarks-outline" as const, onPress: goToBookshelf },
-            ...(isStaff
-              ? [{ label: "Add book", icon: "add-circle-outline" as const, onPress: () => navigation.getParent()?.navigate("Profile", { screen: "AddBook" }) }]
-              : []),
           ].map((action) => (
             <PressableScale
               key={action.label}

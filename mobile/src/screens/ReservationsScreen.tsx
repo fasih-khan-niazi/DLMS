@@ -6,7 +6,7 @@ import {
   StyleSheet,
   RefreshControl,
 } from "react-native";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "../utils/haptics";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
@@ -62,7 +62,7 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
   );
 
   const confirmCancel = async () => {
-    if (!cancelId) return;
+    if (!cancelId || cancelling) return;
     setCancelling(true);
 
     try {
@@ -236,11 +236,16 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
         confirmLabel="Yes, cancel"
         confirmVariant="dangerSoft"
         cancelLabel="Keep reservation"
-        onClose={() => setCancelId(null)}
-        onConfirm={() => {
-          if (!cancelling) void confirmCancel();
+        confirmLoading={cancelling}
+        onClose={() => {
+          if (!cancelling) setCancelId(null);
         }}
-        onCancel={() => setCancelId(null)}
+        onConfirm={() => {
+          void confirmCancel();
+        }}
+        onCancel={() => {
+          if (!cancelling) setCancelId(null);
+        }}
       />
 
       <AppModal

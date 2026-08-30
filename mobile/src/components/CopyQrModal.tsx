@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "../utils/haptics";
 import { Button } from "./ui/Button";
 import { AppModal } from "./AppModal";
 import { exportCopyQrLabelPdf, formatAuthors, qrImageUrl } from "../utils/qrLabelPdf";

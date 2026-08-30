@@ -19,7 +19,7 @@ import {
   invalidateAppConfigCache,
   peekLibrariansCanBorrow,
 } from "../utils/appConfig";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "../utils/haptics";
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";

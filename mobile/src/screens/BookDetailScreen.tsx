@@ -6,7 +6,7 @@ import {
   RefreshControl,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "../utils/haptics";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
@@ -16,6 +16,7 @@ import { firebaseAuth } from "../config/firebase";
 import { useProfile } from "../context/ProfileContext";
 import { CopyQrModal } from "../components/CopyQrModal";
 import { AppModal } from "../components/AppModal";
+import { BookReviewSection, type ReviewItem, type ReviewSummary } from "../components/BookReviewSection";
 import { BookCover, Badge, Button, Card, BackButton, Input, PressableScale } from "../components/ui";
 import { BookDetailSkeleton } from "../components/Skeleton";
 import { formatIsbn } from "../utils/isbn";
@@ -82,6 +83,15 @@ export default function BookDetailScreen({ navigation, route }: Props) {
     title: string;
     message: string;
   } | null>(null);
+  const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [draftRating, setDraftRating] = useState<number | null>(null);
+  const [draftRecommend, setDraftRecommend] = useState<number | null>(null);
+  const [reviewLocked, setReviewLocked] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [confirmReviewOpen, setConfirmReviewOpen] = useState(false);
+  const [reviewSuccessOpen, setReviewSuccessOpen] = useState(false);
   const [staffModal, setStaffModal] = useState<{
     variant: "success" | "error" | "info" | "danger";
     title: string;
@@ -96,9 +106,10 @@ export default function BookDetailScreen({ navigation, route }: Props) {
       setLoading(true);
     }
     try {
-      const [bookRes, loansRes] = await Promise.all([
+      const [bookRes, loansRes, reviewsRes] = await Promise.all([
         api.get(`/api/catalog/books/${isbn}`),
         api.get("/api/loans/mine", { params: { status: "active" } }),
+        api.get(`/api/catalog/books/${isbn}/reviews`).catch(() => ({ data: {} })),
       ]);
       setBook(bookRes.data);
       setCoverUrlDraft(bookRes.data.thumbnailUrl || "");
@@ -110,6 +121,22 @@ export default function BookDetailScreen({ navigation, route }: Props) {
       setEditPageCount(
         bookRes.data.pageCount != null ? String(bookRes.data.pageCount) : ""
       );
+
+      setReviewSummary(reviewsRes.data.summary || null);
+      setReviewItems(reviewsRes.data.items || []);
+      const myReview = reviewsRes.data.mine;
+      setReviewLocked(!!myReview?.confirmed);
+      if (myReview) {
+        setDraftRating(Number(myReview.rating) || null);
+        setDraftRecommend(
+          myReview.recommendScore === null || myReview.recommendScore === undefined
+            ? null
+            : Number(myReview.recommendScore)
+        );
+      } else {
+        setDraftRating(null);
+        setDraftRecommend(null);
+      }
 
       const mine = new Set<string>();
       (loansRes.data.loans || []).forEach((loan: any) => {
@@ -979,6 +1006,31 @@ export default function BookDetailScreen({ navigation, route }: Props) {
             })
           )}
         </>
+
+        <BookReviewSection
+          locked={reviewLocked}
+          busy={reviewBusy}
+          draftRating={draftRating}
+          draftRecommend={draftRecommend}
+          onRating={setDraftRating}
+          onRecommend={setDraftRecommend}
+          onSave={() => {
+            if (!draftRating) {
+              setReserveFeedback({
+                variant: "info",
+                title: "Pick a rating",
+                message: "Tap a star from 1 to 5 first.",
+              });
+              return;
+            }
+            if (reviewLocked) return;
+            setConfirmReviewOpen(true);
+          }}
+          summary={reviewSummary}
+          items={reviewItems}
+          reviewsOpen={reviewsOpen}
+          onToggleReviews={() => setReviewsOpen((v) => !v)}
+        />
       </ScrollView>
 
       {qrModal ? (
@@ -1032,6 +1084,47 @@ export default function BookDetailScreen({ navigation, route }: Props) {
         onCancel={staffModal?.onConfirm ? () => setStaffModal(null) : undefined}
       />
 
+      <AppModal
+        visible={confirmReviewOpen}
+        variant="info"
+        title="Submit your review?"
+        message="Your rating and recommendation will be shared with other students. You cannot edit it later. Copies of this title share one review."
+        confirmLabel="Submit review"
+        cancelLabel="Go back"
+        onClose={() => setConfirmReviewOpen(false)}
+        onConfirm={() => {
+          void (async () => {
+            setConfirmReviewOpen(false);
+            setReviewBusy(true);
+            try {
+              await api.put(`/api/catalog/books/${isbn}/reviews`, {
+                rating: draftRating,
+                recommendScore: draftRecommend,
+              });
+              setReviewLocked(true);
+              setReviewSuccessOpen(true);
+              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+              void load({ silent: true });
+            } catch (error: any) {
+              setReserveFeedback({
+                variant: "error",
+                title: "Could not save review",
+                message: extractApiError(error, "Try again in a moment."),
+              });
+            } finally {
+              setReviewBusy(false);
+            }
+          })();
+        }}
+        onCancel={() => setConfirmReviewOpen(false)}
+      />
+      <AppModal
+        visible={reviewSuccessOpen}
+        variant="success"
+        title="Review submitted"
+        message="Thank you. Your review is now visible to other students."
+        onClose={() => setReviewSuccessOpen(false)}
+      />
       <AppModal
         visible={!!reserveFeedback}
         variant={reserveFeedback?.variant || "info"}

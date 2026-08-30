@@ -1,12 +1,14 @@
 import React, { type ReactNode } from "react";
 import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from "react-native";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "../../utils/haptics";
 import { useTheme } from "../../theme";
 
 type Props = PressableProps & {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
-  haptic?: "light" | "selection";
+  haptic?: "light" | "selection" | "none";
+  /** Opacity dip only — no glow, no haptic. Use on dense menu rows. */
+  quiet?: boolean;
 };
 
 /** Shared tap: light haptic, slight scale, theme-aware glow. Use on cards and chips. */
@@ -16,18 +18,20 @@ export function PressableScale({
   disabled,
   onPressIn,
   haptic = "light",
+  quiet = false,
   ...rest
 }: Props) {
   const { colors } = useTheme();
+  const hapticKind = quiet ? "none" : haptic;
 
   return (
     <Pressable
       disabled={disabled}
       onPressIn={(event) => {
         if (!disabled) {
-          if (haptic === "selection") {
+          if (hapticKind === "selection") {
             void Haptics.selectionAsync().catch(() => {});
-          } else {
+          } else if (hapticKind === "light") {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
           }
         }
@@ -37,13 +41,13 @@ export function PressableScale({
         const active = pressed && !disabled;
         return [
           {
-            opacity: disabled ? 0.65 : active ? 0.9 : 1,
-            transform: [{ scale: active ? 0.98 : 1 }],
+            opacity: disabled ? 0.65 : active ? (quiet ? 0.55 : 0.9) : 1,
+            transform: [{ scale: active && !quiet ? 0.98 : 1 }],
             shadowColor: colors.navy,
-            shadowOpacity: active ? 0.18 : 0,
-            shadowRadius: active ? 8 : 0,
+            shadowOpacity: quiet || !active ? 0 : 0.18,
+            shadowRadius: quiet || !active ? 0 : 8,
             shadowOffset: { width: 0, height: 0 },
-            elevation: active ? 3 : 0,
+            elevation: quiet || !active ? 0 : 3,
           },
           style,
         ];

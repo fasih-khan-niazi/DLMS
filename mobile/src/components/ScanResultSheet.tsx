@@ -1,7 +1,7 @@
 import React from "react";
 import { Modal, View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "../utils/haptics";
 import { Button } from "./ui/Button";
 import { useTheme } from "../theme";
 import { formatShortDate } from "../utils/loanDates";

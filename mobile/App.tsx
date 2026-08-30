@@ -5,6 +5,7 @@ import AppNavigator from "./src/navigation/AppNavigator";
 import { ThemeProvider, useTheme } from "./src/theme";
 import { ToastProvider } from "./src/components/AppToast";
 import { getAppConfig, hydrateAppConfig } from "./src/utils/appConfig";
+import { loadHapticsPreference } from "./src/utils/haptics";
 
 function StatusBarSync() {
   const { mode } = useTheme();
@@ -14,6 +15,7 @@ function StatusBarSync() {
 function Root() {
   React.useEffect(() => {
     void hydrateAppConfig().then(() => getAppConfig());
+    void loadHapticsPreference();
   }, []);
 
   return (

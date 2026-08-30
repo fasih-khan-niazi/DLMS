@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from "react";
-import { Text, Pressable, Switch, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { Text, Switch, View } from "react-native";
 import { signOut } from "firebase/auth";
 import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,6 +12,7 @@ import { useOnboarding } from "../context/OnboardingContext";
 import { AppModal } from "../components/AppModal";
 import { Button, Card, Screen, PressableScale } from "../components/ui";
 import { useTheme } from "../theme";
+import { getHapticsEnabled, setHapticsEnabled, subscribeHaptics } from "../utils/haptics";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -57,6 +58,7 @@ function MenuRow({
 
   return (
     <PressableScale
+      quiet
       onPress={onPress}
       style={{
         flexDirection: "row",
@@ -152,6 +154,7 @@ export default function ProfileScreen({ navigation }: Props) {
   const [unread, setUnread] = useState(0);
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [hapticsOn, setHapticsOn] = useState(getHapticsEnabled);
 
   const reload = useCallback(async () => {
     try {
@@ -168,6 +171,8 @@ export default function ProfileScreen({ navigation }: Props) {
       void reload();
     }, [reload])
   );
+
+  useEffect(() => subscribeHaptics(setHapticsOn), []);
 
   const onPullRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -287,6 +292,46 @@ export default function ProfileScreen({ navigation }: Props) {
             onValueChange={(on) => setMode(on ? "dark" : "light")}
             trackColor={{ false: colors.border, true: colors.amber }}
             thumbColor={mode === "dark" ? "#F8F7F4" : "#FFFFFF"}
+          />
+        </View>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+          }}
+        >
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <Text
+              style={{
+                fontFamily: fontFamily.bodySemiBold,
+                fontSize: type.body,
+                color: colors.navy,
+              }}
+            >
+              Haptics
+            </Text>
+            <Text
+              style={{
+                marginTop: 2,
+                fontFamily: fontFamily.body,
+                fontSize: type.caption,
+                color: colors.muted,
+              }}
+            >
+              Vibration when you tap buttons and cards
+            </Text>
+          </View>
+          <Switch
+            value={hapticsOn}
+            onValueChange={(on) => {
+              void setHapticsEnabled(on);
+            }}
+            trackColor={{ false: colors.border, true: colors.amber }}
+            thumbColor={hapticsOn ? "#F8F7F4" : "#FFFFFF"}
           />
         </View>
         <MenuRow

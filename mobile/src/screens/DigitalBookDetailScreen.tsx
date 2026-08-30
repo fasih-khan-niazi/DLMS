@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+﻿import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -6,16 +6,18 @@ import {
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "../utils/haptics";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import api from "../config/api";
 import { AppModal } from "../components/AppModal";
-import { BookCover, Button, Card, BackButton, PressableScale } from "../components/ui";
+import { BookReviewSection, type ReviewItem, type ReviewSummary } from "../components/BookReviewSection";
+import { BookCover, Button, Card, BackButton, Input, PressableScale } from "../components/ui";
 import { BookDetailSkeleton } from "../components/Skeleton";
 import { invalidateDigitalCache } from "../utils/digitalCache";
 import { extractApiError, runSideEffect } from "../utils/apiError";
+import { useProfile } from "../context/ProfileContext";
 import { useTheme } from "../theme";
 
 const safeInvalidateDigitalCache = () => runSideEffect(invalidateDigitalCache);
@@ -25,124 +27,9 @@ type Props = {
   route: RouteProp<{ params: { digitalBookId: string } }, "params">;
 };
 
-type ReviewSummary = {
-  count: number;
-  averageRating: number | null;
-  recommendPercent: number | null;
-  recommendLabel?: string | null;
-};
-
-type ReviewItem = {
-  reviewId: string;
-  displayName: string;
-  rating: number;
-  recommendScore: number | null;
-  comment: string;
-  updatedAt?: string;
-  isMine?: boolean;
-};
-
-function formatReviewDate(value: unknown): string {
-  if (!value) return "";
-  if (typeof value === "object" && value !== null && "_seconds" in value) {
-    return new Date((value as { _seconds: number })._seconds * 1000).toLocaleDateString();
-  }
-  if (typeof value === "string" || value instanceof Date) {
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString();
-  }
-  return "";
-}
-
-function StarRating({
-  value,
-  onSelect,
-  disabled,
-  size = 32,
-}: {
-  value: number | null;
-  onSelect: (rating: number) => void;
-  disabled?: boolean;
-  size?: number;
-}) {
-  const { colors, space } = useTheme();
-  return (
-    <View style={{ flexDirection: "row", gap: space.sm }}>
-      {[1, 2, 3, 4, 5].map((star) => (
-        <PressableScale
-          key={star}
-          onPress={() => onSelect(star)}
-          disabled={disabled}
-          hitSlop={8}
-          haptic="selection"
-        >
-          <Ionicons
-            name={(value || 0) >= star ? "star" : "star-outline"}
-            size={size}
-            color={(value || 0) >= star ? colors.amber : colors.muted}
-          />
-        </PressableScale>
-      ))}
-    </View>
-  );
-}
-
-function NpsPicker({
-  value,
-  onSelect,
-  disabled,
-}: {
-  value: number | null;
-  onSelect: (score: number) => void;
-  disabled?: boolean;
-}) {
-  const { colors, fontFamily, space, type, radius } = useTheme();
-
-  const renderRow = (scores: number[]) => (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", gap: space.xs }}>
-      {scores.map((score) => {
-        const selected = value === score;
-        return (
-          <PressableScale
-            key={score}
-            disabled={disabled}
-            haptic="selection"
-            onPress={() => onSelect(score)}
-            style={{
-              flex: 1,
-              paddingVertical: 10,
-              borderRadius: radius.sm,
-              borderWidth: 1,
-              borderColor: selected ? colors.navy : colors.border,
-              backgroundColor: selected ? colors.navy : colors.white,
-              alignItems: "center",
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: fontFamily.bodySemiBold,
-                fontSize: type.small,
-                color: selected ? colors.white : colors.navy,
-              }}
-            >
-              {score}
-            </Text>
-          </PressableScale>
-        );
-      })}
-    </View>
-  );
-
-  return (
-    <View style={{ gap: space.sm }}>
-      {renderRow([1, 2, 3, 4, 5])}
-      {renderRow([6, 7, 8, 9, 10])}
-    </View>
-  );
-}
-
 export default function DigitalBookDetailScreen({ navigation, route }: Props) {
   const { digitalBookId } = route.params;
+  const { isStaff } = useProfile();
   const { colors, fontFamily, space, type, radius } = useTheme();
 
   const [book, setBook] = useState<any>(null);
@@ -165,6 +52,13 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
     visible: false,
     message: "",
   });
+  const [manageOpen, setManageOpen] = useState(false);
+  const [editingBook, setEditingBook] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editAuthor, setEditAuthor] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [editSuccess, setEditSuccess] = useState(false);
 
   const load = async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -175,6 +69,9 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
         api.get(`/api/digital-books/${digitalBookId}/reviews`),
       ]);
       setBook(bookRes.data);
+      setEditTitle(bookRes.data.title || "");
+      setEditAuthor(bookRes.data.author || "");
+      setEditDescription(bookRes.data.description || "");
 
       const found = (shelfRes.data.items || []).find(
         (item: any) => item.digitalBookId === digitalBookId
@@ -301,6 +198,32 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
     void load({ silent: true });
   };
 
+  const saveDigitalDetails = async () => {
+    if (!editTitle.trim()) {
+      setModal({ visible: true, message: "Title is required." });
+      return;
+    }
+    setSavingDetails(true);
+    try {
+      const res = await api.patch(`/api/digital-books/${digitalBookId}`, {
+        title: editTitle.trim(),
+        author: editAuthor.trim(),
+        description: editDescription.trim(),
+      });
+      setBook(res.data.book || { ...book, title: editTitle.trim(), author: editAuthor.trim(), description: editDescription.trim() });
+      setEditingBook(false);
+      setEditSuccess(true);
+      safeInvalidateDigitalCache();
+    } catch (error: any) {
+      setModal({
+        visible: true,
+        message: extractApiError(error, "Could not save book details"),
+      });
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
   const requestReviewConfirm = () => {
     if (!draftRating) {
       setModal({ visible: true, message: "Pick a star rating first." });
@@ -382,7 +305,7 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
                 color: colors.muted,
               }}
             >
-              PDF · {Math.round(book.fileSizeBytes / 1024)} KB
+              PDF Â· {Math.round(book.fileSizeBytes / 1024)} KB
             </Text>
           ) : null}
         </View>
@@ -425,7 +348,7 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
             </Text>
             <Text style={{ fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
               {hasProgress
-                ? `Page ${shelf?.lastPage || "?"} · ${progress}% read`
+                ? `Page ${shelf?.lastPage || "?"} Â· ${progress}% read`
                 : "Saved to your bookshelf. Open the book to start reading."}
             </Text>
             <View
@@ -473,183 +396,87 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
           </Card>
         )}
 
-        {!reviewLocked ? (
-          <Card style={{ marginBottom: space.md }}>
-            <Text
-              style={{
-                fontFamily: fontFamily.bodyBold,
-                fontSize: type.body,
-                color: colors.navy,
-                marginBottom: space.xs,
-              }}
-            >
-              How would you rate this book?
-            </Text>
-            <Text
-              style={{
-                marginBottom: space.sm,
-                fontFamily: fontFamily.body,
-                fontSize: type.caption,
-                color: colors.muted,
-              }}
-            >
-              Tap a star from 1 to 5
-            </Text>
-            <StarRating value={draftRating} onSelect={setDraftRating} disabled={busy} />
-            <Text
-              style={{
-                marginTop: space.lg,
-                marginBottom: space.xs,
-                fontFamily: fontFamily.bodySemiBold,
-                fontSize: type.small,
-                color: colors.navy,
-              }}
-            >
-              Would you recommend this book to your friends?
-            </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                marginBottom: space.sm,
-              }}
-            >
-              <Text style={{ fontFamily: fontFamily.body, fontSize: type.caption, color: colors.muted }}>
-                1 · Not at all
-              </Text>
-              <Text style={{ fontFamily: fontFamily.body, fontSize: type.caption, color: colors.muted }}>
-                10 · Definitely
-              </Text>
-            </View>
-            <NpsPicker value={draftRecommend} onSelect={setDraftRecommend} disabled={busy} />
-            <Button
-              title="Save review"
-              variant="secondary"
-              onPress={requestReviewConfirm}
-              loading={busy}
-              style={{ marginTop: space.md }}
-            />
-          </Card>
-        ) : (
-          <Card style={{ marginBottom: space.md }}>
-            <Text
-              style={{
-                fontFamily: fontFamily.bodyBold,
-                fontSize: type.body,
-                color: colors.navy,
-                marginBottom: space.sm,
-              }}
-            >
-              Your review
-            </Text>
-            <StarRating value={draftRating} onSelect={() => {}} disabled size={24} />
-            {draftRecommend !== null ? (
-              <Text
-                style={{
-                  marginTop: space.sm,
-                  fontFamily: fontFamily.body,
-                  fontSize: type.small,
-                  color: colors.muted,
-                }}
-              >
-                Recommend to friends: {draftRecommend}/10
-              </Text>
-            ) : null}
-          </Card>
-        )}
-
-        {publishedReviews.length > 0 ? (
+        {isStaff ? (
           <Card style={{ marginBottom: space.md }}>
             <PressableScale
-              onPress={() => setReviewsOpen((v) => !v)}
-              style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+              onPress={() => {
+                setManageOpen((open) => {
+                  if (open) setEditingBook(false);
+                  return !open;
+                });
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
             >
-              <View>
-                <Text style={{ fontFamily: fontFamily.bodyBold, fontSize: type.body, color: colors.navy }}>
-                  Student reviews ({reviewSummary?.count ?? publishedReviews.length})
-                </Text>
-                {reviewSummary?.averageRating ? (
-                  <Text
-                    style={{
-                      marginTop: 4,
-                      fontFamily: fontFamily.body,
-                      fontSize: type.caption,
-                      color: colors.muted,
-                    }}
-                  >
-                    ★ {reviewSummary.averageRating}/5
-                    {reviewSummary.recommendLabel
-                      ? ` · ${reviewSummary.recommendLabel}`
-                      : ""}
-                  </Text>
-                ) : null}
-              </View>
-              <Ionicons
-                name={reviewsOpen ? "chevron-up" : "chevron-down"}
-                size={20}
-                color={colors.muted}
-              />
+              <Text style={{ fontFamily: fontFamily.bodyBold, fontSize: type.body, color: colors.navy }}>
+                Manage this book
+              </Text>
+              <Ionicons name={manageOpen ? "chevron-up" : "chevron-down"} size={20} color={colors.navy} />
             </PressableScale>
-
-            {reviewsOpen ? (
-              <View style={{ marginTop: space.md, gap: space.sm }}>
-                {publishedReviews.map((review) => (
-                  <View
-                    key={review.reviewId}
-                    style={{
-                      padding: space.sm,
-                      borderRadius: radius.md,
-                      backgroundColor: colors.creamDark,
-                    }}
-                  >
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
-                      <Text style={{ fontFamily: fontFamily.bodyBold, color: colors.navy, flex: 1 }}>
-                        {review.displayName}
-                      </Text>
-                      {formatReviewDate(review.updatedAt) ? (
-                        <Text
-                          style={{
-                            fontFamily: fontFamily.body,
-                            fontSize: type.caption,
-                            color: colors.muted,
-                          }}
-                        >
-                          {formatReviewDate(review.updatedAt)}
-                        </Text>
-                      ) : null}
-                    </View>
+            {manageOpen ? (
+              <View style={{ marginTop: space.md }}>
+                {!editingBook ? (
+                  <>
+                    <Text style={{ fontFamily: fontFamily.body, fontSize: type.small, color: colors.text }}>
+                      {book.title}
+                    </Text>
                     <Text
                       style={{
                         marginTop: 4,
                         fontFamily: fontFamily.body,
-                        fontSize: type.caption,
-                        color: colors.amberDark,
+                        fontSize: type.small,
+                        color: colors.muted,
                       }}
                     >
-                      ★ {review.rating}/5
-                      {review.recommendScore !== null
-                        ? ` · Would recommend to friends: ${review.recommendScore}/10`
-                        : ""}
+                      {book.author || "No author"}
                     </Text>
-                    {review.comment ? (
-                      <Text
-                        style={{
-                          marginTop: 6,
-                          fontFamily: fontFamily.body,
-                          fontSize: type.small,
-                          color: colors.text,
-                          lineHeight: 20,
-                        }}
-                      >
-                        {review.comment}
-                      </Text>
-                    ) : null}
-                  </View>
-                ))}
+                    <Button
+                      title="Edit"
+                      variant="secondary"
+                      onPress={() => setEditingBook(true)}
+                      style={{ marginTop: space.md }}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Input label="Title" value={editTitle} onChangeText={setEditTitle} />
+                    <Input label="Author" value={editAuthor} onChangeText={setEditAuthor} />
+                    <Input
+                      label="About / description"
+                      value={editDescription}
+                      onChangeText={setEditDescription}
+                      multiline
+                    />
+                    <Button
+                      title="Save details"
+                      onPress={() => void saveDigitalDetails()}
+                      loading={savingDetails}
+                      style={{ marginBottom: space.sm }}
+                    />
+                    <Button title="Done editing" variant="softOutline" onPress={() => setEditingBook(false)} />
+                  </>
+                )}
               </View>
             ) : null}
           </Card>
         ) : null}
+
+        <BookReviewSection
+          locked={reviewLocked}
+          busy={busy}
+          draftRating={draftRating}
+          draftRecommend={draftRecommend}
+          onRating={setDraftRating}
+          onRecommend={setDraftRecommend}
+          onSave={requestReviewConfirm}
+          summary={reviewSummary}
+          items={publishedReviews}
+          reviewsOpen={reviewsOpen}
+          onToggleReviews={() => setReviewsOpen((v) => !v)}
+        />
       </ScrollView>
 
       <AppModal
@@ -689,6 +516,13 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
         title="Review submitted"
         message="Thank you. Your review is now visible to other students."
         onClose={() => setReviewSuccessOpen(false)}
+      />
+      <AppModal
+        visible={editSuccess}
+        variant="success"
+        title="Book updated"
+        message="Title, author, and about text were saved."
+        onClose={() => setEditSuccess(false)}
       />
       <AppModal
         visible={modal.visible}

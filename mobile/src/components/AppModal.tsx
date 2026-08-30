@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
+import * as Haptics from "../utils/haptics";
 import { Button } from "./ui/Button";
 import { useTheme } from "../theme";
 
@@ -28,6 +28,7 @@ type Props = {
   cancelVariant?: "ghost" | "secondary" | "softOutline";
   /** center = outcome/confirm dialog; sheet = bottom sheet for actions. */
   presentation?: "center" | "sheet";
+  confirmLoading?: boolean;
   onClose: () => void;
   onConfirm?: () => void;
   onCancel?: () => void;
@@ -53,6 +54,7 @@ export function AppModal({
   confirmVariant = "primary",
   cancelVariant = "softOutline",
   presentation = "center",
+  confirmLoading = false,
   onClose,
   onConfirm,
   onCancel,
@@ -63,6 +65,23 @@ export function AppModal({
   const iconColor = colors[icon.colorKey];
   const showCancel = typeof onCancel === "function";
   const isSheet = presentation === "sheet";
+  const [locked, setLocked] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!visible) setLocked(false);
+  }, [visible]);
+
+  const busy = locked || confirmLoading;
+
+  const handleConfirm = () => {
+    if (busy) return;
+    if (onConfirm) {
+      setLocked(true);
+      onConfirm();
+      return;
+    }
+    onClose();
+  };
 
   const onBackdropPress = () => {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {
@@ -129,14 +148,17 @@ export function AppModal({
           <Button
             title={confirmLabel}
             variant={confirmVariant}
-            onPress={onConfirm ?? onClose}
+            onPress={handleConfirm}
+            loading={busy}
+            disabled={busy}
             style={{ marginTop: space.lg }}
           />
           {showCancel ? (
             <Button
               title={cancelLabel}
               variant={cancelVariant}
-              onPress={onCancel ?? onClose}
+              onPress={busy ? undefined : onCancel ?? onClose}
+              disabled={busy}
               style={{ marginTop: space.sm }}
             />
           ) : null}
