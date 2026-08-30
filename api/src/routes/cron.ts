@@ -1,7 +1,7 @@
 import { Router, Response } from "express";
 import { cronAuth } from "../middleware/cronAuth";
 import { runDailyLoanNotifications } from "../services/notifications";
-import { expireReadyReservationHolds } from "../services/reservations";
+import { runCirculationMaintenance } from "../services/reservations";
 
 const router = Router();
 
@@ -19,7 +19,7 @@ router.post("/daily-loans", async (_req, res: Response) => {
 
 router.post("/reservations", async (_req, res: Response) => {
   try {
-    const result = await expireReadyReservationHolds();
+    const result = await runCirculationMaintenance();
     res.json({ ok: true, result });
   } catch (error) {
     console.error("Manual reservation cron failed:", error);

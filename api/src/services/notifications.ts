@@ -27,12 +27,20 @@ async function sendExpoPush(
   body: string,
   data: Record<string, string>
 ) {
+  const type = data.type || "";
+  const channelId = type.startsWith("reservation")
+    ? "reservations"
+    : type.includes("due") || type === "overdue"
+      ? "loans"
+      : "default";
+
   await axios.post("https://exp.host/--/api/v2/push/send", {
     to: token,
     title,
     body,
     data,
     sound: "default",
+    channelId,
   });
 }
 
@@ -137,7 +145,9 @@ export async function runDailyLoanNotifications() {
   const config = configSnap.data() || {};
   const timezone = config.timezone || "Asia/Karachi";
   const finePerDay = Number(config.finePerDayRs || 50);
-  const reminderDays: number[] = config.reminderDaysBefore || [2, 1];
+  const reminderDays: number[] = (config.reminderDaysBefore || [2, 1])
+    .map((n: unknown) => Number(n))
+    .filter((n: number) => Number.isFinite(n) && n > 0);
 
   const todayKey = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -176,24 +186,19 @@ export async function runDailyLoanNotifications() {
 
     const titleName = loan.title || "your book";
 
-    if (daysUntilDue === 2 && reminderDays.includes(2)) {
+    if (daysUntilDue > 0 && reminderDays.includes(daysUntilDue)) {
+      const isUrgent = daysUntilDue === 1;
       await notifyUser({
         userId: loan.userId,
-        type: "due_reminder",
-        title: "Due in 2 days",
-        body: `"${titleName}" is due in 2 days.`,
+        type: isUrgent ? "due_reminder_urgent" : "due_reminder",
+        title: isUrgent ? "Due tomorrow" : `Due in ${daysUntilDue} days`,
+        body: isUrgent
+          ? `"${titleName}" is due tomorrow. Please return it on time.`
+          : `"${titleName}" is due in ${daysUntilDue} days.`,
         metadata: { loanId: loan.loanId || doc.id },
       });
-      reminders += 1;
-    } else if (daysUntilDue === 1 && reminderDays.includes(1)) {
-      await notifyUser({
-        userId: loan.userId,
-        type: "due_reminder_urgent",
-        title: "Due tomorrow",
-        body: `"${titleName}" is due tomorrow. Please return it on time.`,
-        metadata: { loanId: loan.loanId || doc.id },
-      });
-      urgent += 1;
+      if (isUrgent) urgent += 1;
+      else reminders += 1;
     } else if (daysUntilDue < 0) {
       const lateDays = Math.abs(daysUntilDue);
       const fineAmount = lateDays * finePerDay;

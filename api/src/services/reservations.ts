@@ -638,34 +638,36 @@ export async function expireReadyReservationHolds() {
     const reservationRef = doc.ref;
 
     await db.runTransaction(async (tx) => {
-      const reservationSnap = await tx.get(reservationRef);
+      const catalogRef = db.collection("catalog").doc(isbn);
+      const copyRef = copyId ? db.collection("bookCopies").doc(copyId) : null;
+
+      const [reservationSnap, catalogSnap, copySnap] = await Promise.all([
+        tx.get(reservationRef),
+        tx.get(catalogRef),
+        copyRef ? tx.get(copyRef) : Promise.resolve(null),
+      ]);
+
       if (!reservationSnap.exists) return;
 
       const reservation = reservationSnap.data()!;
       if (reservation.status !== "ready") return;
 
-      const catalogRef = db.collection("catalog").doc(isbn);
-      const catalogSnap = await tx.get(catalogRef);
-
       tx.update(reservationRef, {
         status: "expired",
+        cancelReason: "hold_expired",
         updatedAt: now,
       });
 
-      if (copyId) {
-        const copyRef = db.collection("bookCopies").doc(copyId);
-        const copySnap = await tx.get(copyRef);
-        if (copySnap.exists) {
-          const copy = copySnap.data()!;
-          if (copy.status === "reserved" && copy.reservedForUserId === reservation.userId) {
-            tx.update(copyRef, {
-              status: "available",
-              reservedForUserId: null,
-              readyAt: null,
-              expiresAt: null,
-              updatedAt: now,
-            });
-          }
+      if (copyRef && copySnap?.exists) {
+        const copy = copySnap.data()!;
+        if (copy.status === "reserved" && copy.reservedForUserId === reservation.userId) {
+          tx.update(copyRef, {
+            status: "available",
+            reservedForUserId: null,
+            readyAt: null,
+            expiresAt: null,
+            updatedAt: now,
+          });
         }
       }
 
@@ -681,6 +683,22 @@ export async function expireReadyReservationHolds() {
 
     expired += 1;
 
+    const titleName = String(data.title || "Reserved book");
+    const holderId = String(data.userId || "");
+    if (holderId) {
+      try {
+        await notifyUser({
+          userId: holderId,
+          type: "reservation_expired",
+          title: "Reservation expired",
+          body: `Your hold on "${titleName}" ended. The copy was released.`,
+          metadata: { reservationId: doc.id, isbn, copyId: copyId || "" },
+        });
+      } catch (error) {
+        console.error("[reservations] expire notify failed:", error);
+      }
+    }
+
     if (!copyId) continue;
 
     try {
@@ -693,6 +711,16 @@ export async function expireReadyReservationHolds() {
   }
 
   return { expired, reassigned, freed };
+}
+
+/**
+ * Expire overdue ready holds, then heal waiting queues.
+ * Used by cron and on API boot so a local restart still clears stale holds.
+ */
+export async function runCirculationMaintenance() {
+  const expiry = await expireReadyReservationHolds();
+  const queues = await reconcileAllWaitingQueues();
+  return { expiry, queues };
 }
 
 /** Sweep titles that still have waiting reservations (heals missed return fulfills). */

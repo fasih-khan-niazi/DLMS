@@ -486,6 +486,75 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Staff: edit title, authors, description, categories, page count
+router.patch(
+  "/books/:isbn",
+  authenticate,
+  requireRole("librarian", "admin"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const isbn = normalizeIsbn(req.params.isbn as string);
+      const catalogRef = db.collection("catalog").doc(isbn);
+      const catalogDoc = await catalogRef.get();
+      if (!catalogDoc.exists) {
+        res.status(404).json({ error: "Book not found" });
+        return;
+      }
+
+      const existing = catalogDoc.data()!;
+      const body = req.body || {};
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
+
+      if (typeof body.title === "string" && body.title.trim()) {
+        updates.title = body.title.trim();
+      }
+      if (Array.isArray(body.authors)) {
+        updates.authors = body.authors.map((a: unknown) => String(a).trim()).filter(Boolean);
+      } else if (typeof body.authors === "string") {
+        updates.authors = body.authors
+          .split(",")
+          .map((a: string) => a.trim())
+          .filter(Boolean);
+      }
+      if (typeof body.description === "string") {
+        updates.description = body.description.trim();
+      }
+      if (Array.isArray(body.categories)) {
+        updates.categories = body.categories.map((c: unknown) => String(c).trim()).filter(Boolean);
+      } else if (typeof body.categories === "string") {
+        updates.categories = body.categories
+          .split(",")
+          .map((c: string) => c.trim())
+          .filter(Boolean);
+      }
+      if (body.pageCount !== undefined) {
+        const n = Number(body.pageCount);
+        if (Number.isFinite(n) && n >= 0) updates.pageCount = Math.round(n);
+      }
+
+      const nextTitle = String(updates.title ?? existing.title ?? "");
+      const nextAuthors = (updates.authors as string[] | undefined) ??
+        (Array.isArray(existing.authors) ? existing.authors.map(String) : []);
+      const nextCategories = (updates.categories as string[] | undefined) ??
+        (Array.isArray(existing.categories) ? existing.categories.map(String) : []);
+
+      updates.searchKeywords = buildSearchKeywords({
+        title: nextTitle,
+        authors: nextAuthors,
+        isbn,
+        categories: nextCategories,
+      });
+
+      await catalogRef.update(updates);
+      const fresh = await catalogRef.get();
+      res.json({ success: true, book: { ...fresh.data(), isbn } });
+    } catch (error) {
+      console.error("Update book error:", error);
+      res.status(500).json({ error: "Failed to update book details" });
+    }
+  }
+);
+
 // Set cover image URL manually (librarian/admin)
 router.patch(
   "/books/:isbn/cover",

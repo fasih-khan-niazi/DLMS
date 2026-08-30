@@ -4,7 +4,9 @@ import { authenticate, AuthRequest } from "../middleware/authenticate";
 import { createId } from "../utils/ids";
 import { getSystemConfig } from "../services/loans";
 import {
+  assignCopyToNextReservation,
   computeQueuePosition,
+  expireReadyReservationHolds,
   fulfillWaitingWithAvailableCopies,
   normalizeIsbn,
   reconcileReservationsForIsbn,
@@ -161,6 +163,14 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
 // List current user's reservations (queue position computed live)
 router.get("/mine", authenticate, async (req: AuthRequest, res: Response) => {
   try {
+    // Opening Activity is a natural place to expire a hold that cron missed
+    // (for example while the local API was restarted).
+    try {
+      await expireReadyReservationHolds();
+    } catch (error) {
+      console.error("[reservations] lazy expire on /mine failed:", error);
+    }
+
     const snap = await db
       .collection("reservations")
       .where("userId", "==", req.uid)
@@ -211,27 +221,91 @@ router.delete("/:reservationId", authenticate, async (req: AuthRequest, res: Res
       return;
     }
 
-    if (data.status === "ready") {
-      res.status(400).json({
-        error:
-          "This reservation is ready for pickup. Scan the assigned copy to borrow, or wait for the hold to expire.",
-      });
+    if (data.status !== "waiting" && data.status !== "ready") {
+      res.status(400).json({ error: "Only waiting or ready reservations can be cancelled" });
       return;
     }
 
-    if (data.status !== "waiting") {
-      res.status(400).json({ error: "Only waiting reservations can be cancelled" });
+    const now = new Date();
+    const isbn = normalizeIsbn(String(data.isbn || ""));
+    const copyId = data.assignedCopyId as string | undefined;
+    const title = String(data.title || "this title");
+
+    if (data.status === "ready") {
+      const catalogRef = db.collection("catalog").doc(isbn);
+      await db.runTransaction(async (tx) => {
+        const copyRef = copyId ? db.collection("bookCopies").doc(copyId) : null;
+        const [fresh, catalogSnap, copySnap] = await Promise.all([
+          tx.get(ref),
+          tx.get(catalogRef),
+          copyRef ? tx.get(copyRef) : Promise.resolve(null),
+        ]);
+        if (!fresh.exists) return;
+        const current = fresh.data()!;
+        if (current.status !== "ready") return;
+
+        tx.update(ref, {
+          status: "cancelled",
+          cancelReason: "user_cancelled",
+          updatedAt: now,
+        });
+
+        if (copyRef && copySnap?.exists) {
+          const copy = copySnap.data()!;
+          if (copy.status === "reserved" && copy.reservedForUserId === current.userId) {
+            tx.update(copyRef, {
+              status: "available",
+              reservedForUserId: null,
+              readyAt: null,
+              expiresAt: null,
+              updatedAt: now,
+            });
+          }
+        }
+
+        if (catalogSnap.exists) {
+          const catalog = catalogSnap.data()!;
+          tx.update(catalogRef, {
+            reservedCount: Math.max((catalog.reservedCount || 0) - 1, 0),
+            availableCount: (catalog.availableCount || 0) + (copyId ? 1 : 0),
+            updatedAt: now,
+          });
+        }
+      });
+
+      try {
+        const assigned = copyId
+          ? await assignCopyToNextReservation({
+              copyId,
+              isbn,
+              title,
+              excludeUserId: req.uid,
+            })
+          : null;
+        if (!assigned) {
+          await fulfillWaitingWithAvailableCopies(isbn);
+        }
+      } catch (error) {
+        console.error("Fulfill after ready cancel failed:", error);
+      }
+
+      res.json({
+        success: true,
+        reservationId,
+        released: true,
+        message: "Hold cancelled. The copy was released.",
+      });
       return;
     }
 
     await ref.update({
       status: "cancelled",
-      updatedAt: new Date(),
+      cancelReason: "user_cancelled",
+      updatedAt: now,
     });
 
-    // If copies are sitting available while others wait, fulfill next waiter
     try {
-      await fulfillWaitingWithAvailableCopies(data.isbn);
+      await fulfillWaitingWithAvailableCopies(isbn);
     } catch (error) {
       console.error("Fulfill after cancel failed:", error);
     }
