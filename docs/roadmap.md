@@ -1,81 +1,21 @@
-# Two-Week Roadmap
+# Roadmap
 
-## Week 1
+Week 1 (foundation through admin, tabs, reports) is done and frozen. Details: [`week1-archive.md`](week1-archive.md).
 
-### Phase 1: Foundation
+## Current
 
-- Repository and monorepo setup
-- Root documentation and secret management
-- Express API bootstrap
-- Expo mobile bootstrap
-- Shared types package bootstrap
-- Firebase baseline configuration
+Work continues on **`dev`**. Week 2 mobile plan: [`mobile-week2-plan.md`](mobile-week2-plan.md).
 
-### Phase 2: Catalog and Search ✅
+Parked items (push banners, Google Books extras, profile photo, admin theme): [`park.md`](park.md).
 
-- ISBN metadata ingestion via Google Books
-- Manual metadata fallback
-- Book and copy schema setup (`catalog`, `bookCopies`)
-- QR payload strategy (`copyId_isbn`)
-- Student catalog browse and search
-- Librarian/admin add-book flow on mobile
+## Already shipped after Week 1 (high level)
 
-### Phase 3: Borrow and Return ✅
+- Digital library on Supabase, reader, bookshelf, digital reviews
+- Reservation ready-hold cancel, expiry that actually runs, live catalog counts
+- Staff manage/edit on physical titles; in-app borrow when config allows
+- Home dashboard (PKT), dark mode, AppModal, haptics preference
+- QA scripts in repo-root `scripts/`
 
-- QR scan flow (borrow / return modes)
-- Borrow transaction rules (limit, unpaid fine block, copy status)
-- Return transaction rules + fine calculation
-- Due date calculation with Sunday/holiday roll-forward
-- My Loans screen
-- Device access foundation docs + LAN API config
+## Next (not a commitment list)
 
-### Phase 4: Reservations ✅
-
-- Student reservation creation (FIFO queue per ISBN)
-- Queue processing on return (72-hour hold)
-- Ready-for-pickup claim via QR borrow
-- 6-hour expiry cron for ready holds
-- Mobile Reservations page + Reserve button on book detail
-
-## Week 2
-
-### Phase 5: Digital Library ✅
-
-- Local PDF storage on Express (`api/uploads/`) - Spark workaround (no Firebase Storage)
-- Digital book upload/list/stream APIs
-- Bookshelf with progress (0-100%) and rating (1-5)
-- Mobile E-Library, PDF download/open, Bookshelf, Upload PDF (staff)
-
-### Phase 6: Notifications and Jobs ✅
-
-- FCM / Expo push token registration
-- Daily due reminders (T-2, T-1) and overdue alerts
-- Reservation-ready push (with in-app notification records)
-- Manual cron endpoints for testing (`/internal/cron/...`)
-- Reservation expiry cron already active (every 6 hours)
-
-### Phase 6b: Supabase Storage ✅ (code ready - needs your project keys)
-
-- Express uploads PDFs to private Supabase bucket (service role)
-- Download still via authenticated API proxy
-- Legacy local files still readable if present
-- Onboarding: `docs/supabase.md`
-
-### Phase 7: Admin Web ✅
-
-- Dashboard
-- User and role management
-- Config management
-- Reservation and fine management
-- Admin Vite app at `admin/` - see `docs/admin-web.md`
-
-### Phase 8: Reporting, Navigation Polish, and Hardening ✅
-
-- Bottom tab navbar (Home, Catalog, Scan, Activity, Profile)
-- Dedicated screens wired into tabs (not only stack buttons)
-- Daily metrics ✅ (admin reports daily series + summary)
-- Date-range reports ✅ (`/api/admin/reports` + admin Reports page)
-- CSV export ✅ (CSV download; Excel optional later)
-- PDF export - deferred (CSV covers FYP demo needs)
-- Auth persistence via AsyncStorage
-- Security review and polish (ongoing)
+Whatever is still open in the Week 2 plan / park file. Do not re-open Week 1 scope unless a live bug needs it.

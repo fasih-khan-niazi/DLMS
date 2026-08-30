@@ -87,7 +87,7 @@ Defaults in `admin` and `mobile` already use `https://dlms-csij.onrender.com`.
 | Mobile Expo | `mobile/.env` → `EXPO_PUBLIC_API_URL=...` then `npx expo start -c` |
 | Android APK | `mobile/eas.json` preview profile env (already set) |
 
-Full checklist: `docs/week1-demo.md`.
+Full checklist: `docs/week1-archive.md`.
 
 ## Redeploy Week 1 later
 
@@ -104,7 +104,7 @@ To force Week 1 forever on this service: keep the service branch on `main` and o
 5. Env at **build** time: `VITE_API_URL=https://dlms-csij.onrender.com`.
 6. Firebase Console → Authentication → Authorized domains → add the new admin hostname.
 
-See also `docs/week1-demo.md`.
+See also `docs/week1-archive.md`.
 
 ## Checklist
 

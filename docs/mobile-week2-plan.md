@@ -656,6 +656,7 @@ Phases 11-12 can swap with 10 if you want onboarding earlier.
 - Profile photo upload (separate sub-phase)
 - Native push banners (post Expo Go)
 - Breaking QR payload format (print only changes presentation)
+- Google Books extras (parked in [`park.md`](park.md)): title/author search without ISBN, larger covers, page count/subtitle/language, public ratings
 
 ---
 

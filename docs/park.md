@@ -1,33 +1,47 @@
-# Park status (Week 1 freeze)
+# Park status
 
-DLMS Week 1 is locked as **`v1.0.0-week1`** on branch **`main`**. Continue Week 2 work on **`dev`**.
+DLMS Week 1 is locked as **`v1.0.0-week1`** on branch **`main`**. Continue work on **`dev`**.
 
-## In scope (frozen)
+Week 1 history: [`week1-archive.md`](week1-archive.md).
+
+## In scope (frozen at Week 1)
 
 - Mobile (Expo): student + librarian floor flows; catalog soft-deactivate for staff
 - Admin web: users (student↔librarian only), catalog soft-delete, config, fines, reservations, dashboard, reports (CSV + PDF)
 - Express API: Auth, catalog, loans, reservations, digital books (Supabase), notifications, cron
-- Hosting path: Render for public API (see `docs/deploy-render.md`)
-- Docs: architecture, setup, security, VnV matrix, seed, deploy
+- Hosting path: Render for public API (see [`deploy-render.md`](deploy-render.md))
 
-## Out of scope / Week 2+
+## Parked / future mobile
 
-- Native OS push banners (needs dedicated/dev build)
-- APK polish / store listing (after Render URL is stable)
+- Native OS push banners (needs a dedicated/dev or store build; Expo Go cannot)
+- APK polish / store listing
 - Custom OTP password reset (Firebase email link is enough)
-- Demo walkthrough script document
+- Profile photo upload
+- Admin portal theme sync
+- Interactive onboarding extras beyond the current tour
+
+### Google Books (API already in use for ISBN lookup)
+
+Parked for a later mobile pass. Same `volumes` API; we do not call these yet:
+
+1. Title / author search when the librarian does not have an ISBN
+2. Larger cover variants (`imageLinks.medium` / `large`)
+3. Extra metadata: page count, subtitle, language
+4. Public rating and ratings count from Google
+
+Digital PDFs stay on first-page covers. Google Books is not inventory or loans.
 
 ## Operator notes
 
 1. Client delivery = `main` + tag `v1.0.0-week1`, plus Render deployment of that API.
-2. Checking out the tag on your PC only switches **your local code**. Render keeps serving whatever branch/commit you last deployed until you redeploy.
-3. Re-seed catalog with `npm run seed` (no users). See `docs/seed.md`.
+2. Checking out the tag on your PC only switches **your local code**. Render keeps serving whatever commit you last deployed.
+3. Re-seed catalog with `npm run seed` (no users). See [`seed.md`](seed.md).
 4. Secrets stay in `api/.env` / Render env / `secrets/` only.
 
 ## Related docs
 
-- [`docs/deploy-render.md`](deploy-render.md)
-- [`docs/polish-plan.md`](polish-plan.md)
-- [`docs/security.md`](security.md)
-- [`docs/vnv-matrix.md`](vnv-matrix.md)
-- [`docs/seed.md`](seed.md)
+- [`deploy-render.md`](deploy-render.md)
+- [`security.md`](security.md)
+- [`vnv-matrix.md`](vnv-matrix.md)
+- [`seed.md`](seed.md)
+- [`week1-archive.md`](week1-archive.md)
