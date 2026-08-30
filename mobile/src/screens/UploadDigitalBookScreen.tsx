@@ -7,12 +7,14 @@ import {
   Platform,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
+import * as Haptics from "expo-haptics";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { API_BASE_URL } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
 import { Button, Input, BackButton } from "../components/ui";
 import { AppModal } from "../components/AppModal";
 import { invalidateDigitalCache } from "../utils/digitalCache";
+import { runSideEffect } from "../utils/apiError";
 import { getAppConfig, hydrateAppConfig, peekMaxPdfSizeMb } from "../utils/appConfig";
 import { useTheme } from "../theme";
 
@@ -93,17 +95,19 @@ export default function UploadDigitalBookScreen({ navigation }: Props) {
       if (!response.ok) {
         throw new Error(data.error || "Upload failed");
       }
-
-      invalidateDigitalCache();
-      setModal({
-        kind: "success",
-        message: "Your PDF is in the catalog. The cover is generated from the first page.",
-      });
     } catch (error: any) {
-      setModal({ kind: "error", message: error.message || "Upload failed. Try again." });
-    } finally {
       setLoading(false);
+      setModal({ kind: "error", message: error.message || "Upload failed. Try again." });
+      return;
     }
+
+    setLoading(false);
+    setModal({
+      kind: "success",
+      message: "Your PDF is in the catalog. The cover is generated from the first page.",
+    });
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    runSideEffect(invalidateDigitalCache);
   };
 
   const closeModal = () => {

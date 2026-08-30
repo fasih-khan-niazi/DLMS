@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, StyleSheet, Pressable } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -14,7 +14,11 @@ import { ProfileProvider, useProfile } from "../context/ProfileContext";
 import { OnboardingProvider } from "../context/OnboardingContext";
 import { useToast } from "../components/AppToast";
 import { useTheme } from "../theme";
-import { getAppConfig, invalidateAppConfigCache } from "../utils/appConfig";
+import {
+  getAppConfig,
+  invalidateAppConfigCache,
+  peekLibrariansCanBorrow,
+} from "../utils/appConfig";
 import * as Haptics from "expo-haptics";
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
@@ -38,6 +42,9 @@ const HomeStackNav = createNativeStackNavigator();
 const CatalogStackNav = createNativeStackNavigator();
 const ProfileStackNav = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+
+/** How often the librarian Scan gate is refreshed in the background. */
+const SCAN_GATE_REFRESH_MS = 30_000;
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -174,27 +181,69 @@ function MainTabNavigator() {
   const { profile, refresh } = useProfile();
   const { showToast } = useToast();
 
-  const guardLibrarianScan = async (): Promise<boolean> => {
-    if (profile?.role !== "librarian") return true;
+  /**
+   * Synchronous snapshot of whether Scan is closed to this librarian.
+   * Kept warm in the background so a tab press never waits on the network:
+   * feedback (haptic + toast) and the block decision happen in the same tick.
+   */
+  const scanBlockedRef = useRef(false);
 
+  const computeScanBlocked = useCallback(
+    (librariansCanBorrow: boolean | null, activeLoans: number) => {
+      if (profile?.role !== "librarian") return false;
+      if (librariansCanBorrow !== false) return false;
+      // Borrowing off but loans outstanding: Scan stays open for returns only.
+      return activeLoans === 0;
+    },
+    [profile?.role]
+  );
+
+  // Seed instantly from whatever config is already in memory, then revalidate.
+  useEffect(() => {
+    if (profile?.role !== "librarian") {
+      scanBlockedRef.current = false;
+      return;
+    }
+
+    const activeLoans = Number(profile?.activeBorrowCount) || 0;
+    scanBlockedRef.current = computeScanBlocked(peekLibrariansCanBorrow(), activeLoans);
+
+    let cancelled = false;
+    const sync = async () => {
+      const config = await getAppConfig(true);
+      if (cancelled) return;
+      scanBlockedRef.current = computeScanBlocked(config.librariansCanBorrow, activeLoans);
+    };
+
+    void sync();
+    const interval = setInterval(() => void sync(), SCAN_GATE_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [profile?.role, profile?.activeBorrowCount, computeScanBlocked]);
+
+  /** Re-checks the gate against the server; resolves true when Scan may open. */
+  const revalidateScanGate = async (): Promise<boolean> => {
     invalidateAppConfigCache();
     const config = await getAppConfig(true);
-    if (config.librariansCanBorrow) return true;
+    if (config.librariansCanBorrow) {
+      scanBlockedRef.current = false;
+      return true;
+    }
 
     let activeLoans = Number(profile?.activeBorrowCount) || 0;
     try {
       const me = await api.get("/api/auth/me");
       activeLoans = Number(me.data?.activeBorrowCount) || 0;
-      await refresh();
+      void refresh().catch(() => {});
     } catch {
-      // keep cached count
+      // fall back to the cached count
     }
 
-    if (activeLoans > 0) return true;
-
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-    showToast("Borrowing is disabled for librarians.");
-    return false;
+    const blocked = computeScanBlocked(config.librariansCanBorrow, activeLoans);
+    scanBlockedRef.current = blocked;
+    return !blocked;
   };
 
   return (
@@ -270,11 +319,21 @@ function MainTabNavigator() {
         }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
+            // Not a gated user, or the gate is currently open: let the tab open
+            // natively so there is no perceptible delay.
+            if (profile?.role !== "librarian" || !scanBlockedRef.current) return;
+
             e.preventDefault();
-            void (async () => {
-              const allowed = await guardLibrarianScan();
+            // Same tick as the press, so haptic and toast land together.
+            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
+              () => {}
+            );
+            showToast("Borrowing is disabled for librarians.");
+
+            // Confirm against the server; open Scan if the gate has since lifted.
+            void revalidateScanGate().then((allowed) => {
               if (allowed) navigation.navigate("Scan");
-            })();
+            });
           },
         })}
       />

@@ -32,6 +32,23 @@ const CONFIG_ALLOWED_FIELDS = [
 
 type ConfigField = (typeof CONFIG_ALLOWED_FIELDS)[number];
 
+/** Fields stored as real booleans so a checkbox can never round-trip as a string. */
+const CONFIG_BOOLEAN_FIELDS = new Set<ConfigField>([
+  "blockCheckoutIfUnpaidFine",
+  "librariansCanBorrow",
+  "allowInAppCopyBorrow",
+]);
+
+function coerceConfigValue(field: ConfigField, value: unknown): unknown {
+  if (CONFIG_BOOLEAN_FIELDS.has(field)) {
+    if (typeof value === "string") {
+      return value === "true" || value === "1" || value === "on";
+    }
+    return value === true;
+  }
+  return value;
+}
+
 function serializeDoc(id: string, data: Record<string, any>) {
   const out: Record<string, unknown> = { id };
   for (const [key, value] of Object.entries(data)) {
@@ -129,7 +146,9 @@ router.get("/config", requireRole("admin"), async (_req: AuthRequest, res: Respo
   try {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate");
     const config = await getSystemConfig();
-    res.json({ config });
+    // supportedFields lets the portal detect an older API that would silently
+    // drop newer settings instead of quietly reverting the control.
+    res.json({ config, supportedFields: [...CONFIG_ALLOWED_FIELDS] });
   } catch (error) {
     console.error("Admin config read error:", error);
     res.status(500).json({ error: "Failed to read config" });
@@ -145,11 +164,16 @@ router.put("/config", requireRole("admin"), async (req: AuthRequest, res: Respon
 
     for (const field of CONFIG_ALLOWED_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(body, field)) {
-        updates[field as ConfigField] = body[field];
+        updates[field as ConfigField] = coerceConfigValue(field, body[field]);
       }
     }
 
-    if (Object.keys(updates).length === 0) {
+    const appliedFields = Object.keys(updates);
+    const ignoredFields = Object.keys(body).filter(
+      (key) => !(CONFIG_ALLOWED_FIELDS as readonly string[]).includes(key)
+    );
+
+    if (appliedFields.length === 0) {
       res.status(400).json({ error: "No allowed config fields provided" });
       return;
     }
@@ -184,14 +208,20 @@ router.put("/config", requireRole("admin"), async (req: AuthRequest, res: Respon
       actorId: req.uid,
       targetId: "system",
       metadata: {
-        fields: Object.keys(updates).filter((k) => k !== "updatedAt" && k !== "updatedBy"),
+        fields: appliedFields,
         cancelledLibrarianReservations,
       },
       timestamp: new Date(),
     });
 
     const config = await getSystemConfig();
-    res.json({ success: true, config });
+    res.json({
+      success: true,
+      config,
+      appliedFields,
+      ignoredFields,
+      supportedFields: [...CONFIG_ALLOWED_FIELDS],
+    });
   } catch (error) {
     console.error("Admin config update error:", error);
     res.status(500).json({ error: "Failed to update config" });

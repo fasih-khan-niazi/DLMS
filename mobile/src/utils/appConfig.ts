@@ -96,11 +96,16 @@ export async function getAppConfig(force = false): Promise<{
       librariansCanBorrow,
     };
   } catch {
+    // Offline or server down. Prefer the last known values (memory, then disk)
+    // over defaults so gates such as the librarian Scan check stay accurate.
+    const fallback = memory ?? (await readStoredConfig());
+    if (fallback) memory = fallback;
+
     return {
-      catalogPageSize: memory?.catalogPageSize ?? FALLBACK_PAGE_SIZE,
-      maxPdfSizeMb: memory?.maxPdfSizeMb ?? FALLBACK_MAX_PDF_MB,
-      allowInAppCopyBorrow: memory?.allowInAppCopyBorrow ?? false,
-      librariansCanBorrow: memory?.librariansCanBorrow ?? true,
+      catalogPageSize: fallback?.catalogPageSize ?? FALLBACK_PAGE_SIZE,
+      maxPdfSizeMb: fallback?.maxPdfSizeMb ?? FALLBACK_MAX_PDF_MB,
+      allowInAppCopyBorrow: fallback?.allowInAppCopyBorrow ?? false,
+      librariansCanBorrow: fallback?.librariansCanBorrow ?? true,
     };
   }
 }
@@ -138,8 +143,12 @@ export function peekLibrariansCanBorrow(): boolean | null {
   return memory?.librariansCanBorrow ?? null;
 }
 
+/**
+ * Drops the in-memory copy so the next read hits the network.
+ * The persisted copy is intentionally kept: it seeds instant, offline-safe
+ * decisions (such as the librarian Scan gate) on the next cold start.
+ */
 export function invalidateAppConfigCache(): void {
   memory = null;
   hydratePromise = null;
-  void AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
 }

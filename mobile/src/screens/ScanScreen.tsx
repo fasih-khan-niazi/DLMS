@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -24,13 +25,21 @@ import {
 } from "../utils/scanHistory";
 import { dismissScanCoach, isScanCoachDismissed } from "../utils/onboarding";
 import { invalidateCatalogCache } from "../utils/catalogCache";
-import {
-  getAppConfig,
-  invalidateAppConfigCache,
-  peekLibrariansCanBorrow,
-} from "../utils/appConfig";
+import { invalidateDigitalCache } from "../utils/digitalCache";
+import { extractApiError, runSideEffect } from "../utils/apiError";
+import { getAppConfig, peekLibrariansCanBorrow } from "../utils/appConfig";
 
 type Mode = "borrow" | "return";
+
+/**
+ * The scan overlay always sits on a live camera feed, so its colours are fixed
+ * rather than themed. Theme tokens invert in dark mode (`colors.white` becomes
+ * a dark navy), which would make these controls disappear over the camera.
+ */
+const ON_CAMERA_TEXT = "#FFFFFF";
+const ON_CAMERA_TEXT_DIM = "rgba(255,255,255,0.85)";
+const ON_CAMERA_BACKDROP = "#141F28";
+const ON_AMBER_TEXT = "#1A2834";
 
 function friendlyScanError(message: string): string {
   const lower = message.toLowerCase();
@@ -74,7 +83,7 @@ export default function ScanScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const { colors, fontFamily, space, type, radius } = useTheme();
-  const { isStaff, profile } = useProfile();
+  const { isStaff, profile, refresh } = useProfile();
   const [permission, requestPermission] = useCameraPermissions();
   const initialReturnOnly =
     profile?.role === "librarian" && peekLibrariansCanBorrow() === false;
@@ -136,45 +145,56 @@ export default function ScanScreen({ navigation }: Props) {
     const parsed = parseQrPayload(data);
     const endpoint = mode === "borrow" ? "/api/loans/borrow" : "/api/loans/return";
 
+    let response: any;
     try {
-      const response = await api.post(endpoint, { qrPayload: data });
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      // Invalidate catalog & profile cache immediately so UI reflects updated copy counts & loans
-      invalidateCatalogCache();
-      invalidateAppConfigCache();
-      void refresh();
-
-      const title = response.data.title || "Book";
-      const isLibrarianReturnBlocked =
-        profile?.role === "librarian" && (returnOnly || !peekLibrariansCanBorrow());
-      const loansBeforeReturn = Number(profile?.activeBorrowCount) || 0;
-      const isLastReturnForLibrarian =
-        mode === "return" && isLibrarianReturnBlocked && loansBeforeReturn <= 1;
-
+      response = await api.post(endpoint, { qrPayload: data });
+    } catch (error: any) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       setResult({
-        kind: "success",
-        title,
-        message: response.data.message || "Done",
-        dueDate: response.data.dueDate,
+        kind: "error",
+        message: friendlyScanError(extractApiError(error, "Scan action failed")),
         mode,
-        isLastReturnForLibrarian,
       });
+      setBusy(false);
+      return;
+    }
 
-      if (isStaff && parsed.copyId && parsed.isbn) {
+    // Past this point the server has committed the loan change. Nothing below is
+    // allowed to surface as a scan failure.
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+    const title = response.data?.title || "Book";
+    const isLibrarianReturnBlocked =
+      profile?.role === "librarian" && (returnOnly || !peekLibrariansCanBorrow());
+    const loansBeforeReturn = Number(profile?.activeBorrowCount) || 0;
+    const isLastReturnForLibrarian =
+      mode === "return" && isLibrarianReturnBlocked && loansBeforeReturn <= 1;
+
+    setResult({
+      kind: "success",
+      title,
+      message: response.data?.message || "Done",
+      dueDate: response.data?.dueDate,
+      mode,
+      isLastReturnForLibrarian,
+    });
+    setBusy(false);
+
+    // Refresh derived state in the background so counts are current everywhere.
+    runSideEffect(() => {
+      invalidateCatalogCache();
+      invalidateDigitalCache();
+    });
+    void refresh().catch(() => {});
+
+    if (isStaff && parsed.copyId && parsed.isbn) {
+      try {
         const copyLabel = await resolveCopyLabel(parsed.copyId, parsed.isbn);
         await pushScanHistory({ title, copyLabel, mode });
         await loadHistory();
+      } catch {
+        // scan history is cosmetic; never block or fail the scan result
       }
-    } catch (error: any) {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setResult({
-        kind: "error",
-        message: friendlyScanError(error.response?.data?.error || "Scan action failed"),
-        mode,
-      });
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -223,7 +243,8 @@ export default function ScanScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.navy }]}>
+    <View style={[styles.container, { backgroundColor: ON_CAMERA_BACKDROP }]}>
+      <StatusBar style="light" />
       {isFocused ? (
         <CameraView
           style={StyleSheet.absoluteFillObject}
@@ -234,7 +255,7 @@ export default function ScanScreen({ navigation }: Props) {
           onBarcodeScanned={scanned ? undefined : handleBarcode}
         />
       ) : (
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.navy }]} />
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: ON_CAMERA_BACKDROP }]} />
       )}
 
       <View style={[styles.frameOverlay, StyleSheet.absoluteFillObject]} pointerEvents="none">
@@ -254,13 +275,19 @@ export default function ScanScreen({ navigation }: Props) {
 
       <View style={[styles.topControls, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={28} color={colors.white} />
+          <Ionicons name="chevron-back" size={28} color={ON_CAMERA_TEXT} />
         </Pressable>
-        <Text style={{ fontFamily: fontFamily.display, fontSize: type.titleSm, color: colors.white }}>
+        <Text
+          style={{ fontFamily: fontFamily.display, fontSize: type.titleSm, color: ON_CAMERA_TEXT }}
+        >
           Scan
         </Text>
         <Pressable onPress={() => setTorchOn((v) => !v)} hitSlop={12} style={styles.iconBtn}>
-          <Ionicons name={torchOn ? "flashlight" : "flashlight-outline"} size={24} color={colors.white} />
+          <Ionicons
+            name={torchOn ? "flashlight" : "flashlight-outline"}
+            size={24}
+            color={ON_CAMERA_TEXT}
+          />
         </Pressable>
       </View>
 
@@ -354,7 +381,7 @@ export default function ScanScreen({ navigation }: Props) {
                     style={{
                       fontFamily: fontFamily.bodyBold,
                       fontSize: type.small,
-                      color: active ? colors.navy : colors.white,
+                      color: active ? ON_AMBER_TEXT : ON_CAMERA_TEXT,
                       textTransform: "capitalize",
                     }}
                   >
@@ -372,7 +399,7 @@ export default function ScanScreen({ navigation }: Props) {
             textAlign: "center",
             fontFamily: fontFamily.body,
             fontSize: type.small,
-            color: "rgba(255,255,255,0.85)",
+            color: ON_CAMERA_TEXT_DIM,
             lineHeight: 20,
           }}
         >
@@ -386,7 +413,7 @@ export default function ScanScreen({ navigation }: Props) {
               style={{
                 marginLeft: 8,
                 fontFamily: fontFamily.bodySemiBold,
-                color: colors.white,
+                color: ON_CAMERA_TEXT,
               }}
             >
               Processing...
@@ -409,7 +436,7 @@ export default function ScanScreen({ navigation }: Props) {
               style={{
                 fontFamily: fontFamily.bodyBold,
                 fontSize: type.caption,
-                color: colors.white,
+                color: ON_CAMERA_TEXT,
                 marginBottom: 6,
               }}
             >

@@ -6,6 +6,7 @@ import {
   StyleSheet,
   RefreshControl,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
@@ -16,6 +17,8 @@ import { ErrorState } from "../components/ui/ErrorState";
 import { SkeletonList } from "../components/Skeleton";
 import { formatShortDate, reservationStatusChip } from "../utils/loanDates";
 import { goToCatalogTab } from "../utils/navigation";
+import { invalidateCatalogCache } from "../utils/catalogCache";
+import { extractApiError, runSideEffect } from "../utils/apiError";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -61,25 +64,33 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
   const confirmCancel = async () => {
     if (!cancelId) return;
     setCancelling(true);
+
     try {
       await api.delete(`/api/reservations/${cancelId}`);
-      setCancelId(null);
-      setFeedback({
-        variant: "success",
-        title: "Reservation cancelled",
-        message: "You left the waiting queue for this title.",
-      });
-      await load();
     } catch (err: any) {
+      setCancelling(false);
       setCancelId(null);
       setFeedback({
         variant: "error",
         title: "Could not cancel",
-        message: err.response?.data?.error || "Cancel failed. Try again.",
+        message: extractApiError(err, "Cancel failed. Try again."),
       });
-    } finally {
-      setCancelling(false);
+      return;
     }
+
+    // Server committed the cancel. Report success, then reconcile the views.
+    setCancelling(false);
+    setCancelId(null);
+    setFeedback({
+      variant: "success",
+      title: "Reservation cancelled",
+      message: "You left the waiting queue for this title.",
+    });
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+
+    // Cancelling can free a held copy, so catalog availability may change.
+    runSideEffect(invalidateCatalogCache);
+    void load();
   };
 
   const goCatalog = () => goToCatalogTab(navigation);

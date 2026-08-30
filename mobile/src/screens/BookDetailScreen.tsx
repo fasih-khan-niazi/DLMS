@@ -9,6 +9,7 @@ import {
   RefreshControl,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
+import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
@@ -24,6 +25,7 @@ import { formatIsbn } from "../utils/isbn";
 import { invalidateCatalogCache } from "../utils/catalogCache";
 import { invalidateCoverCache } from "../utils/coverImage";
 import { getAllowInAppCopyBorrow, invalidateAppConfigCache } from "../utils/appConfig";
+import { extractApiError, runSideEffect } from "../utils/apiError";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -39,7 +41,7 @@ type QrModalState = {
 
 export default function BookDetailScreen({ navigation, route }: Props) {
   const { isbn } = route.params;
-  const { isStaff, profile } = useProfile();
+  const { isStaff, profile, refresh: refreshProfile } = useProfile();
   const { colors, fontFamily, space, type, radius } = useTheme();
 
   const [book, setBook] = useState<any>(null);
@@ -122,29 +124,36 @@ export default function BookDetailScreen({ navigation, route }: Props) {
 
   const reserveBook = async () => {
     setReserving(true);
+
+    let response: any;
     try {
-      const response = await api.post("/api/reservations", { isbn });
-      setReserveFeedback({
-        variant: "success",
-        title: "Reservation placed",
-        message:
-          response.data.message ||
-          "You are in the queue. We will notify you when a copy is ready to claim.",
-        goActivity: true,
-      });
+      response = await api.post("/api/reservations", { isbn });
     } catch (error: any) {
-      const apiMessage = error.response?.data?.error || "Request failed";
+      const apiMessage = extractApiError(error, "Request failed");
       const already =
         /already have an active reservation/i.test(apiMessage) ||
         /already have this book on loan/i.test(apiMessage);
+      setReserving(false);
       setReserveFeedback({
         variant: already ? "info" : "error",
         title: already ? "Already reserved" : "Could not reserve",
         message: apiMessage,
       });
-    } finally {
-      setReserving(false);
+      return;
     }
+
+    setReserving(false);
+    setReserveFeedback({
+      variant: "success",
+      title: "Reservation placed",
+      message:
+        response.data?.message ||
+        "You are in the queue. We will notify you when a copy is ready to claim.",
+      goActivity: true,
+    });
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    runSideEffect(invalidateCatalogCache);
+    void load({ silent: true });
   };
 
   const goToScan = () => {
@@ -157,28 +166,35 @@ export default function BookDetailScreen({ navigation, route }: Props) {
     copyLabel: string
   ) => {
     setCopyActionId(copyId);
+    const endpoint = action === "borrow" ? "/api/loans/borrow" : "/api/loans/return";
+
+    let response: any;
     try {
-      const endpoint = action === "borrow" ? "/api/loans/borrow" : "/api/loans/return";
-      const response = await api.post(endpoint, { copyId });
-      invalidateCatalogCache();
-      invalidateAppConfigCache();
-      await load({ silent: true });
-      setCopyFeedback({
-        variant: "success",
-        title: action === "borrow" ? "Borrowed" : "Returned",
-        message:
-          response.data.message ||
-          `${copyLabel} ${action === "borrow" ? "is now on your account" : "was returned successfully"}.`,
-      });
+      response = await api.post(endpoint, { copyId });
     } catch (error: any) {
+      setCopyActionId(null);
       setCopyFeedback({
         variant: "error",
         title: action === "borrow" ? "Could not borrow" : "Could not return",
-        message: error.response?.data?.error || "Request failed",
+        message: extractApiError(error, "Request failed"),
       });
-    } finally {
-      setCopyActionId(null);
+      return;
     }
+
+    // Server committed the change. Report success first, then reconcile the view.
+    setCopyActionId(null);
+    setCopyFeedback({
+      variant: "success",
+      title: action === "borrow" ? "Borrowed" : "Returned",
+      message:
+        response.data?.message ||
+        `${copyLabel} ${action === "borrow" ? "is now on your account" : "was returned successfully"}.`,
+    });
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+    runSideEffect(invalidateCatalogCache);
+    void refreshProfile().catch(() => {});
+    void load({ silent: true });
   };
 
   const toggleCatalogActive = () => {
@@ -228,21 +244,22 @@ export default function BookDetailScreen({ navigation, route }: Props) {
 
   const performStatusChange = async (isActive: boolean) => {
     setTogglingStatus(true);
+
+    let response: any;
     try {
-      const response = await api.patch(`/api/catalog/books/${encodeURIComponent(isbn)}/status`, {
+      response = await api.patch(`/api/catalog/books/${encodeURIComponent(isbn)}/status`, {
         isActive,
       });
-      invalidateCatalogCache();
-      await load({ silent: true });
-      Alert.alert(isActive ? "Reactivated" : "Deactivated", response.data.message || "Updated");
     } catch (error: any) {
-      Alert.alert(
-        "Update failed",
-        error.response?.data?.error || "Could not update book status"
-      );
-    } finally {
       setTogglingStatus(false);
+      Alert.alert("Update failed", extractApiError(error, "Could not update book status"));
+      return;
     }
+
+    setTogglingStatus(false);
+    Alert.alert(isActive ? "Reactivated" : "Deactivated", response.data?.message || "Updated");
+    runSideEffect(invalidateCatalogCache);
+    void load({ silent: true });
   };
 
   const saveCoverUrl = async () => {

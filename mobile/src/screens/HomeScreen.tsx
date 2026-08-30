@@ -8,6 +8,9 @@ import { firebaseAuth } from "../config/firebase";
 import { useProfile } from "../context/ProfileContext";
 import { SearchBar } from "../components/SearchBar";
 import { Card, Screen, BookCover } from "../components/ui";
+import { invalidateCatalogCache } from "../utils/catalogCache";
+import { invalidateDigitalCache } from "../utils/digitalCache";
+import { runSideEffect } from "../utils/apiError";
 import { useTheme } from "../theme";
 import {
   getDashboardCache,
@@ -32,14 +35,16 @@ function toMs(value: unknown): number {
 
 export default function HomeScreen({ navigation }: Props) {
   const { colors, fontFamily, radius, space, type } = useTheme();
-  const { profile } = useProfile();
+  const { profile, refresh: refreshProfile } = useProfile();
   const [unread, setUnread] = useState(0);
   const [quickSearch, setQuickSearch] = useState("");
   const [summary, setSummary] = useState<DashboardSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const loadDashboard = useCallback(async () => {
-    const cached = await getDashboardCache();
+  const loadDashboard = useCallback(async (opts?: { skipCache?: boolean }) => {
+    // Pull-to-refresh skips the cached snapshot so the user sees live numbers.
+    const cached = opts?.skipCache ? null : await getDashboardCache();
     if (cached) setSummary(cached);
 
     try {
@@ -98,15 +103,26 @@ export default function HomeScreen({ navigation }: Props) {
       }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [profile?.activeBorrowCount, profile?.totalOutstandingFines]);
 
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
-      loadDashboard();
+      void loadDashboard();
     }, [loadDashboard])
   );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    runSideEffect(() => {
+      invalidateCatalogCache();
+      invalidateDigitalCache();
+    });
+    void refreshProfile().catch(() => {});
+    void loadDashboard({ skipCache: true });
+  }, [loadDashboard, refreshProfile]);
 
   const displayName =
     profile?.displayName || firebaseAuth.currentUser?.displayName || "there";
@@ -122,7 +138,12 @@ export default function HomeScreen({ navigation }: Props) {
   const goToActivity = () => navigation.getParent()?.navigate("Activity");
 
   return (
-    <Screen scroll contentStyle={{ paddingHorizontal: 20 }}>
+    <Screen
+      scroll
+      contentStyle={{ paddingHorizontal: 20 }}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+    >
       <View
         style={{
           flexDirection: "row",

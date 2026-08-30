@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../theme";
 import { Card } from "./Card";
@@ -42,6 +43,8 @@ export function AuthLayout({
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
     >
+      {/* Auth shell is dark in both themes, so status bar icons stay light. */}
+      <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={[
           styles.scroll,

@@ -33,7 +33,7 @@ No em dashes in UI copy.
 | 9 | E-books tab and reader | 13, 14 | Medium |
 | 10 | Profile and settings | 15, 7, 5 (dark toggle) | Low |
 | 11 | Notifications polish | 16 | Low |
-| R | Reservation harden | return→queue→ready | High — **PARKED incomplete** |
+| R | Reservation harden | return→queue→ready | Superseded by **Phase 16** |
 | B | Auth + modals + profile | extras | Done |
 | B2 | UX harden + lockout + reviews | extras | Medium |
 | C | Available Copies UI | extras | Low |
@@ -42,6 +42,7 @@ No em dashes in UI copy.
 | 13 | Motion, haptics, perf | 4, 17, 18 | Low |
 | 14 | Dark theme completion | 5 | Low |
 | 15 | QA and Week 2 tag prep | all | Low |
+| 16 | Circulation and queue reconcile | ex Phase R | High |
 
 Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 
@@ -516,14 +517,18 @@ Authentication → Templates → Password reset:
 
 ## Phase 13: Motion, haptics, global UX (4, 17, 18)
 
+**Status:** Done (2026-08-30, Phase X). See [`mobile-week2-qa.md`](mobile-week2-qa.md).
+
 **Goal:** App feels responsive and finished.
 
 **Tasks**
-- [ ] Pressable opacity/scale on buttons and cards (4).
-- [ ] Pull-to-refresh on Home, Catalog, Activity, Notifications where missing.
-- [ ] Haptics: borrow, return, reserve success, scan success.
-- [ ] Pass all major screens for **ErrorState + retry** and **skeleton** (17).
-- [ ] Expand session cache (18): catalog page, home summary, profile me.
+- [x] Pressable opacity/scale on buttons and cards (4).
+- [x] Pull-to-refresh on Home (last gap); Catalog / Activity / Notifications already had it.
+- [x] Haptics: borrow, return, reserve, cancel reservation, bookshelf add/remove, review, upload.
+- [x] Shared `extractApiError` / `runSideEffect` helpers so transport faults, timeouts and server
+      rejections read differently and post-success work cannot fake a failure.
+- [x] Pass all major screens for **ErrorState + retry** and **skeleton** (17).
+- [x] Expand session cache (18): catalog page, home summary, profile me.
 
 **Regression:** No jank on low-end device; cache invalidates on pull-to-refresh.
 
@@ -533,13 +538,19 @@ Authentication → Templates → Password reset:
 
 ## Phase 14: Dark theme completion (5)
 
+**Status:** Done (2026-08-30, Phase X). See [`mobile-week2-qa.md`](mobile-week2-qa.md).
+
 **Goal:** Dark mode is designed, not inverted gray.
 
 **Tasks**
-- [ ] Dark palette: navy-tinted backgrounds (`#1A2834`), cream-muted text, amber accents unchanged.
-- [ ] All UI components and screens audited (auth, tabs, modals, scan overlay).
-- [ ] StatusBar style per theme.
-- [ ] Toggle in Profile persists (AsyncStorage).
+- [x] Dark palette: navy-tinted backgrounds (`#1A2834`), cream-muted text, amber accents unchanged.
+- [x] All UI components and screens audited (auth, tabs, modals, scan overlay).
+  - `AddBookScreen` was hardcoded light throughout; rebuilt on theme tokens + shared primitives.
+  - `EmptyState` used the static light palette import; now `useTheme()`.
+  - Scan overlay used `colors.white` for text, which is dark navy in dark mode and became
+    invisible over the camera. Overlay now uses fixed on-camera colours.
+- [x] StatusBar style per theme, forced light on the auth shell and the Scan camera.
+- [x] Toggle in Profile persists (AsyncStorage), device-global rather than per account.
 
 **Regression:** Toggle live; no unreadable text; BookCover placeholder works in dark.
 
@@ -549,15 +560,36 @@ Authentication → Templates → Password reset:
 
 ## Phase 15: QA, docs, Week 2 readiness
 
-**Goal:** Stable Week 2 on `dev`; ready for merge/APK when you choose.
+**Status:** Automated checks + docs done (2026-08-30, Phase X). Manual Expo Go smoke is yours to run.
 
 **Tasks**
-- [ ] Full smoke script (student + staff accounts) on Render API.
-- [ ] Update `docs/mobile-week2-scope.md` with "done" notes if anything shifted.
-- [ ] Optional: short `docs/mobile-week2-qa.md` checklist.
+- [x] Verification harness: `npm run verify`, `verify:heal`, `verify:config`, `verify:flow`.
+- [x] Typecheck clean across `api`, `admin`, `mobile`.
+- [x] `docs/mobile-week2-qa.md` written with fixes, proofs and a manual smoke script.
+- [ ] Full manual smoke (student + staff accounts) in Expo Go.
 - [ ] User decision: merge `dev` → `main`, redeploy Render, new EAS APK.
 
 **Git:** `docs: week2 mobile QA checklist` then tag when releasing (e.g. `v2.0.0-week2`).
+
+---
+
+## Phase 16: Circulation, queues and inventory reconcile (replaces Phase R)
+
+**Status:** Done (2026-08-30, Phase X). Audit is clean; see [`mobile-week2-qa.md`](mobile-week2-qa.md).
+
+**Goal:** Return → queue → ready is provable, and catalog availability never lies.
+
+**Tasks**
+- [x] Book detail derives counters from live copy rows and self-heals stored drift.
+- [x] Cancel reservation busts the mobile catalog cache so freed copies show immediately.
+- [x] Config booleans coerced server-side (a string `"false"` cannot be stored as truthy).
+- [x] Integrity audit covering counter drift, starved queues, orphan reserved copies,
+      broken ready holds, and issued copies without an active loan.
+- [x] Acceptance test: A borrow → B reserve → A return → B ready → B claim → shelf restored.
+
+**Note:** Several symptoms originally filed under Phase R were the mobile `ReferenceError`
+described in the QA doc: the API committed the return but the app rendered a failure sheet, so the
+data looked broken when it was not. The remaining server-side drift risks are covered above.
 
 ---
 

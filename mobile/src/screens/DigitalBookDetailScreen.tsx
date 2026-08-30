@@ -7,6 +7,7 @@ import {
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
@@ -14,7 +15,11 @@ import api from "../config/api";
 import { AppModal } from "../components/AppModal";
 import { BookCover, Button, Card, BackButton } from "../components/ui";
 import { BookDetailSkeleton } from "../components/Skeleton";
+import { invalidateDigitalCache } from "../utils/digitalCache";
+import { extractApiError, runSideEffect } from "../utils/apiError";
 import { useTheme } from "../theme";
+
+const safeInvalidateDigitalCache = () => runSideEffect(invalidateDigitalCache);
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -219,63 +224,75 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
     if (shelf || busy) return;
     setBusy(true);
     setModal({ visible: false, message: "" });
+
+    let added: any = null;
     try {
       const res = await api.post(`/api/digital-books/${digitalBookId}/bookshelf`);
-      setShelf(res.data);
-      setModal({ visible: false, message: "" });
-      setAddedModalOpen(true);
-      invalidateDigitalCache();
+      added = res.data ?? {};
     } catch (error: any) {
+      setBusy(false);
       setAddedModalOpen(false);
       setModal({
         visible: true,
-        message: error.response?.data?.error || "Could not add to bookshelf",
+        message: extractApiError(error, "Could not add to bookshelf"),
       });
-    } finally {
-      setBusy(false);
+      return;
     }
+
+    setBusy(false);
+    setShelf(added);
+    setAddedModalOpen(true);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    safeInvalidateDigitalCache();
   };
 
   const removeFromBookshelf = async () => {
     setRemoveConfirmOpen(false);
     setModal({ visible: false, message: "" });
     setBusy(true);
+
     try {
       await api.delete(`/api/digital-books/${digitalBookId}/bookshelf`);
-      setShelf(null);
-      invalidateDigitalCache();
     } catch (error: any) {
+      setBusy(false);
       setModal({
         visible: true,
-        message: error.response?.data?.error || "Could not remove from bookshelf",
+        message: extractApiError(error, "Could not remove from bookshelf"),
       });
-    } finally {
-      setBusy(false);
+      return;
     }
+
+    setBusy(false);
+    setShelf(null);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    safeInvalidateDigitalCache();
   };
 
   const submitReview = async () => {
     setConfirmReviewOpen(false);
     setModal({ visible: false, message: "" });
     setBusy(true);
+
     try {
       await api.put(`/api/digital-books/${digitalBookId}/reviews`, {
         rating: draftRating,
         recommendScore: draftRecommend,
         comment: draftComment.trim(),
       });
-      setReviewLocked(true);
-      setModal({ visible: false, message: "" });
-      setReviewSuccessOpen(true);
-      await load({ silent: true });
     } catch (error: any) {
+      setBusy(false);
       setModal({
         visible: true,
-        message: error.response?.data?.error || "Could not save your review",
+        message: extractApiError(error, "Could not save your review"),
       });
-    } finally {
-      setBusy(false);
+      return;
     }
+
+    setBusy(false);
+    setReviewLocked(true);
+    setReviewSuccessOpen(true);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    void load({ silent: true });
   };
 
   const requestReviewConfirm = () => {

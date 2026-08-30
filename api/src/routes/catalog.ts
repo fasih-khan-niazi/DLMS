@@ -130,6 +130,26 @@ function getAvailabilityLabel(doc: {
   return "Unavailable";
 }
 
+/** Derives catalog counters from live copy rows (the source of truth). */
+function countCopyStatuses(copies: Array<{ status?: string }>) {
+  let availableCount = 0;
+  let issuedCount = 0;
+  let reservedCount = 0;
+
+  for (const copy of copies) {
+    if (copy.status === "available") availableCount += 1;
+    else if (copy.status === "issued") issuedCount += 1;
+    else if (copy.status === "reserved") reservedCount += 1;
+  }
+
+  return {
+    availableCount,
+    issuedCount,
+    reservedCount,
+    totalCopies: copies.length,
+  };
+}
+
 // Lookup ISBN metadata via Google Books (manual fallback handled by client if null)
 router.get(
   "/lookup/:isbn",
@@ -739,6 +759,10 @@ router.get("/books/:isbn", authenticate, async (req: AuthRequest, res: Response)
 
     const copies = copiesSnap.docs.map((doc) => doc.data());
 
+    // Copy rows are the source of truth. Derive counts from them so a drifted
+    // counter can never make a returned book keep showing as issued/reserved.
+    const liveCounts = countCopyStatuses(copies);
+
     let pendingReservationCount = 0;
     if (isStaff) {
       const reservationsSnap = await db
@@ -749,10 +773,35 @@ router.get("/books/:isbn", authenticate, async (req: AuthRequest, res: Response)
       pendingReservationCount = reservationsSnap.size;
     }
 
+    // Self-heal stored counters in the background when they disagree.
+    if (
+      Number(data.availableCount || 0) !== liveCounts.availableCount ||
+      Number(data.issuedCount || 0) !== liveCounts.issuedCount ||
+      Number(data.reservedCount || 0) !== liveCounts.reservedCount ||
+      Number(data.totalCopies || 0) !== liveCounts.totalCopies
+    ) {
+      console.warn(
+        `[catalog] counter drift healed for ${isbn}:`,
+        {
+          stored: {
+            availableCount: data.availableCount,
+            issuedCount: data.issuedCount,
+            reservedCount: data.reservedCount,
+            totalCopies: data.totalCopies,
+          },
+          live: liveCounts,
+        }
+      );
+      void catalogDoc.ref
+        .update({ ...liveCounts, updatedAt: new Date() })
+        .catch((error) => console.error("[catalog] counter heal failed:", error));
+    }
+
     res.json({
       ...data,
+      ...liveCounts,
       isActive: data.isActive !== false,
-      availability: getAvailabilityLabel(data),
+      availability: getAvailabilityLabel(liveCounts),
       thumbnailUrl: resolveCoverThumbnail(data, req, isbn),
       copies,
       ...(isStaff ? { pendingReservationCount } : {}),
