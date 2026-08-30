@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { Pressable, Text } from "react-native";
+import { Text } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { firebaseAuth } from "../config/firebase";
 import api from "../config/api";
 import { AppModal } from "../components/AppModal";
 import { useToast } from "../components/AppToast";
-import { AuthLayout, AuthLink, Button, Input } from "../components/ui";
+import { AuthLayout, AuthLink, Button, Input, PressableScale } from "../components/ui";
 import { useTheme } from "../theme";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
@@ -31,7 +31,6 @@ export default function LoginScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [missingOpen, setMissingOpen] = useState(false);
   const [lockSheet, setLockSheet] = useState<LockSheet>(null);
-  const [forgotPressed, setForgotPressed] = useState(false);
 
   const handleLogin = async () => {
     const trimmed = email.trim();
@@ -133,10 +132,9 @@ export default function LoginScreen({ navigation }: Props) {
           textContentType="password"
         />
 
-        <Pressable
+        <PressableScale
           onPress={() => navigation.navigate("ForgotPassword", { email: email.trim() })}
-          onPressIn={() => setForgotPressed(true)}
-          onPressOut={() => setForgotPressed(false)}
+          haptic="selection"
           hitSlop={8}
           style={{
             alignSelf: "flex-end",
@@ -145,20 +143,18 @@ export default function LoginScreen({ navigation }: Props) {
             paddingVertical: 4,
             paddingHorizontal: 8,
             borderRadius: 8,
-            backgroundColor: forgotPressed ? "rgba(232, 168, 56, 0.22)" : "transparent",
           }}
         >
           <Text
             style={{
-              color: forgotPressed ? colors.amberDark : colors.amberDark,
+              color: colors.amberDark,
               fontSize: type.small,
               fontFamily: fontFamily.bodySemiBold,
-              textDecorationLine: forgotPressed ? "underline" : "none",
             }}
           >
             Forgot password?
           </Text>
-        </Pressable>
+        </PressableScale>
 
         <Button title="Sign in" onPress={handleLogin} loading={loading} />
       </AuthLayout>

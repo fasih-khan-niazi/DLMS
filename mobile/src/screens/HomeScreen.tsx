@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from "react";
-import { Text, View, Pressable, ScrollView } from "react-native";
+import React, { useCallback, useMemo, useState } from "react";
+import { Text, View, ScrollView } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,7 +7,7 @@ import api from "../config/api";
 import { firebaseAuth } from "../config/firebase";
 import { useProfile } from "../context/ProfileContext";
 import { SearchBar } from "../components/SearchBar";
-import { Card, Screen, BookCover } from "../components/ui";
+import { Card, Screen, BookCover, PressableScale } from "../components/ui";
 import { invalidateCatalogCache } from "../utils/catalogCache";
 import { invalidateDigitalCache } from "../utils/digitalCache";
 import { runSideEffect } from "../utils/apiError";
@@ -23,6 +23,8 @@ type Props = {
   navigation: NativeStackNavigationProp<any>;
 };
 
+const KARACHI = "Asia/Karachi";
+
 function toMs(value: unknown): number {
   if (!value) return 0;
   if (typeof value === "object" && value !== null && "toMillis" in value) {
@@ -34,9 +36,43 @@ function toMs(value: unknown): number {
   return 0;
 }
 
+function hourInKarachi(now = new Date()): number {
+  const hour = new Intl.DateTimeFormat("en-GB", {
+    timeZone: KARACHI,
+    hour: "numeric",
+    hour12: false,
+  }).format(now);
+  return Number(hour);
+}
+
+function dateLineKarachi(now = new Date()): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: KARACHI,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(now);
+}
+
+function timeLineKarachi(now = new Date()): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: KARACHI,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(now);
+}
+
+function greetingInKarachi(now = new Date()): string {
+  const hour = hourInKarachi(now);
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 export default function HomeScreen({ navigation }: Props) {
-  const { colors, fontFamily, radius, space, type } = useTheme();
-  const { profile, refresh: refreshProfile } = useProfile();
+  const { colors, fontFamily, radius, space, type, mode } = useTheme();
+  const { profile, refresh: refreshProfile, isStaff } = useProfile();
   const [unread, setUnread] = useState(0);
   const [quickSearch, setQuickSearch] = useState("");
   const [summary, setSummary] = useState<DashboardSnapshot | null>(null);
@@ -44,7 +80,6 @@ export default function HomeScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
 
   const loadDashboard = useCallback(async (opts?: { skipCache?: boolean }) => {
-    // Pull-to-refresh skips the cached snapshot so the user sees live numbers.
     const cached = opts?.skipCache ? null : await getDashboardCache();
     if (cached) setSummary(cached);
 
@@ -66,7 +101,7 @@ export default function HomeScreen({ navigation }: Props) {
 
       const reservations = resRes.data.reservations || [];
       const readyRows = reservations.filter((r: any) => r.status === "ready");
-      const readyReservations = readyRows.length;
+      const waitingRows = reservations.filter((r: any) => r.status === "waiting");
 
       const datedLoans = loans
         .map((loan: any) => ({ loan, due: toMs(loan.dueDate) }))
@@ -77,7 +112,7 @@ export default function HomeScreen({ navigation }: Props) {
 
       const continueReading = (shelfRes.data.items || [])
         .filter((item: any) => Number(item.progress) > 0 && Number(item.progress) < 100)
-        .slice(0, 6)
+        .slice(0, 8)
         .map((item: any) => ({
           digitalBookId: item.digitalBookId,
           title: item.title,
@@ -91,7 +126,8 @@ export default function HomeScreen({ navigation }: Props) {
       const snapshot: DashboardSnapshot = {
         activeLoans: loans.length,
         overdueLoans,
-        readyReservations,
+        readyReservations: readyRows.length,
+        waitingReservations: waitingRows.length,
         outstandingFines: profile?.totalOutstandingFines ?? 0,
         nextDueLabel: nextDue?.label,
         nextDueOverdue: nextDue?.overdue,
@@ -109,6 +145,7 @@ export default function HomeScreen({ navigation }: Props) {
           activeLoans: profile?.activeBorrowCount ?? 0,
           overdueLoans: 0,
           readyReservations: 0,
+          waitingReservations: 0,
           outstandingFines: profile?.totalOutstandingFines ?? 0,
           continueReading: [],
           fetchedAt: Date.now(),
@@ -140,6 +177,15 @@ export default function HomeScreen({ navigation }: Props) {
   const displayName =
     profile?.displayName || firebaseAuth.currentUser?.displayName || "there";
 
+  const clock = useMemo(() => {
+    const now = new Date();
+    return {
+      greeting: greetingInKarachi(now),
+      dateLine: dateLineKarachi(now),
+      timeLine: timeLineKarachi(now),
+    };
+  }, [summary?.fetchedAt]);
+
   const openUnifiedSearch = (query: string) => {
     const trimmed = query.trim();
     if (!trimmed) return;
@@ -158,9 +204,8 @@ export default function HomeScreen({ navigation }: Props) {
   const goToActivity = (tab?: string) =>
     navigation.getParent()?.navigate("Activity", tab ? { initialTab: tab } : undefined);
 
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const tileBg = colors.white;
+  const isDark = mode === "dark";
 
   return (
     <Screen
@@ -174,7 +219,7 @@ export default function HomeScreen({ navigation }: Props) {
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: space.md,
+          marginBottom: space.sm,
         }}
       >
         <Text
@@ -186,16 +231,16 @@ export default function HomeScreen({ navigation }: Props) {
         >
           DLMS
         </Text>
-        <Pressable
+        <PressableScale
           onPress={() => navigation.navigate("Notifications")}
           hitSlop={8}
           style={{
             flexDirection: "row",
             alignItems: "center",
             gap: 6,
-            backgroundColor: colors.white,
+            backgroundColor: tileBg,
             borderWidth: 1,
-            borderColor: colors.border,
+            borderColor: unread > 0 ? colors.amber : colors.border,
             borderRadius: radius.pill,
             paddingHorizontal: 12,
             paddingVertical: 8,
@@ -216,7 +261,7 @@ export default function HomeScreen({ navigation }: Props) {
             >
               <Text
                 style={{
-                  color: colors.navyDark,
+                  color: isDark ? "#1A2834" : colors.navyDark,
                   fontSize: 10,
                   fontFamily: fontFamily.bodyBold,
                 }}
@@ -225,7 +270,7 @@ export default function HomeScreen({ navigation }: Props) {
               </Text>
             </View>
           ) : null}
-        </Pressable>
+        </PressableScale>
       </View>
 
       <Text
@@ -233,10 +278,20 @@ export default function HomeScreen({ navigation }: Props) {
           fontFamily: fontFamily.display,
           fontSize: type.titleSm,
           color: colors.navy,
-          marginBottom: space.lg,
         }}
       >
-        {greeting}, {displayName}
+        {clock.greeting}, {displayName}
+      </Text>
+      <Text
+        style={{
+          marginTop: 4,
+          marginBottom: space.lg,
+          fontFamily: fontFamily.body,
+          fontSize: type.small,
+          color: colors.muted,
+        }}
+      >
+        {clock.dateLine} · {clock.timeLine} PKT
       </Text>
 
       <View style={{ marginBottom: space.lg }}>
@@ -260,55 +315,45 @@ export default function HomeScreen({ navigation }: Props) {
           </Card>
         ) : (
           <>
-            <Pressable onPress={() => goToActivity("loans")}>
+            <PressableScale onPress={() => goToActivity("loans")}>
               <Card>
                 <Text style={{ fontFamily: fontFamily.bodyBold, fontSize: type.body, color: colors.navy }}>
                   {(summary?.activeLoans ?? 0) === 1
                     ? "1 active loan"
                     : `${summary?.activeLoans ?? 0} active loans`}
                 </Text>
-                {summary?.nextDueLabel ? (
-                  <Text
-                    style={{
-                      marginTop: 6,
-                      fontFamily: fontFamily.bodySemiBold,
-                      fontSize: type.small,
-                      color: summary.nextDueOverdue ? colors.danger : colors.muted,
-                    }}
-                  >
-                    {summary.nextDueLabel}
-                  </Text>
-                ) : (
-                  <Text style={{ marginTop: 6, fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
-                    Nothing on loan. Scan a copy to borrow.
-                  </Text>
-                )}
+                <Text
+                  style={{
+                    marginTop: 6,
+                    fontFamily: fontFamily.bodySemiBold,
+                    fontSize: type.small,
+                    color: summary?.nextDueOverdue ? colors.danger : colors.muted,
+                  }}
+                >
+                  {summary?.nextDueLabel || "Nothing on loan. Scan a copy to borrow."}
+                </Text>
               </Card>
-            </Pressable>
+            </PressableScale>
 
             {(summary?.overdueLoans ?? 0) > 0 || (summary?.outstandingFines ?? 0) > 0 ? (
-              <Pressable onPress={() => goToActivity("loans")}>
+              <PressableScale onPress={() => goToActivity("loans")}>
                 <Card style={{ borderWidth: 1, borderColor: colors.danger }}>
                   <Text style={{ fontFamily: fontFamily.bodyBold, fontSize: type.body, color: colors.danger }}>
                     {(summary?.overdueLoans ?? 0) > 0
                       ? `${summary?.overdueLoans} overdue ${summary?.overdueLoans === 1 ? "loan" : "loans"}`
                       : "Unpaid fines"}
                   </Text>
-                  {(summary?.outstandingFines ?? 0) > 0 ? (
-                    <Text style={{ marginTop: 6, fontFamily: fontFamily.body, fontSize: type.small, color: colors.text }}>
-                      Outstanding fines: Rs {summary?.outstandingFines}
-                    </Text>
-                  ) : (
-                    <Text style={{ marginTop: 6, fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
-                      Return soon to avoid extra charges.
-                    </Text>
-                  )}
+                  <Text style={{ marginTop: 6, fontFamily: fontFamily.body, fontSize: type.small, color: colors.text }}>
+                    {(summary?.outstandingFines ?? 0) > 0
+                      ? `Outstanding fines: Rs ${summary?.outstandingFines}`
+                      : "Return soon to avoid extra charges."}
+                  </Text>
                 </Card>
-              </Pressable>
+              </PressableScale>
             ) : null}
 
             {(summary?.readyReservations ?? 0) > 0 ? (
-              <Pressable onPress={() => goToActivity("reservations")}>
+              <PressableScale onPress={() => goToActivity("reservations")}>
                 <Card style={{ borderWidth: 1, borderColor: colors.amber }}>
                   <Text style={{ fontFamily: fontFamily.bodyBold, fontSize: type.body, color: colors.navy }}>
                     Ready for pickup
@@ -319,7 +364,35 @@ export default function HomeScreen({ navigation }: Props) {
                       : `${summary?.readyReservations} reservation ready. Scan the copy to claim it.`}
                   </Text>
                 </Card>
-              </Pressable>
+              </PressableScale>
+            ) : null}
+
+            {(summary?.waitingReservations ?? 0) > 0 ? (
+              <PressableScale onPress={() => goToActivity("reservations")}>
+                <Card>
+                  <Text style={{ fontFamily: fontFamily.bodyBold, fontSize: type.body, color: colors.navy }}>
+                    {(summary?.waitingReservations ?? 0) === 1
+                      ? "1 title in the queue"
+                      : `${summary?.waitingReservations} titles in the queue`}
+                  </Text>
+                  <Text style={{ marginTop: 6, fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
+                    You will be notified when a copy is ready.
+                  </Text>
+                </Card>
+              </PressableScale>
+            ) : null}
+
+            {unread > 0 ? (
+              <PressableScale onPress={() => navigation.navigate("Notifications")}>
+                <Card>
+                  <Text style={{ fontFamily: fontFamily.bodyBold, fontSize: type.body, color: colors.navy }}>
+                    {unread === 1 ? "1 unread notice" : `${unread} unread notices`}
+                  </Text>
+                  <Text style={{ marginTop: 6, fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
+                    Due dates, holds, and library updates.
+                  </Text>
+                </Card>
+              </PressableScale>
             ) : null}
           </>
         )}
@@ -342,15 +415,18 @@ export default function HomeScreen({ navigation }: Props) {
             { label: "Catalog", icon: "library-outline" as const, onPress: goToCatalog },
             { label: "E-books", icon: "tablet-portrait-outline" as const, onPress: goToEbooks },
             { label: "Bookshelf", icon: "bookmarks-outline" as const, onPress: goToBookshelf },
+            ...(isStaff
+              ? [{ label: "Add book", icon: "add-circle-outline" as const, onPress: () => navigation.getParent()?.navigate("Profile", { screen: "AddBook" }) }]
+              : []),
           ].map((action) => (
-            <Pressable
+            <PressableScale
               key={action.label}
               onPress={action.onPress}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 6,
-                backgroundColor: colors.white,
+                backgroundColor: tileBg,
                 borderWidth: 1,
                 borderColor: colors.border,
                 borderRadius: radius.pill,
@@ -368,7 +444,7 @@ export default function HomeScreen({ navigation }: Props) {
               >
                 {action.label}
               </Text>
-            </Pressable>
+            </PressableScale>
           ))}
         </View>
       </Card>
@@ -391,7 +467,7 @@ export default function HomeScreen({ navigation }: Props) {
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {summary?.continueReading.map((item) => (
-              <Pressable
+              <PressableScale
                 key={item.digitalBookId}
                 onPress={() =>
                   navigation.getParent()?.navigate("Catalog", {
@@ -406,20 +482,12 @@ export default function HomeScreen({ navigation }: Props) {
                     },
                   })
                 }
-                style={{
-                  width: 140,
-                  marginRight: 10,
-                  padding: 12,
-                  backgroundColor: colors.white,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: radius.md,
-                }}
+                style={{ width: 92, marginRight: 12 }}
               >
                 <BookCover
                   uri={item.thumbnailUrl}
-                  width={116}
-                  height={72}
+                  width={92}
+                  height={138}
                   style={{ alignSelf: "center" }}
                 />
                 <Text
@@ -427,7 +495,7 @@ export default function HomeScreen({ navigation }: Props) {
                   style={{
                     marginTop: 8,
                     fontFamily: fontFamily.bodySemiBold,
-                    fontSize: type.small,
+                    fontSize: type.caption,
                     color: colors.navy,
                   }}
                 >
@@ -435,15 +503,15 @@ export default function HomeScreen({ navigation }: Props) {
                 </Text>
                 <Text
                   style={{
-                    marginTop: 4,
+                    marginTop: 2,
                     fontFamily: fontFamily.body,
                     fontSize: type.caption,
                     color: colors.muted,
                   }}
                 >
-                  {item.progress}% · Page {item.lastPage || 1}
+                  {item.progress}%
                 </Text>
-              </Pressable>
+              </PressableScale>
             ))}
           </ScrollView>
         )}

@@ -3,13 +3,12 @@ import {
   View,
   Text,
   FlatList,
-  Pressable,
   RefreshControl,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
-import { BookCover, Card, BackButton } from "../components/ui";
+import { BookCover, Card, BackButton, PressableScale } from "../components/ui";
 import { EmptyState } from "../components/EmptyState";
 import { SkeletonList } from "../components/Skeleton";
 import { useTheme } from "../theme";
@@ -20,6 +19,7 @@ type BookshelfItem = {
   author?: string;
   progress?: number;
   rating?: number;
+  thumbnailUrl?: string;
 };
 
 type Props = {
@@ -99,14 +99,14 @@ export default function BookshelfScreen({ navigation }: Props) {
   const notStarted = items.filter((item) => !item.progress);
 
   const renderItem = (item: BookshelfItem) => (
-    <Pressable
+    <PressableScale
       key={item.digitalBookId}
       onPress={() => openDetail(item.digitalBookId)}
       style={{ marginBottom: space.sm }}
     >
       <Card>
         <View style={{ flexDirection: "row", gap: space.md }}>
-          <BookCover width={56} height={84} />
+          <BookCover uri={item.thumbnailUrl} width={56} height={84} />
           <View style={{ flex: 1 }}>
             <Text
               numberOfLines={2}
@@ -157,7 +157,7 @@ export default function BookshelfScreen({ navigation }: Props) {
           </View>
         </View>
       </Card>
-    </Pressable>
+    </PressableScale>
   );
 
   return (

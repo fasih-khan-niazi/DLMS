@@ -1,11 +1,11 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, FlatList, Pressable, RefreshControl } from "react-native";
+import { View, Text, FlatList, RefreshControl } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
 import { SkeletonList } from "../components/Skeleton";
-import { Badge, ErrorState, ScreenHeader } from "../components/ui";
+import { Badge, ErrorState, ScreenHeader, PressableScale } from "../components/ui";
 import { useTheme } from "../theme";
 import {
   formatNoticeTime,
@@ -84,7 +84,7 @@ export default function NotificationsScreen({ navigation }: Props) {
           onBack={() => navigation.goBack()}
           right={
             unreadCount > 0 ? (
-              <Pressable onPress={() => void markAll()} hitSlop={10}>
+              <PressableScale onPress={() => void markAll()} hitSlop={10} haptic="selection">
                 <Text
                   style={{
                     fontFamily: fontFamily.bodySemiBold,
@@ -94,7 +94,7 @@ export default function NotificationsScreen({ navigation }: Props) {
                 >
                   Mark all read
                 </Text>
-              </Pressable>
+              </PressableScale>
             ) : (
               <View />
             )
@@ -150,17 +150,16 @@ export default function NotificationsScreen({ navigation }: Props) {
             </View>
           }
           renderItem={({ item }) => (
-            <Pressable
+            <PressableScale
               onPress={() => void onPressItem(item)}
-              style={({ pressed }) => ({
+              style={{
                 backgroundColor: item.read ? colors.white : unreadBg,
                 borderRadius: radius.lg,
                 padding: 16,
                 marginBottom: 10,
                 borderWidth: 1,
                 borderColor: item.read ? colors.border : colors.amber,
-                opacity: pressed ? 0.88 : 1,
-              })}
+              }}
             >
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <Badge label={typeLabel(item.type)} tone={typeTone(item.type)} />
@@ -206,7 +205,7 @@ export default function NotificationsScreen({ navigation }: Props) {
               >
                 {item.body}
               </Text>
-            </Pressable>
+            </PressableScale>
           )}
         />
       )}

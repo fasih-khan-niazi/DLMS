@@ -17,7 +17,7 @@ import api from "../config/api";
 import { SearchBar } from "../components/SearchBar";
 import { SkeletonList } from "../components/Skeleton";
 import { EmptyState } from "../components/EmptyState";
-import { BookCover, Badge, Button, Chip } from "../components/ui";
+import { BookCover, Badge, Button, Chip, PressableScale } from "../components/ui";
 import { useProfile } from "../context/ProfileContext";
 import { type PaginatedResponse } from "../types/pagination";
 import { getCatalogPageSize } from "../utils/appConfig";
@@ -221,7 +221,7 @@ export default function CatalogScreen({
 
     if (viewMode === "grid") {
       return (
-        <Pressable
+        <PressableScale
           style={[styles.gridCard, { backgroundColor: colors.white, borderColor: colors.border }]}
           onPress={() => navigation.navigate("BookDetail", { isbn: item.isbn })}
         >
@@ -242,12 +242,12 @@ export default function CatalogScreen({
           ) : (
             <Badge label={item.availability || "Unavailable"} tone={tone} style={{ marginTop: space.xs }} />
           )}
-        </Pressable>
+        </PressableScale>
       );
     }
 
     return (
-      <Pressable
+      <PressableScale
         style={[styles.card, { backgroundColor: colors.white, borderColor: colors.border }]}
         onPress={() => navigation.navigate("BookDetail", { isbn: item.isbn })}
       >
@@ -306,7 +306,7 @@ export default function CatalogScreen({
             </Text>
           ) : null}
         </View>
-      </Pressable>
+      </PressableScale>
     );
   };
 

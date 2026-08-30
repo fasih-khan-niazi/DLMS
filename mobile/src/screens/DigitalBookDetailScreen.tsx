@@ -3,7 +3,6 @@ import {
   View,
   Text,
   ScrollView,
-  Pressable,
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,7 +12,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import api from "../config/api";
 import { AppModal } from "../components/AppModal";
-import { BookCover, Button, Card, BackButton } from "../components/ui";
+import { BookCover, Button, Card, BackButton, PressableScale } from "../components/ui";
 import { BookDetailSkeleton } from "../components/Skeleton";
 import { invalidateDigitalCache } from "../utils/digitalCache";
 import { extractApiError, runSideEffect } from "../utils/apiError";
@@ -70,13 +69,19 @@ function StarRating({
   return (
     <View style={{ flexDirection: "row", gap: space.sm }}>
       {[1, 2, 3, 4, 5].map((star) => (
-        <Pressable key={star} onPress={() => onSelect(star)} disabled={disabled} hitSlop={8}>
+        <PressableScale
+          key={star}
+          onPress={() => onSelect(star)}
+          disabled={disabled}
+          hitSlop={8}
+          haptic="selection"
+        >
           <Ionicons
             name={(value || 0) >= star ? "star" : "star-outline"}
             size={size}
             color={(value || 0) >= star ? colors.amber : colors.muted}
           />
-        </Pressable>
+        </PressableScale>
       ))}
     </View>
   );
@@ -98,9 +103,10 @@ function NpsPicker({
       {scores.map((score) => {
         const selected = value === score;
         return (
-          <Pressable
+          <PressableScale
             key={score}
             disabled={disabled}
+            haptic="selection"
             onPress={() => onSelect(score)}
             style={{
               flex: 1,
@@ -121,7 +127,7 @@ function NpsPicker({
             >
               {score}
             </Text>
-          </Pressable>
+          </PressableScale>
         );
       })}
     </View>
@@ -554,7 +560,7 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
 
         {publishedReviews.length > 0 ? (
           <Card style={{ marginBottom: space.md }}>
-            <Pressable
+            <PressableScale
               onPress={() => setReviewsOpen((v) => !v)}
               style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
             >
@@ -583,7 +589,7 @@ export default function DigitalBookDetailScreen({ navigation, route }: Props) {
                 size={20}
                 color={colors.muted}
               />
-            </Pressable>
+            </PressableScale>
 
             {reviewsOpen ? (
               <View style={{ marginTop: space.md, gap: space.sm }}>

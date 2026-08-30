@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MyLoansScreen from "./MyLoansScreen";
 import ReservationsScreen from "./ReservationsScreen";
 import LoanHistoryScreen from "./LoanHistoryScreen";
 import { useTheme } from "../theme";
+import { PressableScale } from "../components/ui";
 
 type ActivityTab = "loans" | "reservations" | "returns";
 
@@ -65,8 +66,9 @@ export default function ActivityScreen({ navigation, route }: Props) {
         {tabs.map((item) => {
           const active = tab === item.id;
           return (
-            <Pressable
+            <PressableScale
               key={item.id}
+              haptic="selection"
               style={[
                 styles.switchBtn,
                 { borderRadius: radius.sm },
@@ -83,7 +85,7 @@ export default function ActivityScreen({ navigation, route }: Props) {
               >
                 {item.label}
               </Text>
-            </Pressable>
+            </PressableScale>
           );
         })}
       </View>

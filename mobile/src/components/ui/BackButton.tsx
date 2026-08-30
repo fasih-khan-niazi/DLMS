@@ -1,7 +1,8 @@
 import React from "react";
-import { Pressable, StyleSheet, type ViewStyle } from "react-native";
+import { StyleSheet, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../theme";
+import { PressableScale } from "./PressableScale";
 
 type Props = {
   onPress: () => void;
@@ -16,23 +17,19 @@ export function BackButton({ onPress, light = false, style, size = 24 }: Props) 
   const { colors } = useTheme();
 
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       hitSlop={12}
       accessibilityRole="button"
       accessibilityLabel="Go back"
-      style={({ pressed }) => [
-        styles.btn,
-        { opacity: pressed ? 0.65 : 1 },
-        style,
-      ]}
+      style={[styles.btn, style]}
     >
       <Ionicons
         name="chevron-back"
         size={size}
         color={light ? "#FFFFFF" : colors.navy}
       />
-    </Pressable>
+    </PressableScale>
   );
 }
 

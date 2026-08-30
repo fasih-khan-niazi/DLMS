@@ -14,7 +14,7 @@ import * as Haptics from "expo-haptics";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
 import { SearchBar } from "../components/SearchBar";
-import { BookCover, Badge, Button, Chip } from "../components/ui";
+import { BookCover, Badge, Button, Chip, PressableScale } from "../components/ui";
 import { EmptyState } from "../components/EmptyState";
 import { SkeletonList } from "../components/Skeleton";
 import { useProfile } from "../context/ProfileContext";
@@ -192,7 +192,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
   const renderBook = ({ item }: { item: DigitalBook }) => {
     if (viewMode === "grid") {
       return (
-        <Pressable
+        <PressableScale
           style={[styles.gridCard, { backgroundColor: colors.white, borderColor: colors.border }]}
           onPress={() => openBook(item.digitalBookId)}
         >
@@ -209,12 +209,12 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
             {item.title}
           </Text>
           <Badge label="PDF" tone="muted" style={{ marginTop: space.xs }} />
-        </Pressable>
+        </PressableScale>
       );
     }
 
     return (
-      <Pressable
+      <PressableScale
         style={[styles.card, { backgroundColor: colors.white, borderColor: colors.border }]}
         onPress={() => openBook(item.digitalBookId)}
       >
@@ -253,7 +253,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
           </Text>
         </View>
         <Badge label="PDF" tone="default" />
-      </Pressable>
+      </PressableScale>
     );
   };
 

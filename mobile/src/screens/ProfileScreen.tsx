@@ -10,7 +10,7 @@ import api from "../config/api";
 import { useProfile } from "../context/ProfileContext";
 import { useOnboarding } from "../context/OnboardingContext";
 import { AppModal } from "../components/AppModal";
-import { Button, Card, Screen } from "../components/ui";
+import { Button, Card, Screen, PressableScale } from "../components/ui";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -56,16 +56,15 @@ function MenuRow({
   const { colors, fontFamily, type } = useTheme();
 
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
-      style={({ pressed }) => ({
+      style={{
         flexDirection: "row",
         alignItems: "center",
         paddingVertical: 14,
         borderBottomWidth: last ? 0 : 1,
         borderBottomColor: colors.border,
-        opacity: pressed ? 0.85 : 1,
-      })}
+      }}
     >
       {icon ? (
         <Ionicons name={icon} size={20} color={colors.navy} style={{ marginRight: 12 }} />
@@ -118,7 +117,7 @@ function MenuRow({
         </View>
       ) : null}
       <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-    </Pressable>
+    </PressableScale>
   );
 }
 

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   ScrollView,
-  Pressable,
   RefreshControl,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
@@ -17,7 +16,7 @@ import { firebaseAuth } from "../config/firebase";
 import { useProfile } from "../context/ProfileContext";
 import { CopyQrModal } from "../components/CopyQrModal";
 import { AppModal } from "../components/AppModal";
-import { BookCover, Badge, Button, Card, BackButton, Input } from "../components/ui";
+import { BookCover, Badge, Button, Card, BackButton, Input, PressableScale } from "../components/ui";
 import { BookDetailSkeleton } from "../components/Skeleton";
 import { formatIsbn } from "../utils/isbn";
 import { invalidateCatalogCache } from "../utils/catalogCache";
@@ -68,6 +67,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
   const [allowInAppCopyBorrow, setAllowInAppCopyBorrow] = useState(false);
   const [librariansCanBorrow, setLibrariansCanBorrow] = useState(true);
   const [manageOpen, setManageOpen] = useState(false);
+  const [editingBook, setEditingBook] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editAuthors, setEditAuthors] = useState("");
   const [editCategories, setEditCategories] = useState("");
@@ -394,6 +394,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
       });
       if (data?.book) setBook((prev: any) => ({ ...prev, ...data.book }));
       runSideEffect(invalidateCatalogCache);
+      setEditingBook(false);
       setStaffModal({
         variant: "success",
         title: "Details saved",
@@ -620,8 +621,13 @@ export default function BookDetailScreen({ navigation, route }: Props) {
 
         {isStaff ? (
           <Card style={{ marginBottom: space.md }}>
-            <Pressable
-              onPress={() => setManageOpen((open) => !open)}
+            <PressableScale
+              onPress={() => {
+                setManageOpen((open) => {
+                  if (open) setEditingBook(false);
+                  return !open;
+                });
+              }}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
@@ -642,97 +648,147 @@ export default function BookDetailScreen({ navigation, route }: Props) {
                 size={20}
                 color={colors.navy}
               />
-            </Pressable>
+            </PressableScale>
             {manageOpen ? (
               <View style={{ marginTop: space.md }}>
-                <Input label="Title" value={editTitle} onChangeText={setEditTitle} />
-                <Input
-                  label="Authors"
-                  value={editAuthors}
-                  onChangeText={setEditAuthors}
-                  placeholder="Separate names with commas"
-                />
-                <Input
-                  label="Categories"
-                  value={editCategories}
-                  onChangeText={setEditCategories}
-                  placeholder="Fiction, Classics"
-                />
-                <Input
-                  label="Page count"
-                  value={editPageCount}
-                  onChangeText={setEditPageCount}
-                  keyboardType="number-pad"
-                />
-                <Input
-                  label="Description"
-                  value={editDescription}
-                  onChangeText={setEditDescription}
-                  multiline
-                />
-                <Button
-                  title="Save details"
-                  onPress={() => void saveBookDetails()}
-                  loading={savingDetails}
-                  style={{ marginBottom: space.md }}
-                />
+                {!editingBook ? (
+                  <>
+                    <Text style={{ fontFamily: fontFamily.body, fontSize: type.small, color: colors.text, lineHeight: 20 }}>
+                      {book.title}
+                    </Text>
+                    <Text style={{ marginTop: 4, fontFamily: fontFamily.body, fontSize: type.small, color: colors.muted }}>
+                      {(book.authors || []).join(", ") || "No authors"} · {book.totalCopies || 0} copies
+                    </Text>
+                    <Button
+                      title="Edit"
+                      variant="secondary"
+                      onPress={() => setEditingBook(true)}
+                      style={{ marginTop: space.md, marginBottom: space.md }}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Input label="Title" value={editTitle} onChangeText={setEditTitle} />
+                    <Input
+                      label="Authors"
+                      value={editAuthors}
+                      onChangeText={setEditAuthors}
+                      placeholder="Separate names with commas"
+                    />
+                    <Input
+                      label="Categories"
+                      value={editCategories}
+                      onChangeText={setEditCategories}
+                      placeholder="Fiction, Classics"
+                    />
+                    <Input
+                      label="Page count"
+                      value={editPageCount}
+                      onChangeText={setEditPageCount}
+                      keyboardType="number-pad"
+                    />
+                    <Input
+                      label="Description"
+                      value={editDescription}
+                      onChangeText={setEditDescription}
+                      multiline
+                    />
+                    <Button
+                      title="Save details"
+                      onPress={() => void saveBookDetails()}
+                      loading={savingDetails}
+                      style={{ marginBottom: space.sm }}
+                    />
+                    <Button
+                      title="Done editing"
+                      variant="softOutline"
+                      onPress={() => setEditingBook(false)}
+                      style={{ marginBottom: space.md }}
+                    />
 
-                <Text
-                  style={{
-                    fontFamily: fontFamily.bodyBold,
-                    fontSize: type.small,
-                    color: colors.navy,
-                    marginBottom: space.sm,
-                  }}
-                >
-                  Cover
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: fontFamily.body,
-                    fontSize: type.caption,
-                    color: colors.muted,
-                    marginBottom: space.sm,
-                  }}
-                >
-                  Source: {book.coverImageSource === "manual" ? "Manual" : "Google Books (auto)"}
-                </Text>
-                <Input
-                  label="Cover image URL"
-                  value={coverUrlDraft}
-                  onChangeText={setCoverUrlDraft}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  placeholder="https://..."
-                />
-                <Button
-                  title="Save cover URL"
-                  variant="secondary"
-                  onPress={saveCoverUrl}
-                  loading={savingCover}
-                  style={{ marginBottom: space.sm }}
-                />
-                <Button
-                  title="Upload image file"
-                  variant="amber"
-                  onPress={uploadCoverImage}
-                  loading={uploadingCover}
-                  style={{ marginBottom: space.md }}
-                />
+                    <Text
+                      style={{
+                        fontFamily: fontFamily.bodyBold,
+                        fontSize: type.small,
+                        color: colors.navy,
+                        marginBottom: space.sm,
+                      }}
+                    >
+                      Cover
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: fontFamily.body,
+                        fontSize: type.caption,
+                        color: colors.muted,
+                        marginBottom: space.sm,
+                      }}
+                    >
+                      Source: {book.coverImageSource === "manual" ? "Manual" : "Google Books (auto)"}
+                    </Text>
+                    <Input
+                      label="Cover image URL"
+                      value={coverUrlDraft}
+                      onChangeText={setCoverUrlDraft}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      placeholder="https://..."
+                    />
+                    <Button
+                      title="Save cover URL"
+                      variant="secondary"
+                      onPress={saveCoverUrl}
+                      loading={savingCover}
+                      style={{ marginBottom: space.sm }}
+                    />
+                    <Button
+                      title="Upload image file"
+                      variant="amber"
+                      onPress={uploadCoverImage}
+                      loading={uploadingCover}
+                      style={{ marginBottom: space.md }}
+                    />
 
-                <Input
-                  label="Add physical copies"
-                  value={addCopiesQty}
-                  onChangeText={setAddCopiesQty}
-                  keyboardType="number-pad"
-                />
-                <Button
-                  title="Add copies"
-                  variant="secondary"
-                  onPress={() => void addPhysicalCopies()}
-                  loading={addingCopies}
-                  style={{ marginBottom: space.md }}
-                />
+                    <Text
+                      style={{
+                        fontFamily: fontFamily.bodyBold,
+                        fontSize: type.small,
+                        color: colors.navy,
+                        marginBottom: 4,
+                      }}
+                    >
+                      Add physical copies
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: fontFamily.body,
+                        fontSize: type.caption,
+                        color: colors.muted,
+                        marginBottom: space.sm,
+                        lineHeight: 18,
+                      }}
+                    >
+                      Each save adds shelf copies. The default is 1 physical copy with its own QR label.
+                    </Text>
+                    <Input
+                      label="How many copies to add"
+                      value={addCopiesQty}
+                      onChangeText={setAddCopiesQty}
+                      keyboardType="number-pad"
+                    />
+                    <Button
+                      title={
+                        Number(addCopiesQty) === 1
+                          ? "Add 1 physical copy"
+                          : `Add ${addCopiesQty || "0"} physical copies`
+                      }
+                      variant="secondary"
+                      onPress={() => void addPhysicalCopies()}
+                      loading={addingCopies}
+                      style={{ marginBottom: space.md }}
+                    />
+                  </>
+                )}
 
                 <Button
                   title={book.isActive === false ? "Reactivate title" : "Deactivate title"}
@@ -859,7 +915,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
               return (
                 <Card key={copy.copyId} style={{ marginBottom: space.sm }}>
                   {isStaff ? (
-                    <Pressable
+                    <PressableScale
                       onPress={() =>
                         setExpandedCopyId((current) =>
                           current === copy.copyId ? null : copy.copyId
@@ -877,7 +933,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
                         size={20}
                         color={colors.navy}
                       />
-                    </Pressable>
+                    </PressableScale>
                   ) : (
                     statusBlock
                   )}

@@ -1,10 +1,10 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import { useFocusEffect } from "@react-navigation/native";
 import api from "../config/api";
-import { BookCover, Badge, Screen, BackButton } from "../components/ui";
+import { BookCover, Badge, Screen, BackButton, PressableScale } from "../components/ui";
 import { EmptyState } from "../components/EmptyState";
 import { SkeletonList } from "../components/Skeleton";
 import { CATALOG_TABS } from "../constants/catalogTabs";
@@ -136,7 +136,7 @@ export default function UnifiedSearchScreen({ navigation, route }: Props) {
             </Text>
           ) : (
             physical.map((item) => (
-              <Pressable
+              <PressableScale
                 key={item.isbn}
                 onPress={() =>
                   navigation.getParent()?.navigate("Catalog", {
@@ -183,7 +183,7 @@ export default function UnifiedSearchScreen({ navigation, route }: Props) {
                   label={item.availability || "Unavailable"}
                   tone={item.availability === "Available" ? "success" : "muted"}
                 />
-              </Pressable>
+                </PressableScale>
             ))
           )}
 
@@ -210,7 +210,7 @@ export default function UnifiedSearchScreen({ navigation, route }: Props) {
             </Text>
           ) : (
             digital.map((item) => (
-              <Pressable
+              <PressableScale
                 key={item.digitalBookId}
                 onPress={() =>
                   navigation.getParent()?.navigate("Catalog", {
@@ -252,12 +252,12 @@ export default function UnifiedSearchScreen({ navigation, route }: Props) {
                     {item.author || "Unknown author"}
                   </Text>
                 </View>
-              </Pressable>
+              </PressableScale>
             ))
           )}
 
           {refreshing ? null : (
-            <Pressable
+            <PressableScale
               onPress={() => {
                 setRefreshing(true);
                 load();
@@ -267,7 +267,7 @@ export default function UnifiedSearchScreen({ navigation, route }: Props) {
               <Text style={{ fontFamily: fontFamily.bodySemiBold, color: colors.navy }}>
                 Refresh results
               </Text>
-            </Pressable>
+            </PressableScale>
           )}
         </View>
       )}

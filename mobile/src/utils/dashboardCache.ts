@@ -7,6 +7,7 @@ export type DashboardSnapshot = {
   activeLoans: number;
   overdueLoans: number;
   readyReservations: number;
+  waitingReservations?: number;
   outstandingFines: number;
   nextDueLabel?: string;
   nextDueOverdue?: boolean;

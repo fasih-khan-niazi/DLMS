@@ -2,7 +2,6 @@ import React, { type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +11,7 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../../theme";
 import { Card } from "./Card";
+import { PressableScale } from "./PressableScale";
 
 type Props = {
   brandLine: string;
@@ -145,7 +145,7 @@ export function AuthLink({
   const isDark = mode === "dark";
 
   return (
-    <Pressable onPress={onPress} hitSlop={8} style={{ marginTop: space.md }}>
+    <PressableScale onPress={onPress} hitSlop={8} haptic="selection" style={{ marginTop: space.md }}>
       <Text
         style={{
           textAlign: "center",
@@ -156,7 +156,7 @@ export function AuthLink({
       >
         {label}
       </Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 
