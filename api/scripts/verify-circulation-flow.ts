@@ -36,17 +36,19 @@ async function client(uid: string): Promise<AxiosInstance> {
 }
 
 /**
- * Picks a single-copy title with every copy free and no live reservations.
- * A single copy is required: the API (correctly) refuses a reservation while
- * another copy of the same title is still on the shelf.
+ * Picks a title with 1–4 available copies and no live reservations.
+ * Every free copy will be borrowed before the reserve step, because the API
+ * (correctly) refuses a reservation while any copy of that title is on the shelf.
  */
 async function pickTestTitle(): Promise<{ isbn: string; title: string; copyIds: string[] }> {
   const catalogSnap = await db.collection("catalog").get();
+  let fallback: { isbn: string; title: string; copyIds: string[] } | null = null;
+
   for (const doc of catalogSnap.docs) {
     if (doc.data().isActive === false) continue;
     const copies = await db.collection("bookCopies").where("isbn", "==", doc.id).get();
-    if (copies.size !== 1) continue;
-    if (copies.docs.some((c) => c.data().status !== "available")) continue;
+    const available = copies.docs.filter((c) => c.data().status === "available").map((c) => c.id);
+    if (available.length === 0 || available.length > 4) continue;
 
     const reservations = await db
       .collection("reservations")
@@ -55,20 +57,25 @@ async function pickTestTitle(): Promise<{ isbn: string; title: string; copyIds: 
       .get();
     if (!reservations.empty) continue;
 
-    return {
+    const row = {
       isbn: doc.id,
       title: String(doc.data().title || doc.id),
-      copyIds: copies.docs.map((c) => c.id),
+      copyIds: available,
     };
+    if (available.length === 1) return row;
+    if (!fallback) fallback = row;
   }
+  if (fallback) return fallback;
   throw new Error(
-    "No single-copy title with a free copy and no reservations was found for testing"
+    "No title with a free copy and no reservations was found for testing"
   );
 }
 
 async function pickStudents(): Promise<[string, string]> {
-  const snap = await db.collection("users").where("role", "==", "student").limit(5).get();
-  const active = snap.docs.filter((d) => d.data().isActive !== false);
+  const snap = await db.collection("users").where("role", "==", "student").limit(8).get();
+  const active = snap.docs
+    .filter((d) => d.data().isActive !== false)
+    .sort((a, b) => Number(a.data().activeBorrowCount || 0) - Number(b.data().activeBorrowCount || 0));
   if (active.length < 2) throw new Error("Need at least two active student accounts");
   return [active[0].id, active[1].id];
 }
@@ -87,7 +94,7 @@ async function main() {
   const target = await pickTestTitle();
   const testCopy = target.copyIds[0];
 
-  console.log(`\nTitle:   ${target.title} (${target.isbn}), ${target.copyIds.length} copy(ies)`);
+  console.log(`\nTitle:   ${target.title} (${target.isbn}), ${target.copyIds.length} free copy(ies)`);
   console.log(`Student A: ${uidA}`);
   console.log(`Student B: ${uidB}`);
 
@@ -104,10 +111,12 @@ async function main() {
   const borrowedCopyIds = new Set<string>();
 
   try {
-    // 1. Student A borrows the copy in-app.
-    console.log(`\n1) Student A borrows copy ${testCopy}`);
-    await a.post("/api/loans/borrow", { copyId: testCopy });
-    borrowedCopyIds.add(testCopy);
+    // 1. Student A borrows every free copy so a reserve is legal.
+    console.log(`\n1) Student A borrows ${target.copyIds.length} free copy(ies)`);
+    for (const copyId of target.copyIds) {
+      await a.post("/api/loans/borrow", { copyId });
+      borrowedCopyIds.add(copyId);
+    }
     let state = await copyStatus(testCopy);
     if (state.status === "issued") pass("copy is issued");
     else fail(`copy status is ${state.status}, expected issued`);
@@ -121,18 +130,14 @@ async function main() {
     }
 
     // 3. Student B reserves while no copy is free.
-    const otherCopiesFree = target.copyIds.length > 1;
     console.log(`\n2) Student B reserves ${target.title}`);
     const reserveRes = await b.post("/api/reservations", { isbn: target.isbn });
     const reservationId = String(reserveRes.data.reservationId || reserveRes.data.id || "");
     if (reservationId) createdReservationIds.push(reservationId);
     const reserveStatus = String(reserveRes.data.status || "");
     console.log(`   reservation ${reservationId} status=${reserveStatus || "(unreported)"}`);
-    if (otherCopiesFree) {
-      pass("another copy was free, so an immediate ready hold is valid");
-    } else {
-      pass("reservation accepted into the waiting queue");
-    }
+    if (reservationId) pass("reservation accepted into the waiting queue");
+    else fail("no reservation id returned");
 
     // 4. Student A returns. The queue must be promoted in the same request.
     console.log(`\n3) Student A returns copy ${testCopy}`);

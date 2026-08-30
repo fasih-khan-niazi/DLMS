@@ -13,6 +13,11 @@
     "verify:heal": "tsx scripts/verify-phase-x.ts --reconcile",
     "verify:config": "tsx scripts/verify-config-http.ts",
     "verify:flow": "tsx scripts/verify-circulation-flow.ts",
+    "verify:ready-cancel": "tsx scripts/verify-ready-cancel.ts",
+    "verify:gates": "tsx scripts/verify-librarian-gates.ts",
+    "verify:dues": "tsx scripts/verify-due-fines.ts",
+    "verify:covers": "tsx scripts/verify-digital-covers.ts",
+    "verify:suite": "tsx scripts/verify-suite.ts",
     "inspect:copy": "tsx scripts/inspect-copy.ts"
   },
   "license": "MIT",

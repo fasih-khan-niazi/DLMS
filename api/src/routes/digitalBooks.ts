@@ -235,7 +235,9 @@ router.get("/bookshelf/mine", authenticate, async (req: AuthRequest, res: Respon
       .collection("bookshelf")
       .get();
 
-    const items = snap.docs.map((doc) => ({ digitalBookId: doc.id, ...doc.data() }));
+    const items = snap.docs.map((doc) =>
+      withCoverThumbnail(req, { digitalBookId: doc.id, ...doc.data() })
+    );
     items.sort((a: any, b: any) => {
       const aTime = a.lastReadAt?.toMillis?.() || a.addedAt?.toMillis?.() || 0;
       const bTime = b.lastReadAt?.toMillis?.() || b.addedAt?.toMillis?.() || 0;
