@@ -177,19 +177,11 @@ function MainTabNavigator() {
   const guardLibrarianScan = async (): Promise<boolean> => {
     if (profile?.role !== "librarian") return true;
 
-    // Show immediate feedback toast first if memory says borrowing is blocked and no loans
-    const cachedConfig = await getAppConfig(false);
-    const cachedLoans = Number(profile?.activeBorrowCount) || 0;
-    if (cachedConfig.librariansCanBorrow === false && cachedLoans === 0) {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
-      showToast("Borrowing is disabled for librarians.");
-    }
-
     invalidateAppConfigCache();
     const config = await getAppConfig(true);
     if (config.librariansCanBorrow) return true;
 
-    let activeLoans = cachedLoans;
+    let activeLoans = Number(profile?.activeBorrowCount) || 0;
     try {
       const me = await api.get("/api/auth/me");
       activeLoans = Number(me.data?.activeBorrowCount) || 0;
