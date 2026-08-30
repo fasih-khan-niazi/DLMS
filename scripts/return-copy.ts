@@ -1,11 +1,11 @@
-/**
+﻿/**
  * Operator helper: force-return a specific copy through the real API.
  * Used to clear a copy left issued by an interrupted test run.
  *
  * Usage (from api/): npx tsx scripts/return-copy.ts <copyId>
  */
 import axios from "axios";
-import { auth, db } from "../src/config/firebase";
+import { auth, db } from "../api/src/config/firebase";
 
 const API_BASE = (process.env.API_BASE_URL || "http://localhost:5000").replace(/\/$/, "");
 const FIREBASE_WEB_API_KEY = "AIzaSyCREotdbbgVbkqSIyMTA20LVbr2Bu0ZMCQ";

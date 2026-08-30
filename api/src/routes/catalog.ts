@@ -16,6 +16,12 @@ import {
   uploadBookCover,
 } from "../services/bookCoverStorage";
 import { cancelReservationsForDeactivatedTitle } from "../services/reservations";
+import {
+  getCatalogUserReview,
+  listCatalogReviews,
+  summarizeReviews,
+  upsertCatalogReview,
+} from "../services/catalogReviews";
 import { clampCatalogPageSize, getSystemConfig } from "../services/loans";
 import { createId } from "../utils/ids";
 import {
@@ -896,6 +902,87 @@ router.get("/copies/:copyId", authenticate, async (req: AuthRequest, res: Respon
   } catch (error) {
     console.error("Get copy error:", error);
     res.status(500).json({ error: "Failed to fetch copy" });
+  }
+});
+
+router.get("/books/:isbn/reviews", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const isbn = normalizeIsbn(req.params.isbn as string);
+    const catalogSnap = await db.collection("catalog").doc(isbn).get();
+    if (!catalogSnap.exists) {
+      res.status(404).json({ error: "Book not found" });
+      return;
+    }
+
+    const reviews = await listCatalogReviews(isbn);
+    const published = reviews.filter((row: any) => row.confirmed === true);
+    const summary = summarizeReviews(published);
+    const mine = req.uid ? await getCatalogUserReview(isbn, req.uid) : null;
+
+    res.json({
+      summary,
+      items: published.map((row: any) => ({
+        reviewId: row.reviewId || row.userId,
+        displayName: row.displayName || "Student",
+        rating: row.rating,
+        recommendScore: row.recommendScore ?? null,
+        comment: row.comment || "",
+        updatedAt: row.updatedAt,
+        isMine: row.userId === req.uid,
+      })),
+      mine,
+    });
+  } catch (error) {
+    console.error("List catalog reviews error:", error);
+    res.status(500).json({ error: "Failed to list reviews" });
+  }
+});
+
+router.put("/books/:isbn/reviews", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const isbn = normalizeIsbn(req.params.isbn as string);
+    const catalogSnap = await db.collection("catalog").doc(isbn).get();
+    if (!catalogSnap.exists) {
+      res.status(404).json({ error: "Book not found" });
+      return;
+    }
+
+    const rating = Number(req.body.rating);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      res.status(400).json({ error: "rating must be an integer 1-5" });
+      return;
+    }
+
+    let recommendScore: number | null = null;
+    if (req.body.recommendScore !== undefined && req.body.recommendScore !== null) {
+      recommendScore = Number(req.body.recommendScore);
+      if (!Number.isInteger(recommendScore) || recommendScore < 1 || recommendScore > 10) {
+        res.status(400).json({ error: "recommendScore must be an integer 1-10" });
+        return;
+      }
+    }
+
+    const userSnap = await db.collection("users").doc(req.uid!).get();
+    const displayName = String(userSnap.data()?.displayName || "Student");
+
+    const saved = await upsertCatalogReview({
+      isbn,
+      userId: req.uid!,
+      displayName,
+      rating,
+      recommendScore,
+      comment: req.body.comment,
+      confirm: true,
+    });
+
+    res.json(saved);
+  } catch (error: any) {
+    if (String(error?.message || "").includes("cannot be changed")) {
+      res.status(409).json({ error: "You already reviewed this title" });
+      return;
+    }
+    console.error("Upsert catalog review error:", error);
+    res.status(500).json({ error: "Failed to save review" });
   }
 });
 

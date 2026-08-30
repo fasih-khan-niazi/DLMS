@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Librarian borrow/reserve gates.
  *
  * When librariansCanBorrow is off, a librarian must get 403 on borrow and
  * reserve. A student must not get that same error for the same endpoints
- * (they may get 409 for other business reasons — that is still a pass).
+ * (they may get 409 for other business reasons â€” that is still a pass).
  *
  * Restores the original config flag.
  *
@@ -11,7 +11,7 @@
  *   npx tsx scripts/verify-librarian-gates.ts [apiBaseUrl]
  */
 import axios, { type AxiosInstance } from "axios";
-import { auth, db } from "../src/config/firebase";
+import { auth, db } from "../api/src/config/firebase";
 
 const API_BASE = (process.argv[2] || "http://localhost:5000").replace(/\/$/, "");
 const FIREBASE_WEB_API_KEY = "AIzaSyCREotdbbgVbkqSIyMTA20LVbr2Bu0ZMCQ";
@@ -55,8 +55,11 @@ async function main() {
   const isbn = String(copies.docs[0].data().isbn || "");
 
   const cfgRef = db.collection("config").doc("system");
-  const original = (await cfgRef.get()).data()?.librariansCanBorrow;
-  await cfgRef.set({ librariansCanBorrow: false }, { merge: true });
+  const cfgSnap = await cfgRef.get();
+  const original = cfgSnap.data()?.librariansCanBorrow;
+  const originalInApp = cfgSnap.data()?.allowInAppCopyBorrow;
+  // In-app borrow must be on so we reach the librarian role check, not the scan-only gate.
+  await cfgRef.set({ librariansCanBorrow: false, allowInAppCopyBorrow: true }, { merge: true });
 
   const lib = await client(librarian.id);
   const stu = await client(student.id);
@@ -98,12 +101,15 @@ async function main() {
       }
     }
   } finally {
-    if (original === undefined) {
-      await cfgRef.set({ librariansCanBorrow: false }, { merge: true });
-    } else {
-      await cfgRef.set({ librariansCanBorrow: original }, { merge: true });
-    }
+    await cfgRef.set(
+      {
+        librariansCanBorrow: original === undefined ? false : original,
+        allowInAppCopyBorrow: originalInApp === undefined ? false : originalInApp,
+      },
+      { merge: true }
+    );
     console.log(`\n   librariansCanBorrow restored to ${String(original ?? false)}`);
+    console.log(`   allowInAppCopyBorrow restored to ${String(originalInApp ?? false)}`);
   }
 
   console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : `${failures} CHECK(S) FAILED`}`);

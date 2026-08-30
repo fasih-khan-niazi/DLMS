@@ -273,28 +273,31 @@ router.delete("/:reservationId", authenticate, async (req: AuthRequest, res: Res
         }
       });
 
-      try {
-        const assigned = copyId
-          ? await assignCopyToNextReservation({
-              copyId,
-              isbn,
-              title,
-              excludeUserId: req.uid,
-            })
-          : null;
-        if (!assigned) {
-          await fulfillWaitingWithAvailableCopies(isbn);
-        }
-      } catch (error) {
-        console.error("Fulfill after ready cancel failed:", error);
-      }
-
       res.json({
         success: true,
         reservationId,
         released: true,
         message: "Hold cancelled. The copy was released.",
       });
+
+      // Reassign after the client already has a response so Cancel does not hang.
+      void (async () => {
+        try {
+          const assigned = copyId
+            ? await assignCopyToNextReservation({
+                copyId,
+                isbn,
+                title,
+                excludeUserId: req.uid,
+              })
+            : null;
+          if (!assigned) {
+            await fulfillWaitingWithAvailableCopies(isbn);
+          }
+        } catch (error) {
+          console.error("Fulfill after ready cancel failed:", error);
+        }
+      })();
       return;
     }
 
@@ -304,13 +307,11 @@ router.delete("/:reservationId", authenticate, async (req: AuthRequest, res: Res
       updatedAt: now,
     });
 
-    try {
-      await fulfillWaitingWithAvailableCopies(isbn);
-    } catch (error) {
-      console.error("Fulfill after cancel failed:", error);
-    }
-
     res.json({ success: true, reservationId });
+
+    void fulfillWaitingWithAvailableCopies(isbn).catch((error) => {
+      console.error("Fulfill after cancel failed:", error);
+    });
   } catch (error) {
     console.error("Cancel reservation error:", error);
     res.status(500).json({ error: "Failed to cancel reservation" });

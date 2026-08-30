@@ -4,7 +4,8 @@
  * Read-only / math checks first, then HTTP config, then mutating circulation
  * flows so a failure early does not leave the library mid-borrow.
  *
- * Usage (from api/):
+ * Usage (from repo root):
+ *   npm run verify:suite
  *   npx tsx scripts/verify-suite.ts [apiBaseUrl]
  */
 import { spawnSync } from "child_process";
@@ -16,6 +17,7 @@ const STEPS: Array<{ name: string; file: string; args?: boolean }> = [
   { name: "phase-x audit", file: "verify-phase-x.ts" },
   { name: "due / fines / holidays", file: "verify-due-fines.ts" },
   { name: "digital covers", file: "verify-digital-covers.ts", args: true },
+  { name: "notification dedupe", file: "verify-notifications.ts" },
   { name: "admin config HTTP", file: "verify-config-http.ts", args: true },
   { name: "librarian gates", file: "verify-librarian-gates.ts", args: true },
   { name: "ready-hold cancel", file: "verify-ready-cancel.ts", args: true },

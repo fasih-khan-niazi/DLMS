@@ -279,6 +279,59 @@ router.get("/:digitalBookId", authenticate, async (req: AuthRequest, res: Respon
   }
 });
 
+router.patch(
+  "/:digitalBookId",
+  authenticate,
+  requireRole("librarian", "admin"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const digitalBookId = req.params.digitalBookId as string;
+      const ref = db.collection("digitalBooks").doc(digitalBookId);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        res.status(404).json({ error: "Digital book not found" });
+        return;
+      }
+
+      const existing = snap.data()!;
+      const body = req.body || {};
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
+
+      if (typeof body.title === "string" && body.title.trim()) {
+        updates.title = body.title.trim();
+      }
+      if (typeof body.author === "string") {
+        updates.author = body.author.trim();
+      }
+      if (typeof body.description === "string") {
+        updates.description = body.description.trim();
+      }
+
+      const nextTitle = String(updates.title ?? existing.title ?? "");
+      const nextAuthor = String(updates.author ?? existing.author ?? "");
+      updates.searchKeywords = buildSearchKeywords({
+        title: nextTitle,
+        authors: nextAuthor ? [nextAuthor] : [],
+        isbn: digitalBookId,
+      });
+
+      await ref.update(updates);
+      const fresh = await ref.get();
+      res.json({
+        success: true,
+        book: withCoverThumbnail(req, {
+          ...fresh.data(),
+          digitalBookId,
+          fileUrl: publicFileUrl(req, digitalBookId),
+        }),
+      });
+    } catch (error) {
+      console.error("Update digital book error:", error);
+      res.status(500).json({ error: "Failed to update digital book" });
+    }
+  }
+);
+
 // Stream/download PDF (authenticated) - proxies Supabase (or legacy local files)
 router.get("/:digitalBookId/cover-image", authenticate, async (req: AuthRequest, res: Response) => {
   try {

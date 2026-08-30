@@ -1,4 +1,4 @@
-import { db } from "../src/config/firebase";
+﻿import { db } from "../api/src/config/firebase";
 
 async function main() {
   const catalog = await db.collection("catalog").get();

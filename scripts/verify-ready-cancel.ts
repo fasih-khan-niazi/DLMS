@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Ready-hold cancel: borrow -> reserve -> return (promote) -> cancel ready.
  *
  * Asserts the copy goes back on the shelf (or to the next waiter) and that
@@ -8,7 +8,7 @@
  *   npx tsx scripts/verify-ready-cancel.ts [apiBaseUrl]
  */
 import axios, { type AxiosInstance } from "axios";
-import { auth, db } from "../src/config/firebase";
+import { auth, db } from "../api/src/config/firebase";
 
 const API_BASE = (process.argv[2] || "http://localhost:5000").replace(/\/$/, "");
 const FIREBASE_WEB_API_KEY = "AIzaSyCREotdbbgVbkqSIyMTA20LVbr2Bu0ZMCQ";
@@ -114,7 +114,7 @@ async function main() {
     if (reservationId) pass(`waiting reservation ${reservationId}`);
     else fail("no reservation id returned");
 
-    console.log(`\n3) Student A returns one copy — hold should become ready`);
+    console.log(`\n3) Student A returns one copy â€” hold should become ready`);
     await a.post("/api/loans/return", { copyId: primaryCopy });
     borrowedCopyIds.delete(primaryCopy);
 

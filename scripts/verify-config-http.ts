@@ -1,4 +1,4 @@
-/**
+﻿/**
  * End-to-end HTTP check for the admin config round trip.
  *
  * Mints an admin ID token, then drives the real endpoints to prove that
@@ -9,7 +9,7 @@
  *   npx tsx scripts/verify-config-http.ts [apiBaseUrl]
  */
 import axios from "axios";
-import { auth, db } from "../src/config/firebase";
+import { auth, db } from "../api/src/config/firebase";
 
 const API_BASE = (process.argv[2] || "http://localhost:5000").replace(/\/$/, "");
 const FIREBASE_WEB_API_KEY = "AIzaSyCREotdbbgVbkqSIyMTA20LVbr2Bu0ZMCQ";

@@ -188,6 +188,7 @@ export async function assignCopyToNextReservation(input: {
         copyId: input.copyId,
         isbn,
       },
+      dedupeKey: `reservation_ready_${next.id}`,
     });
   } catch (error) {
     // Hold is already committed — never roll back because push/inbox failed
@@ -334,6 +335,7 @@ export async function reconcileReservationsForIsbn(
           title: "Your book is ready",
           body: `"${opts?.title || waiter.title || "Reserved book"}" is ready for pickup.`,
           metadata: { reservationId: waiter.id, copyId: copy.id, isbn },
+          dedupeKey: `reservation_ready_${waiter.id}`,
         });
       } catch (error) {
         console.error("[reconcile] notify after promote failed:", error);
@@ -515,6 +517,7 @@ export async function cancelReservationsForDeactivatedTitle(input: {
         title: "Reservation cancelled",
         body: `Your reservation for "${input.title}" was cancelled because this title is no longer available in the catalog.`,
         metadata: { isbn, reservationId: doc.id },
+        dedupeKey: `reservation_cancelled_${doc.id}`,
       });
     }
 
@@ -594,6 +597,7 @@ export async function cancelLibrarianReservations() {
         title: "Reservation cancelled",
         body: `Your reservation for "${title}" was cancelled because librarian borrowing is disabled.`,
         metadata: { isbn, reservationId: doc.id },
+        dedupeKey: `reservation_cancelled_${doc.id}`,
       });
 
       cancelled += 1;
@@ -693,6 +697,7 @@ export async function expireReadyReservationHolds() {
           title: "Reservation expired",
           body: `Your hold on "${titleName}" ended. The copy was released.`,
           metadata: { reservationId: doc.id, isbn, copyId: copyId || "" },
+          dedupeKey: `reservation_expired_${doc.id}`,
         });
       } catch (error) {
         console.error("[reservations] expire notify failed:", error);

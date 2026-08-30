@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Phase X verification harness.
  *
  * Read-only audit of the live Firestore data plus an optional reconcile pass.
@@ -12,11 +12,11 @@
  *   npx tsx scripts/verify-phase-x.ts            audit only
  *   npx tsx scripts/verify-phase-x.ts --reconcile audit, reconcile, re-audit
  */
-import { db } from "../src/config/firebase";
+import { db } from "../api/src/config/firebase";
 import {
   normalizeIsbn,
   reconcileAllWaitingQueues,
-} from "../src/services/reservations";
+} from "../api/src/services/reservations";
 
 const BOOLEAN_CONFIG_FIELDS = [
   "blockCheckoutIfUnpaidFine",

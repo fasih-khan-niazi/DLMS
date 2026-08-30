@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Due-date / holiday / fine math plus a live loan audit.
  *
  * 1. Unit-tests calculateFineAmount (on-time, 1 day late, multi-day).
@@ -9,8 +9,8 @@
  * Usage (from api/):
  *   npx tsx scripts/verify-due-fines.ts
  */
-import { db } from "../src/config/firebase";
-import { calculateDueDate, calculateFineAmount, getSystemConfig } from "../src/services/loans";
+import { db } from "../api/src/config/firebase";
+import { calculateDueDate, calculateFineAmount, getSystemConfig } from "../api/src/services/loans";
 
 let failures = 0;
 const pass = (msg: string) => console.log(`  PASS  ${msg}`);
@@ -97,7 +97,7 @@ async function main() {
     } else if (holidays.has(key)) {
       fail(`due ${key} is a configured holiday`);
     } else {
-      pass(`from ${toDateKey(from, timezone)} → due ${key} (${day})`);
+      pass(`from ${toDateKey(from, timezone)} â†’ due ${key} (${day})`);
     }
   }
 

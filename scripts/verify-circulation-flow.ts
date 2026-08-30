@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Phase 16 acceptance test: borrow -> reserve -> return -> ready -> claim.
  *
  * Drives the real HTTP endpoints with two student accounts and asserts the
@@ -10,7 +10,7 @@
  *   npx tsx scripts/verify-circulation-flow.ts [apiBaseUrl]
  */
 import axios, { type AxiosInstance } from "axios";
-import { auth, db } from "../src/config/firebase";
+import { auth, db } from "../api/src/config/firebase";
 
 const API_BASE = (process.argv[2] || "http://localhost:5000").replace(/\/$/, "");
 const FIREBASE_WEB_API_KEY = "AIzaSyCREotdbbgVbkqSIyMTA20LVbr2Bu0ZMCQ";
@@ -36,7 +36,7 @@ async function client(uid: string): Promise<AxiosInstance> {
 }
 
 /**
- * Picks a title with 1–4 available copies and no live reservations.
+ * Picks a title with 1â€“4 available copies and no live reservations.
  * Every free copy will be borrowed before the reserve step, because the API
  * (correctly) refuses a reservation while any copy of that title is on the shelf.
  */

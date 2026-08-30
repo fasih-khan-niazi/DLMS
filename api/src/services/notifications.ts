@@ -1,15 +1,21 @@
 import axios from "axios";
 import { db, messaging } from "../config/firebase";
 
+function sanitizeDedupeKey(raw: string) {
+  return raw.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 180);
+}
+
 export async function saveNotification(input: {
   userId: string;
   type: string;
   title: string;
   body: string;
   metadata?: Record<string, unknown>;
-}) {
+  /** Same key = one inbox row. Stops cron + /mine + reconcile double-fires. */
+  dedupeKey?: string;
+}): Promise<{ id: string; created: boolean }> {
   const now = new Date();
-  const ref = await db.collection("notifications").add({
+  const payload = {
     userId: input.userId,
     type: input.type,
     title: input.title,
@@ -17,8 +23,22 @@ export async function saveNotification(input: {
     ...(input.metadata || {}),
     read: false,
     sentAt: now,
-  });
-  return ref.id;
+  };
+
+  if (input.dedupeKey) {
+    const id = sanitizeDedupeKey(input.dedupeKey);
+    const ref = db.collection("notifications").doc(id);
+    const created = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (snap.exists) return false;
+      tx.set(ref, { ...payload, dedupeKey: id });
+      return true;
+    });
+    return { id, created };
+  }
+
+  const ref = await db.collection("notifications").add(payload);
+  return { id: ref.id, created: true };
 }
 
 async function sendExpoPush(
@@ -97,8 +117,12 @@ export async function notifyUser(input: {
   title: string;
   body: string;
   metadata?: Record<string, unknown>;
+  dedupeKey?: string;
 }) {
-  await saveNotification(input);
+  const saved = await saveNotification(input);
+  if (!saved.created) {
+    return { sent: 0, skipped: true };
+  }
   const data: Record<string, string> = { type: input.type };
   if (input.metadata) {
     Object.entries(input.metadata).forEach(([key, value]) => {
@@ -188,14 +212,17 @@ export async function runDailyLoanNotifications() {
 
     if (daysUntilDue > 0 && reminderDays.includes(daysUntilDue)) {
       const isUrgent = daysUntilDue === 1;
+      const loanId = String(loan.loanId || doc.id);
+      const kind = isUrgent ? "due_reminder_urgent" : "due_reminder";
       await notifyUser({
         userId: loan.userId,
-        type: isUrgent ? "due_reminder_urgent" : "due_reminder",
+        type: kind,
         title: isUrgent ? "Due tomorrow" : `Due in ${daysUntilDue} days`,
         body: isUrgent
           ? `"${titleName}" is due tomorrow. Please return it on time.`
           : `"${titleName}" is due in ${daysUntilDue} days.`,
-        metadata: { loanId: loan.loanId || doc.id },
+        metadata: { loanId },
+        dedupeKey: `${kind}_${loanId}_${todayKey}`,
       });
       if (isUrgent) urgent += 1;
       else reminders += 1;
@@ -207,12 +234,14 @@ export async function runDailyLoanNotifications() {
         await doc.ref.update({ status: "overdue", updatedAt: new Date() });
       }
 
+      const loanId = String(loan.loanId || doc.id);
       await notifyUser({
         userId: loan.userId,
         type: "overdue",
         title: "Book overdue",
         body: `"${titleName}" is overdue by ${lateDays} day(s). Estimated fine Rs ${fineAmount}.`,
-        metadata: { loanId: loan.loanId || doc.id, fineAmount: String(fineAmount) },
+        metadata: { loanId, fineAmount: String(fineAmount) },
+        dedupeKey: `overdue_${loanId}_${todayKey}`,
       });
       overdue += 1;
     }
