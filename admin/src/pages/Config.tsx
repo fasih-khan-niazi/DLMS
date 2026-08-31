@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api } from "../config/api";
+import { api, API_BASE_URL } from "../config/api";
 
 type SystemConfig = {
   maxBorrowLimit?: number;
@@ -11,7 +11,9 @@ type SystemConfig = {
   workingDaysOff?: string[];
   maxPdfSizeMb?: number;
   librariansCanBorrow?: boolean;
+  allowInAppCopyBorrow?: boolean;
   timezone?: string;
+  catalogPageSize?: number;
 };
 
 const defaults: SystemConfig = {
@@ -24,8 +26,27 @@ const defaults: SystemConfig = {
   workingDaysOff: ["Sunday"],
   maxPdfSizeMb: 25,
   librariansCanBorrow: true,
+  allowInAppCopyBorrow: false,
   timezone: "Asia/Karachi",
+  catalogPageSize: 10,
 };
+
+/** Human labels used when the connected API cannot store a setting. */
+const FIELD_LABELS: Record<string, string> = {
+  allowInAppCopyBorrow: "Allow in-app copy borrow/return",
+  librariansCanBorrow: "Librarians can borrow physical books",
+  blockCheckoutIfUnpaidFine: "Block new borrows and reservations while unpaid fines exist",
+  catalogPageSize: "Catalog page size",
+  maxPdfSizeMb: "Max PDF size",
+  reservationHoldHours: "Reservation hold hours",
+};
+
+function labelFor(field: string) {
+  return FIELD_LABELS[field] || field;
+}
+
+/** Settings added after the Week 1 API; used to detect an outdated backend. */
+const TOGGLE_FIELDS = ["allowInAppCopyBorrow", "librariansCanBorrow"] as const;
 
 export function ConfigPage() {
   const [form, setForm] = useState<SystemConfig>(defaults);
@@ -35,6 +56,7 @@ export function ConfigPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [unsupported, setUnsupported] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,9 +74,30 @@ export function ConfigPage() {
           setLoading(false);
         }
 
-        const { data } = await api.get<{ config: SystemConfig }>("/api/admin/config");
+        const { data } = await api.get<{
+          config: SystemConfig;
+          supportedFields?: string[];
+        }>("/api/admin/config", {
+          headers: { "Cache-Control": "no-cache" },
+          params: { _t: Date.now() },
+        });
         if (cancelled) return;
-        const cfg = { ...defaults, ...data.config };
+        const cfg: SystemConfig = {
+          ...defaults,
+          ...data.config,
+          allowInAppCopyBorrow: data.config?.allowInAppCopyBorrow === true,
+          librariansCanBorrow: data.config?.librariansCanBorrow !== false,
+        };
+
+        // An API that does not advertise a field cannot store it. Flag it now
+        // rather than letting the control appear to save and then revert.
+        if (Array.isArray(data.supportedFields)) {
+          const missing = TOGGLE_FIELDS.filter((f) => !data.supportedFields!.includes(f));
+          setUnsupported(missing);
+        } else {
+          setUnsupported([...TOGGLE_FIELDS]);
+        }
+
         setForm(cfg);
         sessionStorage.setItem("dlms.admin.config", JSON.stringify(cfg));
         const reminders = Array.isArray(cfg.reminderDaysBefore)
@@ -103,14 +146,44 @@ export function ConfigPage() {
         workingDaysOff,
         maxPdfSizeMb: form.maxPdfSizeMb,
         librariansCanBorrow: !!form.librariansCanBorrow,
+        allowInAppCopyBorrow: !!form.allowInAppCopyBorrow,
         timezone: form.timezone || "Asia/Karachi",
+        catalogPageSize: form.catalogPageSize,
       };
 
-      const { data } = await api.put<{ config: SystemConfig }>("/api/admin/config", payload);
-      const cfg = { ...defaults, ...data.config };
+      const { data } = await api.put<{
+        config: SystemConfig;
+        appliedFields?: string[];
+        supportedFields?: string[];
+      }>("/api/admin/config", payload);
+
+      const cfg: SystemConfig = {
+        ...defaults,
+        ...data.config,
+        allowInAppCopyBorrow: data.config?.allowInAppCopyBorrow === true,
+        librariansCanBorrow: data.config?.librariansCanBorrow !== false,
+      };
+
+      // Verify the server actually stored what we sent. Anything it did not
+      // acknowledge is reported instead of silently snapping back.
+      const applied = Array.isArray(data.appliedFields) ? data.appliedFields : null;
+      const dropped = applied
+        ? Object.keys(payload).filter((key) => !applied.includes(key))
+        : [];
+
       setForm(cfg);
       sessionStorage.setItem("dlms.admin.config", JSON.stringify(cfg));
-      setMessage("Configuration saved successfully.");
+
+      if (dropped.length > 0) {
+        setUnsupported(dropped);
+        setError(
+          `Saved, but this API rejected ${dropped.length} setting(s): ` +
+            `${dropped.map(labelFor).join(", ")}. The API at ${API_BASE_URL} is older than this portal.`
+        );
+      } else {
+        setUnsupported([]);
+        setMessage("Configuration saved successfully.");
+      }
     } catch {
       setError("Failed to save config");
     } finally {
@@ -141,10 +214,18 @@ export function ConfigPage() {
         <p className="muted">
           Grouped system settings for loans, fines, reservations, calendar, and digital library.
         </p>
+        <p className="muted small">Connected API: {API_BASE_URL}</p>
       </header>
 
       {message ? <p className="success-banner">{message}</p> : null}
       {error ? <p className="error-banner">{error}</p> : null}
+      {unsupported.length > 0 ? (
+        <p className="error-banner">
+          This API does not support {unsupported.map(labelFor).join(", ")}. Point the portal at an
+          API that has these settings (set VITE_API_URL in admin/.env, then restart the dev server),
+          or redeploy the API. Until then those controls cannot be saved.
+        </p>
+      ) : null}
 
       <form className="config-form config-form-sections" onSubmit={(e) => void onSubmit(e)}>
         <section className="config-section">
@@ -181,13 +262,30 @@ export function ConfigPage() {
               />
               Librarians can borrow physical books
             </label>
+            <label className="checkbox-row config-span">
+              <input
+                type="checkbox"
+                checked={!!form.allowInAppCopyBorrow}
+                disabled={unsupported.includes("allowInAppCopyBorrow")}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, allowInAppCopyBorrow: e.target.checked }))
+                }
+              />
+              Allow in-app copy borrow/return (Scan remains primary; default off)
+              {unsupported.includes("allowInAppCopyBorrow") ? (
+                <span className="muted small"> (not supported by the connected API)</span>
+              ) : null}
+            </label>
           </div>
         </section>
 
         <section className="config-section">
           <div className="config-section-head">
             <h2>Fines</h2>
-            <p className="muted small">Late return charges and checkout blocking</p>
+            <p className="muted small">
+              Late charges. Returning a copy with an unpaid fine is always blocked until the desk
+              records payment. This toggle only controls new borrows and reservations.
+            </p>
           </div>
           <div className="config-grid">
             <label>
@@ -207,7 +305,13 @@ export function ConfigPage() {
                   setForm((p) => ({ ...p, blockCheckoutIfUnpaidFine: e.target.checked }))
                 }
               />
-              Block borrow and reserve while unpaid fines exist
+              <span>
+                Block new borrows and reservations while unpaid fines exist
+                <span className="muted small" style={{ display: "block", fontWeight: 400 }}>
+                  Off means they can still borrow or reserve with a balance. They still cannot
+                  return a late copy until that fine is paid.
+                </span>
+              </span>
             </label>
           </div>
         </section>
@@ -263,6 +367,26 @@ export function ConfigPage() {
                 placeholder="Sunday"
               />
               <span className="field-hint">Comma-separated weekday names</span>
+            </label>
+          </div>
+        </section>
+
+        <section className="config-section">
+          <div className="config-section-head">
+            <h2>Catalog</h2>
+            <p className="muted small">How many titles appear per page in mobile and admin lists</p>
+          </div>
+          <div className="config-grid">
+            <label>
+              Books per page
+              <input
+                type="number"
+                min={5}
+                max={50}
+                value={form.catalogPageSize ?? 10}
+                onChange={(e) => updateNumber("catalogPageSize", e.target.value)}
+              />
+              <span className="field-hint">Between 5 and 50. Default is 10.</span>
             </label>
           </div>
         </section>

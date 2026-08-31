@@ -2,17 +2,31 @@
 
 ## `docs/` - engineering (on GitHub)
 
-These files are for **developers, viva evidence, and GitHub visitors**. They stay in the repo.
+These files are for developers, viva evidence, and GitHub visitors. They stay in the repo.
 
-Examples: architecture, setup, roadmap, Firebase notes, device LAN setup, digital library, indexes, GitHub workflow.
+**Do not put `docs/` in `.gitignore`.**
 
-**Do not put `docs/` in `.gitignore`.** Ignoring project docs is not industry practice.
+### Start here
+
+| File | Use |
+|------|-----|
+| [`setup.md`](setup.md) | Local install and env |
+| [`architecture.md`](architecture.md) | How the system is wired |
+| [`deploy-render.md`](deploy-render.md) | Public API hosting |
+| [`device-setup.md`](device-setup.md) | Phone on LAN / Expo |
+| [`park.md`](park.md) | Freeze status and parked work |
+| [`roadmap.md`](roadmap.md) | Week 2+ direction |
+
+### Active runbooks
+
+Auth, Firebase, indexes, key rotation, Supabase, digital library, notifications inbox, admin web, security, VnV, seed, GitHub workflow.
+
+Week 2 mobile: [`mobile-week2-plan.md`](mobile-week2-plan.md), [`mobile-week2-scope.md`](mobile-week2-scope.md), [`mobile-week2-qa.md`](mobile-week2-qa.md).
+
+### Archive
+
+Week 1 history (demo checklist, Phase 8, polish blocks) is in [`week1-archive.md`](week1-archive.md).
 
 ## `docs/fyp/` - university FYP narrative
 
-Use this folder for **thesis / report drafts** (chapters, abstracts, screenshots for the report).
-
-- Safe to keep drafts here if you want them versioned with the project.
-- If a file must stay private (final Word report with personal data), add that filename to `.gitignore` or keep it outside the repo.
-
-Engineering truth lives in `docs/*.md`. FYP prose can summarize or cite those files instead of duplicating every detail.
+Thesis / report drafts. Engineering truth stays in `docs/*.md`.

@@ -1,6 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { colors, radius, space, type } from "../theme";
+import { View, Text, StyleSheet } from "react-native";
+import { Button } from "./ui/Button";
+import { useTheme } from "../theme";
 
 type Props = {
   title: string;
@@ -10,14 +11,38 @@ type Props = {
 };
 
 export function EmptyState({ title, message, actionLabel, onAction }: Props) {
+  const { colors, fontFamily, space, type } = useTheme();
+
   return (
-    <View style={styles.wrap}>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.message}>{message}</Text>
+    <View style={[styles.wrap, { paddingVertical: space.xxl, paddingHorizontal: space.lg }]}>
+      <Text
+        style={{
+          fontFamily: fontFamily.bodyBold,
+          fontSize: type.body,
+          color: colors.navy,
+          textAlign: "center",
+        }}
+      >
+        {title}
+      </Text>
+      <Text
+        style={{
+          marginTop: space.sm,
+          fontFamily: fontFamily.body,
+          fontSize: type.small,
+          color: colors.muted,
+          textAlign: "center",
+          lineHeight: 20,
+        }}
+      >
+        {message}
+      </Text>
       {actionLabel && onAction ? (
-        <TouchableOpacity style={styles.btn} onPress={onAction} activeOpacity={0.85}>
-          <Text style={styles.btnText}>{actionLabel}</Text>
-        </TouchableOpacity>
+        <Button
+          title={actionLabel}
+          onPress={onAction}
+          style={{ marginTop: space.md, alignSelf: "stretch" }}
+        />
       ) : null}
     </View>
   );
@@ -26,31 +51,5 @@ export function EmptyState({ title, message, actionLabel, onAction }: Props) {
 const styles = StyleSheet.create({
   wrap: {
     alignItems: "center",
-    paddingVertical: space.xxl,
-    paddingHorizontal: space.lg,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.navy,
-    textAlign: "center",
-  },
-  message: {
-    marginTop: space.sm,
-    fontSize: type.small,
-    color: colors.muted,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  btn: {
-    marginTop: space.md,
-    backgroundColor: colors.navy,
-    borderRadius: radius.md,
-    paddingHorizontal: space.lg,
-    paddingVertical: 12,
-  },
-  btnText: {
-    color: colors.white,
-    fontWeight: "700",
   },
 });

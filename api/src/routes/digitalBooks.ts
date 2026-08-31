@@ -8,19 +8,121 @@ import { requireRole } from "../middleware/requireRole";
 import { uploadPdf } from "../middleware/uploadPdf";
 import { createId } from "../utils/ids";
 import { buildSearchKeywords } from "../services/googleBooks";
-import { getSystemConfig } from "../services/loans";
+import { clampCatalogPageSize, getSystemConfig } from "../services/loans";
 import {
   downloadDigitalBookPdf,
   removeDigitalBookPdf,
   uploadDigitalBookPdf,
 } from "../services/digitalBookStorage";
+import { uploadBookCover, downloadBookCover } from "../services/bookCoverStorage";
+import {
+  digitalCoverObjectPath,
+  renderPdfFirstPageToJpeg,
+} from "../services/pdfCover";
+import {
+  getUserReview,
+  listDigitalBookReviews,
+  summarizeReviews,
+  upsertDigitalBookReview,
+} from "../services/digitalBookReviews";
+import {
+  LIST_FETCH_CAP,
+  paginateArray,
+  parseListQuery,
+  toMillis,
+} from "../utils/pagination";
+import { matchesTextQuery } from "../utils/textSearch";
 
 const router = Router();
+
+function sortDigitalBooks(items: Record<string, unknown>[], sort: string) {
+  const copy = [...items];
+  switch (sort) {
+    case "title_desc":
+      return copy.sort((a, b) => String(b.title || "").localeCompare(String(a.title || "")));
+    case "newest":
+      return copy.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
+    default:
+      return copy.sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")));
+  }
+}
 
 function publicFileUrl(req: AuthRequest, digitalBookId: string) {
   const host = req.get("host") || "localhost:5000";
   const protocol = req.protocol || "http";
   return `${protocol}://${host}/api/digital-books/${digitalBookId}/file`;
+}
+
+function buildDigitalCoverImageUrl(req: AuthRequest, digitalBookId: string) {
+  const host = req.get("host") || "localhost:5000";
+  const protocol = req.protocol || "http";
+  return `${protocol}://${host}/api/digital-books/${digitalBookId}/cover-image`;
+}
+
+function withCoverThumbnail(req: AuthRequest, row: Record<string, unknown>) {
+  const digitalBookId = String(row.digitalBookId || "");
+  // Always expose cover URL — endpoint lazy-generates from PDF page 1 if missing.
+  return {
+    ...row,
+    thumbnailUrl: buildDigitalCoverImageUrl(req, digitalBookId),
+  };
+}
+
+async function ensureDigitalCover(
+  digitalBookId: string,
+  data: Record<string, unknown>
+): Promise<{ buffer: Buffer; contentType: string; path: string }> {
+  const existingPath = String(data.coverStoragePath || "");
+  if (existingPath) {
+    try {
+      const file = await downloadBookCover(existingPath);
+      return { ...file, path: existingPath };
+    } catch {
+      // fall through and regenerate
+    }
+  }
+
+  const coverPath = digitalCoverObjectPath(digitalBookId);
+  try {
+    const file = await downloadBookCover(coverPath);
+    if (!existingPath) {
+      await db.collection("digitalBooks").doc(digitalBookId).update({
+        coverStoragePath: coverPath,
+        updatedAt: new Date(),
+      });
+    }
+    return { ...file, path: coverPath };
+  } catch {
+    // generate from PDF
+  }
+
+  const backend = String(data.storageBackend || "local");
+  let pdfBuffer: Buffer;
+  if (backend === "supabase") {
+    const objectPath = String(data.storagePath || data.storedFileName || "");
+    if (!objectPath) {
+      throw new Error("PDF storage path missing");
+    }
+    pdfBuffer = await downloadDigitalBookPdf(objectPath);
+  } else {
+    const filePath = digitalBookFilePath(String(data.storedFileName || ""));
+    if (!fs.existsSync(filePath)) {
+      throw new Error("PDF file missing on server");
+    }
+    pdfBuffer = fs.readFileSync(filePath);
+  }
+
+  const coverBuffer = await renderPdfFirstPageToJpeg(pdfBuffer);
+  await uploadBookCover({
+    objectPath: coverPath,
+    buffer: coverBuffer,
+    contentType: "image/jpeg",
+  });
+  await db.collection("digitalBooks").doc(digitalBookId).update({
+    coverStoragePath: coverPath,
+    updatedAt: new Date(),
+  });
+  return { buffer: coverBuffer, contentType: "image/jpeg", path: coverPath };
 }
 
 // List published digital books (search optional)
@@ -29,7 +131,14 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
     const q = String(req.query.q || "")
       .trim()
       .toLowerCase();
-    const limit = Math.min(Number(req.query.limit) || 40, 100);
+    const sort = String(req.query.sort || "title_asc");
+    const shelfFilter = String(req.query.shelfFilter || "all");
+    const config = await getSystemConfig();
+    const defaultPageSize = clampCatalogPageSize(config.catalogPageSize);
+    const { page, pageSize } = parseListQuery(
+      req.query as Record<string, unknown>,
+      defaultPageSize
+    );
 
     let snap;
     if (q) {
@@ -39,34 +148,78 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
         .filter(Boolean)
         .slice(0, 10);
       if (tokens.length === 0) {
-        res.json({ results: [] });
+        res.json(paginateArray([], page, pageSize));
         return;
       }
+      // Broad fetch + substring match ("mock" → "Mockingbird")
       snap = await db
         .collection("digitalBooks")
         .where("isPublished", "==", true)
-        .where("searchKeywords", "array-contains-any", tokens)
-        .limit(limit)
+        .limit(LIST_FETCH_CAP)
         .get();
     } else {
       snap = await db
         .collection("digitalBooks")
         .where("isPublished", "==", true)
-        .limit(limit)
+        .limit(LIST_FETCH_CAP)
         .get();
     }
 
-    const results: any[] = snap.docs.map((doc) => {
+    let results: Record<string, unknown>[] = snap.docs.map((doc) => {
       const data = doc.data();
-      return {
+      return withCoverThumbnail(req, {
         ...data,
         digitalBookId: data.digitalBookId || doc.id,
         fileUrl: publicFileUrl(req, data.digitalBookId || doc.id),
-      };
+      });
     });
 
-    results.sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")));
-    res.json({ results });
+    if (shelfFilter !== "all" && req.uid) {
+      const shelfSnap = await db
+        .collection("users")
+        .doc(req.uid)
+        .collection("bookshelf")
+        .get();
+      const shelfByBook = new Map(
+        shelfSnap.docs.map((doc) => [doc.id, doc.data() as Record<string, unknown>])
+      );
+
+      results = results.filter((row) => {
+        const id = String(row.digitalBookId || "");
+        const shelf = shelfByBook.get(id);
+        const progress = Number(shelf?.progress ?? 0);
+        switch (shelfFilter) {
+          case "saved":
+            // On bookshelf but not started reading yet
+            return !!shelf && progress <= 0;
+          case "reading":
+            return !!shelf && progress > 0 && progress < 100;
+          case "unread":
+            return !shelf;
+          case "finished":
+            return !!shelf && progress >= 100;
+          default:
+            return true;
+        }
+      });
+    }
+
+    if (q) {
+      results = results.filter((row) =>
+        matchesTextQuery(
+          {
+            title: String(row.title || ""),
+            author: String(row.author || ""),
+            searchKeywords: Array.isArray(row.searchKeywords)
+              ? row.searchKeywords.map(String)
+              : [],
+          },
+          q
+        )
+      );
+    }
+
+    res.json(paginateArray(sortDigitalBooks(results, sort), page, pageSize));
   } catch (error) {
     console.error("List digital books error:", error);
     res.status(500).json({ error: "Failed to list digital books" });
@@ -82,7 +235,9 @@ router.get("/bookshelf/mine", authenticate, async (req: AuthRequest, res: Respon
       .collection("bookshelf")
       .get();
 
-    const items = snap.docs.map((doc) => ({ digitalBookId: doc.id, ...doc.data() }));
+    const items = snap.docs.map((doc) =>
+      withCoverThumbnail(req, { digitalBookId: doc.id, ...doc.data() })
+    );
     items.sort((a: any, b: any) => {
       const aTime = a.lastReadAt?.toMillis?.() || a.addedAt?.toMillis?.() || 0;
       const bTime = b.lastReadAt?.toMillis?.() || b.addedAt?.toMillis?.() || 0;
@@ -116,6 +271,7 @@ router.get("/:digitalBookId", authenticate, async (req: AuthRequest, res: Respon
       ...data,
       digitalBookId,
       fileUrl: publicFileUrl(req, digitalBookId),
+      thumbnailUrl: buildDigitalCoverImageUrl(req, digitalBookId),
     });
   } catch (error) {
     console.error("Get digital book error:", error);
@@ -123,7 +279,170 @@ router.get("/:digitalBookId", authenticate, async (req: AuthRequest, res: Respon
   }
 });
 
+router.patch(
+  "/:digitalBookId",
+  authenticate,
+  requireRole("librarian", "admin"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const digitalBookId = req.params.digitalBookId as string;
+      const ref = db.collection("digitalBooks").doc(digitalBookId);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        res.status(404).json({ error: "Digital book not found" });
+        return;
+      }
+
+      const existing = snap.data()!;
+      const body = req.body || {};
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
+
+      if (typeof body.title === "string" && body.title.trim()) {
+        updates.title = body.title.trim();
+      }
+      if (typeof body.author === "string") {
+        updates.author = body.author.trim();
+      }
+      if (typeof body.description === "string") {
+        updates.description = body.description.trim();
+      }
+
+      const nextTitle = String(updates.title ?? existing.title ?? "");
+      const nextAuthor = String(updates.author ?? existing.author ?? "");
+      updates.searchKeywords = buildSearchKeywords({
+        title: nextTitle,
+        authors: nextAuthor ? [nextAuthor] : [],
+        isbn: digitalBookId,
+      });
+
+      await ref.update(updates);
+      const fresh = await ref.get();
+      res.json({
+        success: true,
+        book: withCoverThumbnail(req, {
+          ...fresh.data(),
+          digitalBookId,
+          fileUrl: publicFileUrl(req, digitalBookId),
+        }),
+      });
+    } catch (error) {
+      console.error("Update digital book error:", error);
+      res.status(500).json({ error: "Failed to update digital book" });
+    }
+  }
+);
+
 // Stream/download PDF (authenticated) - proxies Supabase (or legacy local files)
+router.get("/:digitalBookId/cover-image", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const digitalBookId = req.params.digitalBookId as string;
+    const snap = await db.collection("digitalBooks").doc(digitalBookId).get();
+    if (!snap.exists) {
+      res.status(404).json({ error: "Digital book not found" });
+      return;
+    }
+
+    const data = snap.data()!;
+    if (!data.isPublished && req.role !== "librarian" && req.role !== "admin") {
+      res.status(404).json({ error: "Digital book not found" });
+      return;
+    }
+
+    const file = await ensureDigitalCover(digitalBookId, data);
+    res.setHeader("Content-Type", file.contentType);
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    res.send(file.buffer);
+  } catch (error) {
+    console.error("Digital cover image error:", error);
+    res.status(404).json({ error: "Cover image not found" });
+  }
+});
+
+// Reviews MUST be before generic /:digitalBookId mutations that could conflict
+router.get("/:digitalBookId/reviews", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const digitalBookId = req.params.digitalBookId as string;
+    const bookSnap = await db.collection("digitalBooks").doc(digitalBookId).get();
+    if (!bookSnap.exists || !bookSnap.data()?.isPublished) {
+      res.status(404).json({ error: "Digital book not found" });
+      return;
+    }
+
+    const reviews = await listDigitalBookReviews(digitalBookId);
+    const published = reviews.filter((row: any) => row.confirmed === true);
+    const summary = summarizeReviews(published);
+    const mine = req.uid ? await getUserReview(digitalBookId, req.uid) : null;
+
+    res.json({
+      summary,
+      items: published.map((row: any) => ({
+        reviewId: row.reviewId || row.userId,
+        displayName: row.displayName || "Student",
+        rating: row.rating,
+        recommendScore: row.recommendScore ?? null,
+        comment: row.comment || "",
+        updatedAt: row.updatedAt,
+        isMine: row.userId === req.uid,
+      })),
+      mine,
+    });
+  } catch (error) {
+    console.error("List digital reviews error:", error);
+    res.status(500).json({ error: "Failed to list reviews" });
+  }
+});
+
+router.put("/:digitalBookId/reviews", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const digitalBookId = req.params.digitalBookId as string;
+    const bookSnap = await db.collection("digitalBooks").doc(digitalBookId).get();
+    if (!bookSnap.exists || !bookSnap.data()?.isPublished) {
+      res.status(404).json({ error: "Digital book not found" });
+      return;
+    }
+
+    const rating = Number(req.body.rating);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      res.status(400).json({ error: "rating must be an integer 1-5" });
+      return;
+    }
+
+    let recommendScore: number | null = null;
+    if (req.body.recommendScore !== undefined && req.body.recommendScore !== null) {
+      recommendScore = Number(req.body.recommendScore);
+      if (!Number.isInteger(recommendScore) || recommendScore < 1 || recommendScore > 10) {
+        res.status(400).json({ error: "recommendScore must be an integer 1-10" });
+        return;
+      }
+    }
+
+    const userSnap = await db.collection("users").doc(req.uid!).get();
+    const displayName = String(userSnap.data()?.displayName || "Student");
+
+    const saved = await upsertDigitalBookReview({
+      digitalBookId,
+      userId: req.uid!,
+      displayName,
+      rating,
+      recommendScore,
+      comment: req.body.comment,
+      confirm: true,
+    });
+
+    // Keep bookshelf rating in sync when present
+    const shelfRef = db.collection("users").doc(req.uid!).collection("bookshelf").doc(digitalBookId);
+    const shelfSnap = await shelfRef.get();
+    if (shelfSnap.exists) {
+      await shelfRef.update({ rating, updatedAt: new Date() });
+    }
+
+    res.json(saved);
+  } catch (error) {
+    console.error("Upsert digital review error:", error);
+    res.status(500).json({ error: "Failed to save review" });
+  }
+});
+
 router.get("/:digitalBookId/file", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const digitalBookId = req.params.digitalBookId as string;
@@ -237,6 +556,7 @@ router.post(
         isbn: digitalBookId,
       });
 
+      const coverStoragePath = digitalCoverObjectPath(digitalBookId);
       const doc = {
         digitalBookId,
         title,
@@ -249,6 +569,8 @@ router.post(
         mimeType: "application/pdf",
         isPublished: true,
         storageBackend: "supabase",
+        // Path reserved; image is generated in background so upload returns quickly.
+        coverStoragePath,
         searchKeywords,
         uploadedBy: req.uid,
         createdAt: now,
@@ -257,9 +579,25 @@ router.post(
 
       await db.collection("digitalBooks").doc(digitalBookId).set(doc);
 
+      // Non-blocking: first-page cover while client already sees the new title.
+      const pdfBuffer = req.file.buffer;
+      void (async () => {
+        try {
+          const coverBuffer = await renderPdfFirstPageToJpeg(pdfBuffer);
+          await uploadBookCover({
+            objectPath: coverStoragePath,
+            buffer: coverBuffer,
+            contentType: "image/jpeg",
+          });
+        } catch (coverError) {
+          console.warn("Digital cover generation failed (book still uploaded):", coverError);
+        }
+      })();
+
       res.status(201).json({
         ...doc,
         fileUrl: publicFileUrl(req, digitalBookId),
+        thumbnailUrl: buildDigitalCoverImageUrl(req, digitalBookId),
         message: "PDF uploaded to Supabase Storage",
       });
     } catch (error: any) {
@@ -386,6 +724,25 @@ router.patch(
         }
         updates.progress = progress;
         updates.lastReadAt = new Date();
+      }
+
+      if (req.body.lastPage !== undefined) {
+        const lastPage = Number(req.body.lastPage);
+        if (!Number.isInteger(lastPage) || lastPage < 1) {
+          res.status(400).json({ error: "lastPage must be a positive integer" });
+          return;
+        }
+        updates.lastPage = lastPage;
+        updates.lastReadAt = new Date();
+      }
+
+      if (req.body.totalPages !== undefined) {
+        const totalPages = Number(req.body.totalPages);
+        if (!Number.isInteger(totalPages) || totalPages < 1) {
+          res.status(400).json({ error: "totalPages must be a positive integer" });
+          return;
+        }
+        updates.totalPages = totalPages;
       }
 
       if (req.body.rating !== undefined && req.body.rating !== null) {

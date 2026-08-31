@@ -8,6 +8,7 @@ import fs from "fs";
 import dotenv from "dotenv";
 
 dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 function loadCredential() {
   const jsonInline = process.env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim();

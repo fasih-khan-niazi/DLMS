@@ -4,14 +4,22 @@ import {
   Text,
   FlatList,
   StyleSheet,
-  ActivityIndicator,
-  TouchableOpacity,
   RefreshControl,
-  Alert,
 } from "react-native";
+import * as Haptics from "../utils/haptics";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
+import { AppModal } from "../components/AppModal";
+import { Badge, Button, Card } from "../components/ui";
+import { EmptyState } from "../components/EmptyState";
+import { ErrorState } from "../components/ui/ErrorState";
+import { SkeletonList } from "../components/Skeleton";
+import { formatShortDate, reservationStatusChip } from "../utils/loanDates";
+import { goToCatalogTab } from "../utils/navigation";
+import { invalidateCatalogCache } from "../utils/catalogCache";
+import { extractApiError, runSideEffect } from "../utils/apiError";
+import { useTheme } from "../theme";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -19,16 +27,27 @@ type Props = {
 };
 
 export default function ReservationsScreen({ navigation, embedded }: Props) {
+  const { colors, fontFamily, space, type } = useTheme();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+  const [cancelId, setCancelId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    variant: "success" | "error";
+    title: string;
+    message: string;
+  } | null>(null);
 
   const load = async () => {
+    setError(false);
     try {
       const response = await api.get("/api/reservations/mine");
       setItems(response.data.reservations || []);
     } catch {
       setItems([]);
+      setError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -42,97 +61,201 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
     }, [])
   );
 
-  const formatDate = (value: any) => {
-    if (!value) return "-";
-    const date = value._seconds
-      ? new Date(value._seconds * 1000)
-      : new Date(value);
-    return date.toLocaleString();
+  const confirmCancel = async () => {
+    if (!cancelId || cancelling) return;
+    setCancelling(true);
+
+    try {
+      await api.delete(`/api/reservations/${cancelId}`);
+    } catch (err: any) {
+      setCancelling(false);
+      setCancelId(null);
+      setFeedback({
+        variant: "error",
+        title: "Could not cancel",
+        message: extractApiError(err, "Cancel failed. Try again."),
+      });
+      return;
+    }
+
+    // Server committed the cancel. Report success, then reconcile the views.
+    setCancelling(false);
+    setCancelId(null);
+    setFeedback({
+      variant: "success",
+      title: "Reservation cancelled",
+      message: "The hold is released. If someone else is waiting, they get the copy next.",
+    });
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+
+    // Cancelling can free a held copy, so catalog availability may change.
+    runSideEffect(invalidateCatalogCache);
+    void load();
   };
 
-  const cancelReservation = (reservationId: string) => {
-    Alert.alert("Cancel reservation?", "You will leave the waiting queue.", [
-      { text: "No", style: "cancel" },
-      {
-        text: "Yes, cancel",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await api.delete(`/api/reservations/${reservationId}`);
-            load();
-          } catch (error: any) {
-            Alert.alert("Error", error.response?.data?.error || "Cancel failed");
-          }
-        },
-      },
-    ]);
-  };
+  const goCatalog = () => goToCatalogTab(navigation);
+  const goScan = () => navigation.navigate("Scan");
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.cream }]}>
       {!embedded && (
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>← Back</Text>
-        </TouchableOpacity>
+        <Text style={[styles.heading, { color: colors.navy, fontFamily: fontFamily.display }]}>
+          My Reservations
+        </Text>
       )}
-      {!embedded && <Text style={styles.heading}>My Reservations</Text>}
-      {embedded && <Text style={styles.headingEmbedded}>Your reservations</Text>}
-      <Text style={styles.hint}>
-        When status is Ready, scan that copy&apos;s QR (Borrow mode) within 72 hours.
+
+      <Text
+        style={{
+          fontFamily: fontFamily.body,
+          fontSize: type.small,
+          color: colors.muted,
+          marginBottom: space.md,
+          lineHeight: 20,
+        }}
+      >
+        When status is Ready, scan that copy&apos;s QR (Borrow mode) within the hold window.
+        You can cancel a ready hold if you no longer need the book.
       </Text>
 
       {loading ? (
-        <ActivityIndicator color="#2E4A62" style={{ marginTop: 40 }} />
+        <SkeletonList rows={4} />
+      ) : error ? (
+        <ErrorState onRetry={() => { setLoading(true); void load(); }} />
       ) : (
         <FlatList
           data={items}
           keyExtractor={(item) => item.reservationId}
+          contentContainerStyle={{ paddingBottom: space.lg, flexGrow: 1 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => {
                 setRefreshing(true);
-                load();
+                void load();
               }}
+              tintColor={colors.navy}
             />
           }
           ListEmptyComponent={
-            <Text style={styles.empty}>No reservations yet.</Text>
+            <EmptyState
+              title="No reservations"
+              message="Reserve a book from its detail page when all copies are checked out."
+              actionLabel="Browse catalog"
+              onAction={goCatalog}
+            />
           }
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <Text style={styles.title}>{item.title || item.isbn}</Text>
-              <Text style={styles.meta}>ISBN: {item.isbn}</Text>
-              <Text style={styles.status}>Status: {item.status}</Text>
-              {item.status === "waiting" && (
-                <Text style={styles.meta}>Queue position: ~{item.queuePosition || "?"}</Text>
-              )}
-              {item.status === "ready" && (
-                <>
-                  <Text style={styles.ready}>Ready for pickup</Text>
-                  <Text style={styles.meta}>Copy: {item.assignedCopyId}</Text>
-                  <Text style={styles.meta}>Hold until: {formatDate(item.expiresAt)}</Text>
-                  <TouchableOpacity
-                    style={styles.scanButton}
-                    onPress={() => navigation.navigate("Scan")}
+          renderItem={({ item }) => {
+            const chip = reservationStatusChip(item.status);
+
+            return (
+              <Card style={{ marginBottom: space.sm }}>
+                <View style={styles.row}>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontFamily: fontFamily.bodyBold,
+                      fontSize: type.body,
+                      color: colors.navy,
+                    }}
                   >
-                    <Text style={styles.scanButtonText}>Open Scanner</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-              <Text style={styles.meta}>Created: {formatDate(item.createdAt)}</Text>
-              {item.status === "waiting" && (
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => cancelReservation(item.reservationId)}
+                    {item.title || item.isbn}
+                  </Text>
+                  <Badge label={chip.label} tone={chip.tone} />
+                </View>
+
+                {item.status === "waiting" && (
+                  <Text
+                    style={{
+                      marginTop: space.xs,
+                      fontFamily: fontFamily.body,
+                      fontSize: type.small,
+                      color: colors.muted,
+                    }}
+                  >
+                    Queue position: ~{item.queuePosition || "?"}
+                  </Text>
+                )}
+
+                {item.status === "ready" && (
+                  <>
+                    <Text
+                      style={{
+                        marginTop: space.sm,
+                        fontFamily: fontFamily.bodySemiBold,
+                        fontSize: type.small,
+                        color: colors.success,
+                      }}
+                    >
+                      Ready for pickup
+                    </Text>
+                    <Text
+                      style={{
+                        marginTop: 4,
+                        fontFamily: fontFamily.body,
+                        fontSize: type.small,
+                        color: colors.muted,
+                      }}
+                    >
+                      Hold until {formatShortDate(item.expiresAt)}
+                    </Text>
+                    <Button title="Open scanner" onPress={goScan} style={{ marginTop: space.sm }} />
+                  </>
+                )}
+
+                <Text
+                  style={{
+                    marginTop: space.sm,
+                    fontFamily: fontFamily.body,
+                    fontSize: type.caption,
+                    color: colors.muted,
+                  }}
                 >
-                  <Text style={styles.cancelText}>Cancel</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+                  Created {formatShortDate(item.createdAt)}
+                </Text>
+
+                {(item.status === "waiting" || item.status === "ready") && (
+                  <Button
+                    title="Cancel reservation"
+                    variant="dangerSoft"
+                    onPress={() => setCancelId(item.reservationId)}
+                    style={{ marginTop: space.md }}
+                  />
+                )}
+              </Card>
+            );
+          }}
         />
       )}
+
+      <AppModal
+        visible={!!cancelId}
+        variant="danger"
+        presentation="sheet"
+        title="Cancel reservation?"
+        message="You will leave this title. If a copy is held for you, it goes to the next person in the queue or back on the shelf."
+        confirmLabel="Yes, cancel"
+        confirmVariant="dangerSoft"
+        cancelLabel="Keep reservation"
+        confirmLoading={cancelling}
+        onClose={() => {
+          if (!cancelling) setCancelId(null);
+        }}
+        onConfirm={() => {
+          void confirmCancel();
+        }}
+        onCancel={() => {
+          if (!cancelling) setCancelId(null);
+        }}
+      />
+
+      <AppModal
+        visible={!!feedback}
+        variant={feedback?.variant || "info"}
+        title={feedback?.title || ""}
+        message={feedback?.message || ""}
+        confirmLabel="OK"
+        onClose={() => setFeedback(null)}
+      />
     </View>
   );
 }
@@ -140,80 +263,15 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F7F4",
-    paddingTop: 16,
     paddingHorizontal: 20,
-  },
-  back: {
-    color: "#E8A838",
-    marginBottom: 12,
-    fontSize: 16,
   },
   heading: {
     fontSize: 28,
-    fontWeight: "700",
-    color: "#2E4A62",
+    marginBottom: 8,
   },
-  headingEmbedded: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#2E4A62",
-    marginTop: 4,
-  },
-  hint: {
-    marginTop: 8,
-    marginBottom: 16,
-    color: "#6B7280",
-    fontSize: 13,
-  },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#2E4A62",
-  },
-  meta: {
-    marginTop: 4,
-    color: "#6B7280",
-  },
-  status: {
-    marginTop: 8,
-    color: "#4B5563",
-    fontWeight: "600",
-    textTransform: "capitalize",
-  },
-  ready: {
-    marginTop: 8,
-    color: "#6BA3A8",
-    fontWeight: "700",
-  },
-  scanButton: {
-    marginTop: 12,
-    backgroundColor: "#2E4A62",
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  scanButtonText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
-  cancelButton: {
-    marginTop: 12,
-    alignSelf: "flex-start",
-  },
-  cancelText: {
-    color: "#B91C1C",
-    fontWeight: "600",
-  },
-  empty: {
-    textAlign: "center",
-    color: "#6B7280",
-    marginTop: 40,
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
   },
 });

@@ -15,6 +15,9 @@ import reservationRoutes from "./routes/reservations";
 import digitalBookRoutes from "./routes/digitalBooks";
 import notificationRoutes from "./routes/notifications";
 import cronRoutes from "./routes/cron";
+import configRoutes from "./routes/config";
+import finesRoutes from "./routes/fines";
+import { requestLogger } from "./middleware/requestLogger";
 import { ensureUploadDirs } from "./config/storage";
 
 ensureUploadDirs();
@@ -38,6 +41,7 @@ app.use(
   })
 );
 app.use(express.json({ limit: "1mb" }));
+app.use(requestLogger);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -58,8 +62,10 @@ app.get("/health", (_req, res) => {
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/reports", reportsRoutes);
+app.use("/api/config", configRoutes);
 app.use("/api/catalog", catalogRoutes);
 app.use("/api/loans", loanRoutes);
+app.use("/api/fines", finesRoutes);
 app.use("/api/reservations", reservationRoutes);
 app.use("/api/digital-books", digitalBookRoutes);
 app.use("/api/notifications", notificationRoutes);

@@ -62,14 +62,14 @@ Phases **1-6** are implemented in this codebase:
 | [`docs/supabase.md`](docs/supabase.md) | PDF cloud storage |
 | [`docs/github-workflow.md`](docs/github-workflow.md) | Branches & commits |
 | [`docs/digital-library.md`](docs/digital-library.md) | PDF / e-library |
-| [`docs/polish-plan.md`](docs/polish-plan.md) | Completion / park polish blocks |
+| [`docs/week1-archive.md`](docs/week1-archive.md) | Week 1 history and old demo checklist |
 | [`docs/notifications-inbox.md`](docs/notifications-inbox.md) | In-app notification inbox |
 | [`docs/security.md`](docs/security.md) | Security checklist |
 | [`docs/vnv-matrix.md`](docs/vnv-matrix.md) | Business logic VnV matrix |
 | [`docs/seed.md`](docs/seed.md) | MVP seed script |
-| [`docs/park.md`](docs/park.md) | MVP freeze / park notes |
-| [`docs/deploy-render.md`](docs/deploy-render.md) | Public API on Render (off-LAN) |
-| [`docs/week1-demo.md`](docs/week1-demo.md) | Week 1 public demo checklist |
+| [`docs/park.md`](docs/park.md) | Freeze notes and parked work |
+| [`docs/mobile-week2-scope.md`](docs/mobile-week2-scope.md) | Week 2 mobile scope (locked) |
+| [`docs/mobile-week2-plan.md`](docs/mobile-week2-plan.md) | Week 2 mobile phased plan |
 | [`docs/firebase-key-rotation.md`](docs/firebase-key-rotation.md) | Rotate leaked Admin SDK key |
 
 Engineering docs under `docs/` **are committed** - that is normal industry practice. Only secrets and uploaded PDFs are ignored.

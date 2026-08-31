@@ -1,16 +1,19 @@
 import React, { useCallback, useState } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  ActivityIndicator,
-  TouchableOpacity,
-  RefreshControl,
-} from "react-native";
+import { View, Text, FlatList, StyleSheet, RefreshControl } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
+import { Badge, Card } from "../components/ui";
+import { EmptyState } from "../components/EmptyState";
+import { ErrorState } from "../components/ui/ErrorState";
+import { SkeletonList } from "../components/Skeleton";
+import {
+  dueCountdown,
+  formatShortDate,
+  loanStatusChip,
+} from "../utils/loanDates";
+import { goToCatalogTab } from "../utils/navigation";
+import { useTheme } from "../theme";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -18,16 +21,20 @@ type Props = {
 };
 
 export default function MyLoansScreen({ navigation, embedded }: Props) {
+  const { colors, fontFamily, space, type } = useTheme();
   const [loans, setLoans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
 
   const load = async () => {
+    setError(false);
     try {
-      const response = await api.get("/api/loans/mine");
+      const response = await api.get("/api/loans/mine", { params: { status: "active" } });
       setLoans(response.data.loans || []);
     } catch {
       setLoans([]);
+      setError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -41,57 +48,139 @@ export default function MyLoansScreen({ navigation, embedded }: Props) {
     }, [])
   );
 
-  const formatDate = (value: any) => {
-    if (!value) return "-";
-    const date = value._seconds
-      ? new Date(value._seconds * 1000)
-      : new Date(value);
-    return date.toLocaleDateString();
-  };
+  const goCatalog = () => goToCatalogTab(navigation);
+  const goScan = () => navigation.navigate("Scan");
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.cream }]}>
       {!embedded && (
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>← Back</Text>
-        </TouchableOpacity>
+        <Text style={[styles.heading, { color: colors.navy, fontFamily: fontFamily.display }]}>
+          My Loans
+        </Text>
       )}
-      {!embedded && <Text style={styles.heading}>My Loans</Text>}
-      {embedded && <Text style={styles.headingEmbedded}>Your loans</Text>}
 
       {loading ? (
-        <ActivityIndicator color="#2E4A62" style={{ marginTop: 40 }} />
+        <SkeletonList rows={4} />
+      ) : error ? (
+        <ErrorState onRetry={() => { setLoading(true); void load(); }} />
       ) : (
         <FlatList
           data={loans}
           keyExtractor={(item) => item.loanId}
+          contentContainerStyle={{ paddingBottom: space.lg, flexGrow: 1 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => {
                 setRefreshing(true);
-                load();
+                void load();
               }}
+              tintColor={colors.navy}
             />
           }
           ListEmptyComponent={
-            <Text style={styles.empty}>No loans yet. Scan a book QR to borrow.</Text>
+            <EmptyState
+              title="No active loans"
+              message="Browse the catalog or scan a book QR to borrow."
+              actionLabel="Browse catalog"
+              onAction={goCatalog}
+            />
           }
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <Text style={styles.title}>{item.title}</Text>
-              <Text style={styles.meta}>Status: {item.status}</Text>
-              <Text style={styles.meta}>Borrowed: {formatDate(item.borrowedAt)}</Text>
-              <Text style={styles.meta}>Due: {formatDate(item.dueDate)}</Text>
-              {item.fineAmount > 0 && (
-                <Text style={styles.fine}>
-                  Fine: Rs {item.fineAmount} {item.finePaid ? "(paid)" : "(unpaid)"}
+          renderItem={({ item }) => {
+            const status = loanStatusChip(item.status, item.dueDate);
+            const due = dueCountdown(item.dueDate);
+
+            return (
+              <Card style={{ marginBottom: space.sm }}>
+                <View style={styles.row}>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontFamily: fontFamily.bodyBold,
+                      fontSize: type.body,
+                      color: colors.navy,
+                    }}
+                  >
+                    {item.title}
+                  </Text>
+                  <Badge label={status.label} tone={status.tone} />
+                </View>
+                {item.copyNumber ? (
+                  <Text
+                    style={{
+                      marginTop: space.xs,
+                      fontFamily: fontFamily.bodySemiBold,
+                      fontSize: type.small,
+                      color: colors.navy,
+                    }}
+                  >
+                    Copy {item.copyNumber}
+                  </Text>
+                ) : null}
+                <Text
+                  style={{
+                    marginTop: item.copyNumber ? 4 : space.xs,
+                    fontFamily: fontFamily.body,
+                    fontSize: type.small,
+                    color: colors.muted,
+                  }}
+                >
+                  Borrowed {formatShortDate(item.borrowedAt)}
                 </Text>
-              )}
-            </View>
-          )}
+                <Text
+                  style={{
+                    marginTop: 4,
+                    fontFamily: fontFamily.bodySemiBold,
+                    fontSize: type.small,
+                    color: due.overdue ? colors.danger : colors.text,
+                  }}
+                >
+                  {due.label}
+                </Text>
+                <Text
+                  style={{
+                    marginTop: 4,
+                    fontFamily: fontFamily.body,
+                    fontSize: type.caption,
+                    color: colors.muted,
+                  }}
+                >
+                  Due {formatShortDate(item.dueDate)}
+                </Text>
+                {(Number(item.remainingFine) > 0 || Number(item.fineAmount) > 0) && (
+                  <Text
+                    style={{
+                      marginTop: space.sm,
+                      fontFamily: fontFamily.bodyBold,
+                      fontSize: type.small,
+                      color: Number(item.remainingFine) > 0 ? colors.danger : colors.muted,
+                    }}
+                  >
+                    {Number(item.remainingFine) > 0
+                      ? `Fine due: Rs ${item.remainingFine}. Pay at the desk before returning`
+                      : `Fine: Rs ${item.fineAmount} (paid)`}
+                  </Text>
+                )}
+              </Card>
+            );
+          }}
         />
       )}
+
+      {!loading && !error && loans.length > 0 ? (
+        <Text
+          style={{
+            textAlign: "center",
+            fontFamily: fontFamily.body,
+            fontSize: type.caption,
+            color: colors.muted,
+            marginBottom: space.sm,
+          }}
+          onPress={goScan}
+        >
+          Tap Scan tab to return a book
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -99,51 +188,15 @@ export default function MyLoansScreen({ navigation, embedded }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F8F7F4",
-    paddingTop: 16,
     paddingHorizontal: 20,
-  },
-  back: {
-    color: "#E8A838",
-    marginBottom: 12,
-    fontSize: 16,
   },
   heading: {
     fontSize: 28,
-    fontWeight: "700",
-    color: "#2E4A62",
     marginBottom: 16,
   },
-  headingEmbedded: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#2E4A62",
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#2E4A62",
-  },
-  meta: {
-    marginTop: 4,
-    color: "#6B7280",
-  },
-  fine: {
-    marginTop: 8,
-    color: "#B45309",
-    fontWeight: "700",
-  },
-  empty: {
-    textAlign: "center",
-    color: "#6B7280",
-    marginTop: 40,
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
   },
 });

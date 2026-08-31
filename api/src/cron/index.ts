@@ -1,9 +1,9 @@
 import cron from "node-cron";
-import { expireReadyReservationHolds } from "../services/reservations";
+import { runCirculationMaintenance } from "../services/reservations";
 import { runDailyLoanNotifications } from "../services/notifications";
 
 export function startCronJobs() {
-  // Daily job: due-date reminders and overdue alerts (midnight Asia/Karachi)
+  // Daily: due reminders, overdue alerts, estimated fine notices (midnight Karachi)
   cron.schedule(
     "0 0 * * *",
     async () => {
@@ -18,20 +18,29 @@ export function startCronJobs() {
     { timezone: "Asia/Karachi" }
   );
 
-  // Every 6 hours: expire 72h reservation holds
+  // Every 15 minutes: expire overdue ready holds, then assign waiting queues.
+  // Frequent enough that a 72h hold cannot sit days past expiresAt.
   cron.schedule(
-    "0 */6 * * *",
+    "*/15 * * * *",
     async () => {
-      console.log("[CRON] Running reservation expiry check...");
+      console.log("[CRON] Circulation maintenance...");
       try {
-        const result = await expireReadyReservationHolds();
-        console.log("[CRON] Reservation expiry result:", result);
+        const result = await runCirculationMaintenance();
+        console.log("[CRON] Circulation maintenance:", JSON.stringify(result));
       } catch (error) {
-        console.error("[CRON] Reservation expiry failed:", error);
+        console.error("[CRON] Circulation maintenance failed:", error);
       }
     },
     { timezone: "Asia/Karachi" }
   );
 
   console.log("Cron jobs scheduled (Asia/Karachi timezone)");
+
+  // Local watch/restarts never wait 6 hours. Expire + heal immediately after boot.
+  setTimeout(() => {
+    console.log("[CRON] Startup circulation maintenance...");
+    runCirculationMaintenance()
+      .then((result) => console.log("[CRON] Startup circulation maintenance:", JSON.stringify(result)))
+      .catch((error) => console.error("[CRON] Startup circulation maintenance failed:", error));
+  }, 4000);
 }

@@ -8,11 +8,23 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "verify": "tsx ../scripts/verify-phase-x.ts",
+    "verify:heal": "tsx ../scripts/verify-phase-x.ts --reconcile",
+    "verify:config": "tsx ../scripts/verify-config-http.ts",
+    "verify:flow": "tsx ../scripts/verify-circulation-flow.ts",
+    "verify:ready-cancel": "tsx ../scripts/verify-ready-cancel.ts",
+    "verify:gates": "tsx ../scripts/verify-librarian-gates.ts",
+    "verify:dues": "tsx ../scripts/verify-due-fines.ts",
+    "verify:covers": "tsx ../scripts/verify-digital-covers.ts",
+    "verify:notices": "tsx ../scripts/verify-notifications.ts",
+    "verify:suite": "tsx ../scripts/verify-suite.ts",
+    "inspect:copy": "tsx ../scripts/inspect-copy.ts"
   },
   "license": "MIT",
   "type": "commonjs",
   "dependencies": {
+    "@napi-rs/canvas": "^1.0.7",
     "@supabase/supabase-js": "^2.112.3",
     "axios": "^1.19.0",
     "cors": "^2.8.6",
@@ -24,6 +36,7 @@
     "multer": "^2.2.0",
     "nanoid": "^6.0.1",
     "node-cron": "^4.6.0",
+    "pdfjs-dist": "^6.2.108",
     "pdfkit": "^0.19.1",
     "zod": "^4.4.3"
   },

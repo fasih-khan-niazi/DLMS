@@ -1,8 +1,57 @@
 import { Router, Request, Response } from "express";
 import { auth, db } from "../config/firebase";
 import { authenticate, AuthRequest } from "../middleware/authenticate";
+import { getLoginLockStatus, recordLoginAttempt } from "../services/loginLock";
 
 const router = Router();
+
+function serializeLock(status: Awaited<ReturnType<typeof getLoginLockStatus>>) {
+  return {
+    email: status.email,
+    locked: status.locked,
+    failedAttempts: status.failedAttempts,
+    attemptsRemaining: status.attemptsRemaining,
+    lockedUntil: status.lockedUntil ? status.lockedUntil.toISOString() : null,
+    lockedForSeconds: status.lockedForSeconds,
+  };
+}
+
+/** Check whether an email is temporarily locked after failed sign-ins. */
+router.get("/login-lock", async (req: Request, res: Response) => {
+  try {
+    const email = String(req.query.email || "").trim();
+    if (!email.includes("@")) {
+      res.status(400).json({ error: "email is required" });
+      return;
+    }
+    const status = await getLoginLockStatus(email);
+    res.json(serializeLock(status));
+  } catch (error) {
+    console.error("Login lock check error:", error);
+    res.status(500).json({ error: "Failed to check login lock" });
+  }
+});
+
+/**
+ * Record a client-side sign-in attempt.
+ * success:false increments failures and may lock for 15 minutes after 3 fails.
+ * success:true clears the lock counter.
+ */
+router.post("/login-attempt", async (req: Request, res: Response) => {
+  try {
+    const email = String(req.body?.email || "").trim();
+    const success = req.body?.success === true;
+    if (!email.includes("@")) {
+      res.status(400).json({ error: "email is required" });
+      return;
+    }
+    const status = await recordLoginAttempt({ email, success });
+    res.json(serializeLock(status));
+  } catch (error) {
+    console.error("Login attempt record error:", error);
+    res.status(500).json({ error: "Failed to record login attempt" });
+  }
+});
 
 // Register a new user (always as student)
 router.post("/register", async (req: Request, res: Response) => {

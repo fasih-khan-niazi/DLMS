@@ -2,17 +2,18 @@ import { Router, Response } from "express";
 import { db } from "../config/firebase";
 import { authenticate, AuthRequest } from "../middleware/authenticate";
 import { createId } from "../utils/ids";
+import { persistAccruedFines } from "../services/fines";
 import { getSystemConfig } from "../services/loans";
 import {
+  assignCopyToNextReservation,
   computeQueuePosition,
+  expireReadyReservationHolds,
   fulfillWaitingWithAvailableCopies,
+  normalizeIsbn,
+  reconcileReservationsForIsbn,
 } from "../services/reservations";
 
 const router = Router();
-
-function normalizeIsbn(isbn: string): string {
-  return isbn.replace(/[-\s]/g, "").toUpperCase();
-}
 
 // Create a reservation (queue) for an unavailable title
 router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
@@ -26,16 +27,37 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
     const isbn = normalizeIsbn(String(isbnRaw));
     const config = await getSystemConfig();
 
+    // Heal drift before deciding whether reserve is allowed
+    try {
+      await reconcileReservationsForIsbn(isbn);
+    } catch (error) {
+      console.error("[reserve] pre-create reconcile failed:", error);
+    }
+
+    const outstandingFines = await persistAccruedFines(req.uid!);
+    if (config.blockCheckoutIfUnpaidFine === true && outstandingFines > 0) {
+      res.status(403).json({
+        error: "You have outstanding fines. Pay at the library desk, then try reserving again.",
+      });
+      return;
+    }
+
     const userRef = db.collection("users").doc(req.uid!);
     const catalogRef = db.collection("catalog").doc(isbn);
 
-    const [userSnap, catalogSnap, activeLoansSnap] = await Promise.all([
+    const [userSnap, catalogSnap, activeLoansSnap, availableCopiesSnap] = await Promise.all([
       userRef.get(),
       catalogRef.get(),
       db
         .collection("loans")
         .where("userId", "==", req.uid)
         .where("status", "==", "active")
+        .get(),
+      db
+        .collection("bookCopies")
+        .where("isbn", "==", isbn)
+        .where("status", "==", "available")
+        .limit(1)
         .get(),
     ]);
 
@@ -61,8 +83,17 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    if (config.blockCheckoutIfUnpaidFine && user.hasUnpaidFines) {
-      res.status(403).json({ error: "Clear unpaid fines before reserving" });
+    if (user.role === "librarian" && config.librariansCanBorrow === false) {
+      res.status(403).json({
+        error: "Librarians cannot reserve physical books while borrowing is disabled",
+      });
+      return;
+    }
+
+    if (config.blockCheckoutIfUnpaidFine === true && user.hasUnpaidFines) {
+      res.status(403).json({
+        error: "You have outstanding fines. Pay at the library desk, then try reserving again.",
+      });
       return;
     }
 
@@ -76,7 +107,7 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    if ((catalog.availableCount || 0) > 0) {
+    if (!availableCopiesSnap.empty || (catalog.availableCount || 0) > 0) {
       res.status(409).json({
         error: "Copies are available. Borrow from the shelf instead of reserving.",
       });
@@ -143,6 +174,14 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
 // List current user's reservations (queue position computed live)
 router.get("/mine", authenticate, async (req: AuthRequest, res: Response) => {
   try {
+    // Opening Activity is a natural place to expire a hold that cron missed
+    // (for example while the local API was restarted).
+    try {
+      await expireReadyReservationHolds();
+    } catch (error) {
+      console.error("[reservations] lazy expire on /mine failed:", error);
+    }
+
     const snap = await db
       .collection("reservations")
       .where("userId", "==", req.uid)
@@ -193,32 +232,97 @@ router.delete("/:reservationId", authenticate, async (req: AuthRequest, res: Res
       return;
     }
 
-    if (data.status === "ready") {
-      res.status(400).json({
-        error:
-          "This reservation is ready for pickup. Scan the assigned copy to borrow, or wait for the hold to expire.",
-      });
+    if (data.status !== "waiting" && data.status !== "ready") {
+      res.status(400).json({ error: "Only waiting or ready reservations can be cancelled" });
       return;
     }
 
-    if (data.status !== "waiting") {
-      res.status(400).json({ error: "Only waiting reservations can be cancelled" });
+    const now = new Date();
+    const isbn = normalizeIsbn(String(data.isbn || ""));
+    const copyId = data.assignedCopyId as string | undefined;
+    const title = String(data.title || "this title");
+
+    if (data.status === "ready") {
+      const catalogRef = db.collection("catalog").doc(isbn);
+      await db.runTransaction(async (tx) => {
+        const copyRef = copyId ? db.collection("bookCopies").doc(copyId) : null;
+        const [fresh, catalogSnap, copySnap] = await Promise.all([
+          tx.get(ref),
+          tx.get(catalogRef),
+          copyRef ? tx.get(copyRef) : Promise.resolve(null),
+        ]);
+        if (!fresh.exists) return;
+        const current = fresh.data()!;
+        if (current.status !== "ready") return;
+
+        tx.update(ref, {
+          status: "cancelled",
+          cancelReason: "user_cancelled",
+          updatedAt: now,
+        });
+
+        if (copyRef && copySnap?.exists) {
+          const copy = copySnap.data()!;
+          if (copy.status === "reserved" && copy.reservedForUserId === current.userId) {
+            tx.update(copyRef, {
+              status: "available",
+              reservedForUserId: null,
+              readyAt: null,
+              expiresAt: null,
+              updatedAt: now,
+            });
+          }
+        }
+
+        if (catalogSnap.exists) {
+          const catalog = catalogSnap.data()!;
+          tx.update(catalogRef, {
+            reservedCount: Math.max((catalog.reservedCount || 0) - 1, 0),
+            availableCount: (catalog.availableCount || 0) + (copyId ? 1 : 0),
+            updatedAt: now,
+          });
+        }
+      });
+
+      res.json({
+        success: true,
+        reservationId,
+        released: true,
+        message: "Hold cancelled. The copy was released.",
+      });
+
+      // Reassign after the client already has a response so Cancel does not hang.
+      void (async () => {
+        try {
+          const assigned = copyId
+            ? await assignCopyToNextReservation({
+                copyId,
+                isbn,
+                title,
+                excludeUserId: req.uid,
+              })
+            : null;
+          if (!assigned) {
+            await fulfillWaitingWithAvailableCopies(isbn);
+          }
+        } catch (error) {
+          console.error("Fulfill after ready cancel failed:", error);
+        }
+      })();
       return;
     }
 
     await ref.update({
       status: "cancelled",
-      updatedAt: new Date(),
+      cancelReason: "user_cancelled",
+      updatedAt: now,
     });
 
-    // If copies are sitting available while others wait, fulfill next waiter
-    try {
-      await fulfillWaitingWithAvailableCopies(data.isbn);
-    } catch (error) {
-      console.error("Fulfill after cancel failed:", error);
-    }
-
     res.json({ success: true, reservationId });
+
+    void fulfillWaitingWithAvailableCopies(isbn).catch((error) => {
+      console.error("Fulfill after cancel failed:", error);
+    });
   } catch (error) {
     console.error("Cancel reservation error:", error);
     res.status(500).json({ error: "Failed to cancel reservation" });

@@ -2,10 +2,15 @@
   "expo": {
     "name": "DLMS",
     "slug": "dlms",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2E4A62"
+    },
     "plugins": [
       [
         "expo-camera",
@@ -17,7 +22,8 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#2E4A62"
+          "color": "#2E4A62",
+          "defaultChannel": "default"
         }
       ],
       "expo-asset",
@@ -26,6 +32,8 @@
     ],
     "android": {
       "package": "com.fyp.dlms",
+      "versionCode": 2,
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "CAMERA",
         "POST_NOTIFICATIONS",

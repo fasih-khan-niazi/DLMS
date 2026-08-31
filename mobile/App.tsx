@@ -2,12 +2,36 @@ import React from "react";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import AppNavigator from "./src/navigation/AppNavigator";
+import { ThemeProvider, useTheme } from "./src/theme";
+import { ToastProvider } from "./src/components/AppToast";
+import { getAppConfig, hydrateAppConfig } from "./src/utils/appConfig";
+import { loadHapticsPreference } from "./src/utils/haptics";
+
+function StatusBarSync() {
+  const { mode } = useTheme();
+  return <StatusBar style={mode === "dark" ? "light" : "dark"} />;
+}
+
+function Root() {
+  React.useEffect(() => {
+    void hydrateAppConfig().then(() => getAppConfig());
+    void loadHapticsPreference();
+  }, []);
+
+  return (
+    <ToastProvider>
+      <StatusBarSync />
+      <AppNavigator />
+    </ToastProvider>
+  );
+}
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <AppNavigator />
+      <ThemeProvider>
+        <Root />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

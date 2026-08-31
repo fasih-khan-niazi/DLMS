@@ -1,29 +1,19 @@
 import React, { useCallback, useState } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-  RefreshControl,
-  Alert,
-} from "react-native";
+import { View, Text, FlatList, RefreshControl } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
-import { colors, radius, space, type } from "../theme";
 import { SkeletonList } from "../components/Skeleton";
-import { EmptyState } from "../components/EmptyState";
-
-type NotificationItem = {
-  id: string;
-  title: string;
-  body: string;
-  type: string;
-  read: boolean;
-  sentAt: string | null;
-};
+import { Badge, ErrorState, ScreenHeader, PressableScale } from "../components/ui";
+import { useTheme } from "../theme";
+import {
+  formatNoticeTime,
+  openNotificationTarget,
+  typeLabel,
+  typeTone,
+  type InboxNotification,
+} from "../utils/notificationNav";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
@@ -31,15 +21,22 @@ type Props = {
 
 export default function NotificationsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const [items, setItems] = useState<NotificationItem[]>([]);
+  const { colors, fontFamily, radius, space, type, mode } = useTheme();
+  const [items, setItems] = useState<InboxNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
+  const unreadCount = items.filter((n) => !n.read).length;
+
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
+    setError(null);
     try {
       const res = await api.get("/api/notifications");
       setItems(res.data.items || []);
     } catch {
+      setError("Could not load notifications.");
       setItems([]);
     } finally {
       setLoading(false);
@@ -49,8 +46,7 @@ export default function NotificationsScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      load();
+      void load();
     }, [])
   );
 
@@ -58,165 +54,161 @@ export default function NotificationsScreen({ navigation }: Props) {
     try {
       await api.patch(`/api/notifications/${id}/read`);
       setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    } catch (error: any) {
-      Alert.alert("Error", error.response?.data?.error || "Could not update");
+    } catch {
+      // still allow navigation
     }
   };
 
   const markAll = async () => {
+    if (unreadCount === 0) return;
     try {
       await api.post("/api/notifications/read-all");
       setItems((prev) => prev.map((n) => ({ ...n, read: true })));
-    } catch (error: any) {
-      Alert.alert("Error", error.response?.data?.error || "Could not update");
+    } catch {
+      // keep current state
     }
   };
 
-  const formatWhen = (value: string | null) => {
-    if (!value) return "";
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleString();
+  const onPressItem = async (item: InboxNotification) => {
+    if (!item.read) await markOne(item.id);
+    openNotificationTarget(navigation, item);
   };
 
+  const unreadBg = mode === "dark" ? "#2A3324" : "#FFFBF3";
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={8}>
-          <Text style={styles.back}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.heading}>Notifications</Text>
-        <TouchableOpacity onPress={markAll} hitSlop={8}>
-          <Text style={styles.markAll}>Mark all</Text>
-        </TouchableOpacity>
+    <View style={{ flex: 1, backgroundColor: colors.cream, paddingTop: insets.top + 8 }}>
+      <View style={{ paddingHorizontal: 16 }}>
+        <ScreenHeader
+          title="Notifications"
+          onBack={() => navigation.goBack()}
+          right={
+            unreadCount > 0 ? (
+              <PressableScale onPress={() => void markAll()} hitSlop={10} haptic="selection">
+                <Text
+                  style={{
+                    fontFamily: fontFamily.bodySemiBold,
+                    fontSize: type.caption,
+                    color: colors.amberDark,
+                  }}
+                >
+                  Mark all read
+                </Text>
+              </PressableScale>
+            ) : (
+              <View />
+            )
+          }
+        />
       </View>
-      <Text style={styles.hint}>
-        In-app alerts for dues, overdue books, and reservation ready notices.
-        System push banners need a dedicated app build later.
-      </Text>
 
       {loading ? (
-        <SkeletonList rows={6} />
+        <View style={{ paddingHorizontal: 20 }}>
+          <SkeletonList rows={6} />
+        </View>
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => void load()} />
       ) : (
         <FlatList
           data={items}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 32 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, flexGrow: 1 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => {
                 setRefreshing(true);
-                load();
+                void load(true);
               }}
               tintColor={colors.navy}
             />
           }
           ListEmptyComponent={
-            <EmptyState
-              title="No notifications yet"
-              message="When loans are due or a reservation is ready, they will show up here."
-            />
+            <View style={{ paddingTop: 48, alignItems: "center", paddingHorizontal: 24 }}>
+              <Text
+                style={{
+                  fontFamily: fontFamily.bodyBold,
+                  fontSize: type.titleSm,
+                  color: colors.navy,
+                  textAlign: "center",
+                }}
+              >
+                No notifications yet
+              </Text>
+              <Text
+                style={{
+                  marginTop: space.sm,
+                  fontFamily: fontFamily.body,
+                  fontSize: type.small,
+                  color: colors.muted,
+                  textAlign: "center",
+                  lineHeight: 20,
+                }}
+              >
+                Due dates, overdue books, and ready reservations will show up here.
+              </Text>
+            </View>
           }
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.card, !item.read && styles.cardUnread]}
-              onPress={() => {
-                if (!item.read) markOne(item.id);
+            <PressableScale
+              onPress={() => void onPressItem(item)}
+              style={{
+                backgroundColor: item.read ? colors.white : unreadBg,
+                borderRadius: radius.lg,
+                padding: 16,
+                marginBottom: 10,
+                borderWidth: 1,
+                borderColor: item.read ? colors.border : colors.amber,
               }}
-              activeOpacity={0.85}
             >
-              <View style={styles.cardTop}>
-                <Text style={styles.cardTitle}>{item.title}</Text>
-                {!item.read ? <View style={styles.dot} /> : null}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Badge label={typeLabel(item.type)} tone={typeTone(item.type)} />
+                {!item.read ? (
+                  <View
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: colors.amber,
+                    }}
+                  />
+                ) : null}
+                <Text
+                  style={{
+                    marginLeft: "auto",
+                    fontFamily: fontFamily.body,
+                    fontSize: type.caption,
+                    color: colors.muted,
+                  }}
+                >
+                  {formatNoticeTime(item.sentAt)}
+                </Text>
               </View>
-              <Text style={styles.cardBody}>{item.body}</Text>
-              <Text style={styles.cardMeta}>
-                {item.type}
-                {item.sentAt ? ` · ${formatWhen(item.sentAt)}` : ""}
+              <Text
+                style={{
+                  marginTop: 8,
+                  fontFamily: fontFamily.bodyBold,
+                  fontSize: type.body,
+                  color: colors.navy,
+                }}
+              >
+                {item.title}
               </Text>
-            </TouchableOpacity>
+              <Text
+                style={{
+                  marginTop: 4,
+                  fontFamily: fontFamily.body,
+                  fontSize: type.small,
+                  color: colors.text,
+                  lineHeight: 20,
+                }}
+              >
+                {item.body}
+              </Text>
+            </PressableScale>
           )}
         />
       )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.cream,
-    paddingHorizontal: 20,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  back: {
-    color: colors.amberDark,
-    fontWeight: "700",
-    width: 64,
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: colors.navy,
-  },
-  markAll: {
-    color: colors.navy,
-    fontWeight: "600",
-    fontSize: type.small,
-    width: 64,
-    textAlign: "right",
-  },
-  hint: {
-    color: colors.muted,
-    fontSize: type.small,
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  cardUnread: {
-    borderColor: colors.amber,
-    backgroundColor: "#FFFBF3",
-  },
-  cardTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  cardTitle: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.navy,
-  },
-  dot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: colors.amber,
-  },
-  cardBody: {
-    marginTop: 6,
-    color: colors.text,
-    fontSize: type.body,
-    lineHeight: 22,
-  },
-  cardMeta: {
-    marginTop: 8,
-    color: colors.muted,
-    fontSize: 12,
-  },
-});

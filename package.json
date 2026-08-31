@@ -11,6 +11,17 @@
   "scripts": {
     "bootstrap": "npm install --workspaces",
     "seed": "tsx scripts/seed-admin.ts",
+    "verify": "tsx scripts/verify-phase-x.ts",
+    "verify:suite": "tsx scripts/verify-suite.ts",
+    "verify:flow": "tsx scripts/verify-circulation-flow.ts",
+    "verify:ready-cancel": "tsx scripts/verify-ready-cancel.ts",
+    "verify:gates": "tsx scripts/verify-librarian-gates.ts",
+    "verify:dues": "tsx scripts/verify-due-fines.ts",
+    "verify:covers": "tsx scripts/verify-digital-covers.ts",
+    "verify:notices": "tsx scripts/verify-notifications.ts",
+    "verify:config": "tsx scripts/verify-config-http.ts",
+    "verify:return-copy": "tsx scripts/verify-return-copy.ts",
+    "verify:fines": "tsx scripts/verify-fines-collect.ts",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"

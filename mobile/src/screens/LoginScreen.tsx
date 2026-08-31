@@ -1,209 +1,183 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from "react-native";
+import { Text } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { firebaseAuth } from "../config/firebase";
-import { colors, radius, space, type } from "../theme";
+import api from "../config/api";
+import { AppModal } from "../components/AppModal";
+import { useToast } from "../components/AppToast";
+import { AuthLayout, AuthLink, Button, Input, PressableScale } from "../components/ui";
+import { useTheme } from "../theme";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 type Props = {
   navigation: NativeStackNavigationProp<any>;
 };
 
+type LockSheet = {
+  title: string;
+  message: string;
+} | null;
+
+function formatLockMinutes(seconds: number) {
+  const m = Math.max(1, Math.ceil(seconds / 60));
+  return m === 1 ? "1 minute" : `${m} minutes`;
+}
+
 export default function LoginScreen({ navigation }: Props) {
-  const insets = useSafeAreaInsets();
+  const { colors, fontFamily, type, space } = useTheme();
+  const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [missingOpen, setMissingOpen] = useState(false);
+  const [lockSheet, setLockSheet] = useState<LockSheet>(null);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password) {
-      Alert.alert("Missing details", "Enter email and password.");
+    const trimmed = email.trim();
+    if (!trimmed || !password) {
+      setMissingOpen(true);
       return;
     }
 
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
-    } catch (error: any) {
-      const message =
-        error.code === "auth/invalid-credential" ||
-        error.code === "auth/wrong-password" ||
-        error.code === "auth/user-not-found"
-          ? "Invalid email or password"
-          : error.message || "Login failed";
-      Alert.alert("Sign in failed", message);
+      const lockRes = await api.get("/api/auth/login-lock", { params: { email: trimmed } });
+      if (lockRes.data?.locked) {
+        const secs = Number(lockRes.data.lockedForSeconds) || 0;
+        showToast(`Account locked. Try again in ${formatLockMinutes(secs)}.`);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        await signInWithEmailAndPassword(firebaseAuth, trimmed, password);
+        await api.post("/api/auth/login-attempt", { email: trimmed, success: true }).catch(() => {});
+      } catch (error: any) {
+        const invalid =
+          error.code === "auth/invalid-credential" ||
+          error.code === "auth/wrong-password" ||
+          error.code === "auth/user-not-found" ||
+          error.code === "auth/invalid-email";
+
+        if (!invalid) {
+          showToast(error.message || "Could not sign in. Try again.");
+          return;
+        }
+
+        const attempt = await api
+          .post("/api/auth/login-attempt", { email: trimmed, success: false })
+          .then((r) => r.data)
+          .catch(() => null);
+
+        if (attempt?.locked) {
+          const secs = Number(attempt.lockedForSeconds) || 15 * 60;
+          setLockSheet({
+            title: "Account temporarily locked",
+            message: `Too many incorrect sign-in attempts. Try again in ${formatLockMinutes(secs)}.`,
+          });
+          return;
+        }
+
+        const left = Number(attempt?.attemptsRemaining);
+        if (Number.isFinite(left) && left > 0) {
+          showToast(
+            left === 1
+              ? "Incorrect email or password. 1 attempt left."
+              : `Incorrect email or password. ${left} attempts left.`
+          );
+        } else {
+          showToast("Incorrect email or password.");
+        }
+      }
+    } catch {
+      showToast("Could not reach the server. Check your connection.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingTop: insets.top + space.xl, paddingBottom: insets.bottom + space.xl },
-        ]}
-        keyboardShouldPersistTaps="handled"
+    <>
+      <AuthLayout
+        brandLine="Your campus library, in your pocket"
+        panelTitle="Sign in"
+        panelHint="Students and staff use the same app"
+        footer={
+          <AuthLink
+            label="New here? Create a student account"
+            onDark
+            onPress={() => navigation.navigate("Register")}
+          />
+        }
       >
-        <View style={styles.hero}>
-          <Text style={styles.brand}>DLMS</Text>
-          <Text style={styles.tagline}>Your campus library, in your pocket</Text>
-        </View>
+        <Input
+          label="Email"
+          placeholder="you@university.edu"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          textContentType="emailAddress"
+        />
 
-        <View style={styles.panel}>
-          <Text style={styles.panelTitle}>Sign in</Text>
-          <Text style={styles.panelHint}>Students and staff use the same app</Text>
+        <Input
+          label="Password"
+          placeholder="Your password"
+          value={password}
+          onChangeText={setPassword}
+          passwordToggle
+          autoComplete="password"
+          textContentType="password"
+        />
 
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="you@university.edu"
-            placeholderTextColor={colors.muted}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Your password"
-            placeholderTextColor={colors.muted}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-
-          <TouchableOpacity
-            onPress={() => navigation.navigate("ForgotPassword", { email: email.trim() })}
-            hitSlop={8}
+        <PressableScale
+          onPress={() => navigation.navigate("ForgotPassword", { email: email.trim() })}
+          haptic="selection"
+          hitSlop={8}
+          style={{
+            alignSelf: "flex-end",
+            marginTop: space.sm,
+            marginBottom: space.md,
+            paddingVertical: 4,
+            paddingHorizontal: 8,
+            borderRadius: 8,
+          }}
+        >
+          <Text
+            style={{
+              color: colors.amberDark,
+              fontSize: type.small,
+              fontFamily: fontFamily.bodySemiBold,
+            }}
           >
-            <Text style={styles.forgot}>Forgot password?</Text>
-          </TouchableOpacity>
+            Forgot password?
+          </Text>
+        </PressableScale>
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.buttonText}>Sign in</Text>
-            )}
-          </TouchableOpacity>
+        <Button title="Sign in" onPress={handleLogin} loading={loading} />
+      </AuthLayout>
 
-          <TouchableOpacity onPress={() => navigation.navigate("Register")} hitSlop={8}>
-            <Text style={styles.link}>New here? Create a student account</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      <AppModal
+        visible={missingOpen}
+        variant="info"
+        title="Missing details"
+        message="Enter your email and password to sign in."
+        confirmLabel="OK"
+        onClose={() => setMissingOpen(false)}
+      />
+
+      <AppModal
+        visible={!!lockSheet}
+        variant="danger"
+        presentation="sheet"
+        title={lockSheet?.title || ""}
+        message={lockSheet?.message || ""}
+        confirmLabel="OK"
+        confirmVariant="dangerSoft"
+        onClose={() => setLockSheet(null)}
+      />
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.navy },
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: space.lg,
-    justifyContent: "center",
-  },
-  hero: {
-    marginBottom: space.lg,
-    paddingHorizontal: space.sm,
-  },
-  brand: {
-    fontSize: type.brand,
-    fontWeight: "800",
-    color: colors.white,
-    letterSpacing: 0.5,
-  },
-  tagline: {
-    marginTop: space.sm,
-    fontSize: type.subtitle,
-    color: "rgba(255,255,255,0.78)",
-    lineHeight: 22,
-  },
-  panel: {
-    backgroundColor: colors.cream,
-    borderRadius: radius.lg,
-    padding: space.lg,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-  panelTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: colors.navy,
-  },
-  panelHint: {
-    marginTop: 4,
-    marginBottom: space.md,
-    color: colors.muted,
-    fontSize: type.small,
-  },
-  label: {
-    fontSize: type.small,
-    fontWeight: "600",
-    color: colors.navy,
-    marginBottom: 6,
-    marginTop: space.sm,
-  },
-  input: {
-    backgroundColor: colors.white,
-    borderRadius: radius.md,
-    paddingHorizontal: space.md,
-    paddingVertical: 14,
-    fontSize: type.body,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-  },
-  forgot: {
-    alignSelf: "flex-end",
-    marginTop: space.sm,
-    marginBottom: space.md,
-    color: colors.amberDark,
-    fontSize: type.small,
-    fontWeight: "600",
-  },
-  button: {
-    backgroundColor: colors.navy,
-    borderRadius: radius.md,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  buttonDisabled: { opacity: 0.7 },
-  buttonText: {
-    color: colors.white,
-    fontSize: type.body,
-    fontWeight: "700",
-  },
-  link: {
-    textAlign: "center",
-    color: colors.navy,
-    fontSize: type.small,
-    marginTop: space.md,
-    fontWeight: "600",
-  },
-});
