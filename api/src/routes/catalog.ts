@@ -31,6 +31,7 @@ import {
   toMillis,
 } from "../utils/pagination";
 import { matchesTextQuery } from "../utils/textSearch";
+import { sortCopies } from "../utils/copies";
 
 const router = Router();
 
@@ -832,7 +833,12 @@ router.get("/books/:isbn", authenticate, async (req: AuthRequest, res: Response)
       .where("isbn", "==", isbn)
       .get();
 
-    const copies = copiesSnap.docs.map((doc) => doc.data());
+    const copies = sortCopies(
+      copiesSnap.docs.map((doc) => {
+        const data = doc.data() as { copyId?: string; createdAt?: unknown; status?: string };
+        return { ...data, copyId: String(data.copyId || doc.id) };
+      })
+    );
 
     // Copy rows are the source of truth. Derive counts from them so a drifted
     // counter can never make a returned book keep showing as issued/reserved.

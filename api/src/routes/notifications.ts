@@ -40,9 +40,18 @@ router.get("/", async (req: AuthRequest, res: Response) => {
       .map((doc) => serializeNotification(doc.id, doc.data()))
       .sort((a, b) => String(b.sentAt || "").localeCompare(String(a.sentAt || "")));
 
-    const unreadCount = items.filter((n) => !n.read).length;
+    const seen = new Set<string>();
+    const collapsed = items.filter((n) => {
+      const day = String(n.sentAt || "").slice(0, 10);
+      const key = `${n.type}|${n.loanId || n.reservationId || n.title}|${day}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
-    res.json({ items, unreadCount });
+    const unreadCount = collapsed.filter((n) => !n.read).length;
+
+    res.json({ items: collapsed, unreadCount });
   } catch (error) {
     console.error("List notifications error:", error);
     res.status(500).json({ error: "Failed to list notifications" });
@@ -57,7 +66,19 @@ router.get("/unread-count", async (req: AuthRequest, res: Response) => {
       .where("read", "==", false)
       .limit(100)
       .get();
-    res.json({ unreadCount: snap.size });
+    const seen = new Set<string>();
+    let unreadCount = 0;
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      const sent = data.sentAt?.toDate?.()
+        ? data.sentAt.toDate().toISOString()
+        : String(data.sentAt || "");
+      const key = `${data.type || ""}|${data.loanId || data.reservationId || data.title || ""}|${sent.slice(0, 10)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unreadCount += 1;
+    }
+    res.json({ unreadCount });
   } catch (error) {
     console.error("Unread count error:", error);
     res.status(500).json({ error: "Failed to count unread notifications" });

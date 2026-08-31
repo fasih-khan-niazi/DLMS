@@ -164,7 +164,43 @@ function calendarDaysBetween(a: Date, b: Date): number {
  * - 1 day before due: urgent reminder
  * - due date passed: overdue + mark loan overdue + fine alert
  */
+let dailyJobRunning = false;
+
 export async function runDailyLoanNotifications() {
+  if (dailyJobRunning) {
+    return { reminders: 0, urgent: 0, overdue: 0, checked: 0, skipped: "in_process" };
+  }
+  dailyJobRunning = true;
+  try {
+    return await runDailyLoanNotificationsInner();
+  } finally {
+    dailyJobRunning = false;
+  }
+}
+
+async function alreadySentLoanNotice(
+  loanId: string,
+  type: string,
+  todayKey: string,
+  timezone: string
+): Promise<boolean> {
+  const snap = await db.collection("notifications").where("loanId", "==", loanId).limit(20).get();
+  return snap.docs.some((doc) => {
+    const data = doc.data();
+    if (String(data.type || "") !== type) return false;
+    const sent = toDate(data.sentAt);
+    if (!sent) return false;
+    const sentKey = new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(sent);
+    return sentKey === todayKey;
+  });
+}
+
+async function runDailyLoanNotificationsInner() {
   const configSnap = await db.collection("config").doc("system").get();
   const config = configSnap.data() || {};
   const timezone = config.timezone || "Asia/Karachi";
@@ -214,6 +250,9 @@ export async function runDailyLoanNotifications() {
       const isUrgent = daysUntilDue === 1;
       const loanId = String(loan.loanId || doc.id);
       const kind = isUrgent ? "due_reminder_urgent" : "due_reminder";
+      if (await alreadySentLoanNotice(loanId, kind, todayKey, timezone)) {
+        continue;
+      }
       await notifyUser({
         userId: loan.userId,
         type: kind,
@@ -235,6 +274,10 @@ export async function runDailyLoanNotifications() {
       }
 
       const loanId = String(loan.loanId || doc.id);
+      if (await alreadySentLoanNotice(loanId, "overdue", todayKey, timezone)) {
+        overdue += 1;
+        continue;
+      }
       await notifyUser({
         userId: loan.userId,
         type: "overdue",

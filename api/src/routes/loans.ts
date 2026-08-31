@@ -13,6 +13,7 @@ import {
   normalizeIsbn,
   reconcileReservationsForIsbn,
 } from "../services/reservations";
+import { copyNumberMap } from "../utils/copies";
 
 const router = Router();
 
@@ -348,6 +349,23 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
       }
 
       const copy = copySnap.data()!;
+      const isbn = normalizeIsbn(String(copy.isbn || ""));
+
+      const [myActiveSnap, myOverdueSnap] = await Promise.all([
+        tx.get(db.collection("loans").where("userId", "==", req.uid).where("status", "==", "active")),
+        tx.get(db.collection("loans").where("userId", "==", req.uid).where("status", "==", "overdue")),
+      ]);
+      const myLoanOnOtherCopy = [...myActiveSnap.docs, ...myOverdueSnap.docs].find((doc) => {
+        const data = doc.data();
+        return (
+          normalizeIsbn(String(data.isbn || "")) === isbn &&
+          String(data.copyId || "") !== copyId
+        );
+      });
+      if (myLoanOnOtherCopy) {
+        throw new Error("WRONG_COPY");
+      }
+
       if (copy.status !== "issued" || !copy.currentLoanId) {
         throw new Error("NOT_ISSUED");
       }
@@ -366,7 +384,6 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
       }
 
       const userRef = db.collection("users").doc(loan.userId);
-      const isbn = normalizeIsbn(String(copy.isbn || ""));
       const catalogRef = db.collection("catalog").doc(isbn);
       const [userSnap, catalogSnap] = await Promise.all([
         tx.get(userRef),
@@ -493,7 +510,14 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
   } catch (error: any) {
     const map: Record<string, [number, string]> = {
       COPY_NOT_FOUND: [404, "Copy not found"],
-      NOT_ISSUED: [409, "Copy is not currently issued"],
+      NOT_ISSUED: [
+        409,
+        "This copy is not on loan. If you borrowed a different copy of this title, scan that label.",
+      ],
+      WRONG_COPY: [
+        409,
+        "You borrowed a different copy of this title. Scan the copy that is issued to you.",
+      ],
       LOAN_NOT_FOUND: [404, "Loan record not found"],
       NOT_ALLOWED: [403, "You cannot return this loan"],
       DATA_MISSING: [404, "Related user or catalog data missing"],
@@ -521,11 +545,35 @@ router.get("/mine", authenticate, async (req: AuthRequest, res: Response) => {
     }
 
     const snap = await query.get();
-    const loans = snap.docs
-      .map((doc) => doc.data())
+    const raw = snap.docs.map((doc) => doc.data());
+    const isbnSet = [...new Set(raw.map((row) => normalizeIsbn(String(row.isbn || ""))).filter(Boolean))];
+    const numberByCopy = new Map<string, number>();
+    await Promise.all(
+      isbnSet.map(async (isbn) => {
+        const copiesSnap = await db.collection("bookCopies").where("isbn", "==", isbn).get();
+        const rows = copiesSnap.docs.map((doc) => ({
+          copyId: String(doc.data().copyId || doc.id),
+          docId: doc.id,
+          createdAt: doc.data().createdAt,
+        }));
+        const mapped = copyNumberMap(rows);
+        rows.forEach((row) => {
+          const n = mapped.get(row.copyId);
+          if (!n) return;
+          numberByCopy.set(row.copyId, n);
+          numberByCopy.set(row.docId, n);
+        });
+      })
+    );
+
+    const loans = raw
+      .map((row) => ({
+        ...row,
+        copyNumber: numberByCopy.get(String(row.copyId || "")) || null,
+      }))
       .sort((a, b) => {
-        const aTime = a.borrowedAt?.toMillis?.() || 0;
-        const bTime = b.borrowedAt?.toMillis?.() || 0;
+        const aTime = (a as { borrowedAt?: { toMillis?: () => number } }).borrowedAt?.toMillis?.() || 0;
+        const bTime = (b as { borrowedAt?: { toMillis?: () => number } }).borrowedAt?.toMillis?.() || 0;
         return bTime - aTime;
       });
 
