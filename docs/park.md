@@ -1,14 +1,14 @@
 # Park status
 
-DLMS Week 1 is locked as **`v1.0.0-week1`** on branch **`main`**. Continue work on **`dev`**.
+DLMS Week 2 is locked as **`v2.0.0-week2`** on branch **`main`**. Continue work on **`dev`**.
 
 Week 1 history: [`week1-archive.md`](week1-archive.md).
 
-## In scope (frozen at Week 1)
+## In scope (frozen at Week 2)
 
-- Mobile (Expo): student + librarian floor flows; catalog soft-deactivate for staff
+- Mobile (Expo): student + librarian floor flows; catalog soft-deactivate for staff; desk fine collection; copy numbers; PKT due dates and greetings; PDF reader enhancements; app modals; error feedback
 - Admin web: users (student↔librarian only), catalog soft-delete, config, fines, reservations, dashboard, reports (CSV + PDF)
-- Express API: Auth, catalog, loans, reservations, digital books (Supabase), notifications, cron
+- Express API: Auth, catalog, loans, reservations, digital books (Supabase), fines, notifications, cron
 - Hosting path: Render for public API (see [`deploy-render.md`](deploy-render.md))
 
 ## Parked / future mobile
