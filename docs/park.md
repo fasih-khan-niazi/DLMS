@@ -13,6 +13,12 @@ Week 1 history: [`week1-archive.md`](week1-archive.md).
 
 ## Parked / future mobile
 
+The Expo student + librarian app is parked for this phase. Circulation,
+notices, scan returns, Activity copy numbers, Home greetings (PKT), and
+unified-search digital covers are in the current tree.
+
+Still later:
+
 - Native OS push banners (needs a dedicated/dev or store build; Expo Go cannot)
 - APK polish / store listing
 - Custom OTP password reset (Firebase email link is enough)

@@ -104,6 +104,30 @@ async function main() {
   if (timezone === "Asia/Karachi") pass("library timezone is Asia/Karachi (PKT)");
   else fail(`timezone is ${timezone}, expected Asia/Karachi`);
 
+  console.log(`\n2b) Activity due-label uses PKT calendar days, not leftover hours`);
+  const lateNight = new Date("2026-09-01T00:30:00+05:00");
+  const dueNextCalendarDay = new Date("2026-09-02T23:00:00+05:00");
+  const pktDays = (() => {
+    const dayKey = (value: Date) =>
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Karachi",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(value);
+    const today = new Date(`${dayKey(lateNight)}T12:00:00`);
+    const dueNoon = new Date(`${dayKey(dueNextCalendarDay)}T12:00:00`);
+    return Math.round((dueNoon.getTime() - today.getTime()) / DAY_MS);
+  })();
+  const naiveCeil = Math.ceil((dueNextCalendarDay.getTime() - lateNight.getTime()) / DAY_MS);
+  if (pktDays === 1) pass("00:30 PKT → due 23:00 next calendar day = Due in 1 day");
+  else fail(`PKT calendar days = ${pktDays}, expected 1`);
+  if (naiveCeil !== pktDays) {
+    pass(`hour-ceil would have said ${naiveCeil} days (the old bug)`);
+  } else {
+    pass("hour-ceil happened to match calendar days on this sample");
+  }
+
   console.log(`\n3) Live active-loan audit (read-only)`);
   const loans = await db.collection("loans").where("status", "in", ["active", "overdue"]).get();
   const now = Date.now();

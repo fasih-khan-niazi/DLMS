@@ -20,6 +20,7 @@
     "verify:covers": "tsx scripts/verify-digital-covers.ts",
     "verify:notices": "tsx scripts/verify-notifications.ts",
     "verify:config": "tsx scripts/verify-config-http.ts",
+    "verify:return-copy": "tsx scripts/verify-return-copy.ts",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
