@@ -36,6 +36,7 @@ import UploadDigitalBookScreen from "../screens/UploadDigitalBookScreen";
 import PdfReaderScreen from "../screens/PdfReaderScreen";
 import NotificationsScreen from "../screens/NotificationsScreen";
 import UnifiedSearchScreen from "../screens/UnifiedSearchScreen";
+import CollectFinesScreen from "../screens/CollectFinesScreen";
 
 const AuthStackNav = createNativeStackNavigator();
 const HomeStackNav = createNativeStackNavigator();
@@ -120,6 +121,7 @@ function HomeStackNavigator() {
         name="UnifiedSearch"
         component={UnifiedSearchScreen as React.ComponentType<any>}
       />
+      <HomeStackNav.Screen name="CollectFines" component={CollectFinesScreen} />
     </HomeStackNav.Navigator>
   );
 }
@@ -160,6 +162,7 @@ function ProfileStackNavigator() {
       <ProfileStackNav.Screen name="Bookshelf" component={BookshelfScreen} />
       <ProfileStackNav.Screen name="AddBook" component={AddBookScreen} />
       <ProfileStackNav.Screen name="UploadDigitalBook" component={UploadDigitalBookScreen} />
+      <ProfileStackNav.Screen name="CollectFines" component={CollectFinesScreen} />
     </ProfileStackNav.Navigator>
   );
 }

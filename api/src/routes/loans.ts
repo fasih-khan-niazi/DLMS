@@ -4,8 +4,9 @@ import { authenticate, AuthRequest } from "../middleware/authenticate";
 import { requireRole } from "../middleware/requireRole";
 import { createId } from "../utils/ids";
 import {
+  assessedFineForLoan,
   calculateDueDate,
-  calculateFineAmount,
+  fineRemaining,
   getSystemConfig,
 } from "../services/loans";
 import {
@@ -14,6 +15,7 @@ import {
   reconcileReservationsForIsbn,
 } from "../services/reservations";
 import { copyNumberMap } from "../utils/copies";
+import { persistAccruedFines } from "../services/fines";
 
 const router = Router();
 
@@ -56,6 +58,11 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
         error: "In-app borrow is disabled. Use the Scan tab to borrow this copy.",
       });
       return;
+    }
+
+    const outstandingFines = await persistAccruedFines(req.uid!);
+    if (config.blockCheckoutIfUnpaidFine === true && outstandingFines > 0) {
+      throw new Error("UNPAID_FINES");
     }
 
     const userRef = db.collection("users").doc(req.uid!);
@@ -129,7 +136,7 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
         throw new Error("LIBRARIAN_BORROW_DISABLED");
       }
 
-      if (config.blockCheckoutIfUnpaidFine && user.hasUnpaidFines) {
+      if (config.blockCheckoutIfUnpaidFine === true && user.hasUnpaidFines) {
         throw new Error("UNPAID_FINES");
       }
 
@@ -276,7 +283,10 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
       COPY_NOT_FOUND: [404, "Copy not found"],
       USER_INACTIVE: [403, "Account is suspended"],
       LIBRARIAN_BORROW_DISABLED: [403, "Librarians cannot borrow books"],
-      UNPAID_FINES: [403, "Clear unpaid fines before borrowing"],
+      UNPAID_FINES: [
+        403,
+        "You have outstanding fines. Pay at the library desk, then try borrowing again.",
+      ],
       BORROW_LIMIT: [403, "Borrow limit reached"],
       ALREADY_ISSUED: [409, "Book already issued"],
       COPY_DAMAGED: [409, "Copy is damaged"],
@@ -396,15 +406,22 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
 
       const now = new Date();
       const dueDate = loan.dueDate?.toDate ? loan.dueDate.toDate() : new Date(loan.dueDate);
-      const fineAmount = calculateFineAmount(dueDate, now, finePerDay);
+      const timezone = String(config.timezone || "Asia/Karachi");
+      const assessed = assessedFineForLoan(loan, now, finePerDay, timezone);
+      const paidSoFar = Number(loan.finePaidAmount || 0);
+      const remainingFine = loan.finePaid === true ? 0 : Math.max(assessed - paidSoFar, 0);
+      if (remainingFine > 0) {
+        throw new Error("FINES_UNPAID");
+      }
       const user = userSnap.data()!;
       const catalog = catalogSnap.data()!;
 
       tx.update(loanRef, {
         returnedAt: now,
         status: "returned",
-        fineAmount,
-        finePaid: fineAmount === 0,
+        fineAmount: assessed,
+        finePaidAmount: paidSoFar,
+        finePaid: assessed === 0 || paidSoFar >= assessed,
         returnedVia: "qr_scan",
         updatedAt: now,
       });
@@ -422,8 +439,6 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
 
       tx.update(userRef, {
         activeBorrowCount: Math.max((user.activeBorrowCount || 0) - 1, 0),
-        hasUnpaidFines: fineAmount > 0 ? true : user.hasUnpaidFines || false,
-        totalOutstandingFines: (user.totalOutstandingFines || 0) + fineAmount,
         updatedAt: now,
       });
 
@@ -438,7 +453,7 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
         copyId,
         isbn,
         title: copy.title,
-        fineAmount,
+        fineAmount: assessed,
         dueDate,
         returnedAt: now,
         returnedByUserId: loan.userId,
@@ -519,7 +534,14 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
         "You borrowed a different copy of this title. Scan the copy that is issued to you.",
       ],
       LOAN_NOT_FOUND: [404, "Loan record not found"],
-      NOT_ALLOWED: [403, "You cannot return this loan"],
+      NOT_ALLOWED: [
+        403,
+        "This copy is issued to another reader. You can only return a copy that is issued to you.",
+      ],
+      FINES_UNPAID: [
+        409,
+        "This copy has an unpaid fine. Pay at the desk, then scan again to return.",
+      ],
       DATA_MISSING: [404, "Related user or catalog data missing"],
     };
 
@@ -538,14 +560,21 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
 router.get("/mine", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const status = String(req.query.status || "").trim();
+    let outstandingFines: number | undefined;
+    if (!status || status === "active") {
+      outstandingFines = await persistAccruedFines(req.uid!);
+    }
     let query = db.collection("loans").where("userId", "==", req.uid);
 
-    if (status) {
+    if (status && status !== "active") {
       query = query.where("status", "==", status) as typeof query;
     }
 
     const snap = await query.get();
-    const raw = snap.docs.map((doc) => doc.data());
+    let raw = snap.docs.map((doc) => doc.data());
+    if (status === "active") {
+      raw = raw.filter((row) => ["active", "overdue"].includes(String(row.status || "")));
+    }
     const isbnSet = [...new Set(raw.map((row) => normalizeIsbn(String(row.isbn || ""))).filter(Boolean))];
     const numberByCopy = new Map<string, number>();
     await Promise.all(
@@ -570,6 +599,7 @@ router.get("/mine", authenticate, async (req: AuthRequest, res: Response) => {
       .map((row) => ({
         ...row,
         copyNumber: numberByCopy.get(String(row.copyId || "")) || null,
+        remainingFine: fineRemaining(row),
       }))
       .sort((a, b) => {
         const aTime = (a as { borrowedAt?: { toMillis?: () => number } }).borrowedAt?.toMillis?.() || 0;
@@ -577,7 +607,7 @@ router.get("/mine", authenticate, async (req: AuthRequest, res: Response) => {
         return bTime - aTime;
       });
 
-    res.json({ loans });
+    res.json({ loans, outstandingFines });
   } catch (error) {
     console.error("List loans error:", error);
     res.status(500).json({ error: "Failed to list loans" });
@@ -615,13 +645,19 @@ router.post(
         }
 
         const user = userSnap.data()!;
-        const remaining = Math.max(
-          (user.totalOutstandingFines || 0) - (loan.fineAmount || 0),
+        const unpaidOnLoan = Math.max(
+          Number(loan.fineAmount || 0) - Number(loan.finePaidAmount || 0),
           0
         );
+        if (!unpaidOnLoan || loan.finePaid) {
+          throw new Error("NO_UNPAID_FINE");
+        }
+
+        const remaining = Math.max((user.totalOutstandingFines || 0) - unpaidOnLoan, 0);
 
         tx.update(loanRef, {
           finePaid: true,
+          finePaidAmount: Number(loan.fineAmount || 0),
           finePaidAt: new Date(),
           finePaidBy: req.uid,
         });
@@ -645,6 +681,10 @@ router.post(
     } catch (error: any) {
       if (error.message === "USER_NOT_FOUND") {
         res.status(404).json({ error: "User not found" });
+        return;
+      }
+      if (error.message === "NO_UNPAID_FINE") {
+        res.status(400).json({ error: "No unpaid fine on this loan" });
         return;
       }
       console.error("Mark fine paid error:", error);

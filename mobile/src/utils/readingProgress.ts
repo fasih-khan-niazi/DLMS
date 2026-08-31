@@ -8,7 +8,7 @@ export type ReadingProgressSnapshot = {
 };
 
 /**
- * Tracks meaningful reading — rapid scroll-to-end does not instantly hit 100%.
+ * Tracks meaningful reading. Rapid scroll-to-end does not instantly hit 100%.
  * A page counts only after the reader stays on it for MIN_PAGE_DWELL_MS.
  * Prior saved progress is preserved and can only increase.
  */

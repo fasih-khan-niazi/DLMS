@@ -309,7 +309,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
             ) : null}
           </Pressable>
 
-          {/* Upload PDF lives under Profile for staff — keep catalog free of add-book CTAs
+          {/* Upload PDF lives under Profile for staff; keep catalog free of add-book CTAs
           {isStaff ? (
             <Pressable
               onPress={() => navigation.navigate("UploadDigitalBook")}
@@ -402,7 +402,7 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
                     ? "Add digital books from Profile when you are ready."
                     : "Check back later for new uploads."
                 }
-                // Upload CTA removed from catalog — staff uploads from Profile
+                // Upload CTA removed from catalog; staff uploads from Profile
                 // actionLabel={isStaff ? "Upload PDF" : undefined}
                 // onAction={isStaff ? () => navigation.navigate("UploadDigitalBook") : undefined}
               />
@@ -464,8 +464,8 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
               {(
                 [
-                  { id: "title_asc" as const, label: "A–Z" },
-                  { id: "title_desc" as const, label: "Z–A" },
+                  { id: "title_asc" as const, label: "A-Z" },
+                  { id: "title_desc" as const, label: "Z-A" },
                   { id: "newest" as const, label: "Newest" },
                 ] as const
               ).map((c) => (

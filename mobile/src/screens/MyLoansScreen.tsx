@@ -147,16 +147,18 @@ export default function MyLoansScreen({ navigation, embedded }: Props) {
                 >
                   Due {formatShortDate(item.dueDate)}
                 </Text>
-                {item.fineAmount > 0 && (
+                {(Number(item.remainingFine) > 0 || Number(item.fineAmount) > 0) && (
                   <Text
                     style={{
                       marginTop: space.sm,
                       fontFamily: fontFamily.bodyBold,
                       fontSize: type.small,
-                      color: colors.warning,
+                      color: Number(item.remainingFine) > 0 ? colors.danger : colors.muted,
                     }}
                   >
-                    Fine: Rs {item.fineAmount} {item.finePaid ? "(paid)" : "(unpaid)"}
+                    {Number(item.remainingFine) > 0
+                      ? `Fine due: Rs ${item.remainingFine}. Pay at the desk before returning`
+                      : `Fine: Rs ${item.fineAmount} (paid)`}
                   </Text>
                 )}
               </Card>

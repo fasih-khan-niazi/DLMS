@@ -41,7 +41,7 @@ function stableCoverPath(cacheKey: string): string {
   return `${FileSystem.cacheDirectory}cover_${safe}.img`;
 }
 
-/** Instant cache hit for list views — any on-disk file counts. */
+/** Instant cache hit for list views. Any on-disk file counts. */
 export async function peekCoverCache(uri: string): Promise<string | null> {
   if (!uri.trim()) return null;
   if (!isApiCoverUrl(uri)) return uri;

@@ -18,7 +18,7 @@ export const lightColors = {
   bookPlaceholderIcon: "#8FA3B8",
 } as const;
 
-/** Navy-tinted dark palette — refined further in Phase 14. */
+/** Navy-tinted dark palette. Refined further in Phase 14. */
 export const darkColors = {
   navy: "#D7E4F0",
   navyDark: "#A8BDD0",

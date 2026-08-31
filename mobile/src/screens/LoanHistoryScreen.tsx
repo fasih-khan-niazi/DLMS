@@ -128,16 +128,17 @@ export default function LoanHistoryScreen({ navigation, embedded }: Props) {
               >
                 Returned {formatShortDate(item.returnedAt)}
               </Text>
-              {item.fineAmount > 0 && (
+              {(Number(item.remainingFine) > 0 || Number(item.fineAmount) > 0) && (
                 <Text
                   style={{
                     marginTop: space.sm,
                     fontFamily: fontFamily.bodyBold,
                     fontSize: type.small,
-                    color: colors.warning,
+                    color: Number(item.remainingFine) > 0 ? colors.danger : colors.muted,
                   }}
                 >
-                  Fine: Rs {item.fineAmount} {item.finePaid ? "(paid)" : "(unpaid)"}
+                  Fine: Rs {item.remainingFine > 0 ? item.remainingFine : item.fineAmount}{" "}
+                  {item.finePaid || Number(item.remainingFine || 0) === 0 ? "(paid)" : "(unpaid)"}
                 </Text>
               )}
             </Card>

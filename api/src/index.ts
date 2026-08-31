@@ -16,6 +16,7 @@ import digitalBookRoutes from "./routes/digitalBooks";
 import notificationRoutes from "./routes/notifications";
 import cronRoutes from "./routes/cron";
 import configRoutes from "./routes/config";
+import finesRoutes from "./routes/fines";
 import { requestLogger } from "./middleware/requestLogger";
 import { ensureUploadDirs } from "./config/storage";
 
@@ -64,6 +65,7 @@ app.use("/api/admin/reports", reportsRoutes);
 app.use("/api/config", configRoutes);
 app.use("/api/catalog", catalogRoutes);
 app.use("/api/loans", loanRoutes);
+app.use("/api/fines", finesRoutes);
 app.use("/api/reservations", reservationRoutes);
 app.use("/api/digital-books", digitalBookRoutes);
 app.use("/api/notifications", notificationRoutes);

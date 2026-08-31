@@ -75,7 +75,7 @@ function greetingInKarachi(now = new Date()): string {
 
 export default function HomeScreen({ navigation }: Props) {
   const { colors, fontFamily, radius, space, type, mode } = useTheme();
-  const { profile, refresh: refreshProfile } = useProfile();
+  const { profile, refresh: refreshProfile, isStaff } = useProfile();
   const [unread, setUnread] = useState(0);
   const [quickSearch, setQuickSearch] = useState("");
   const [summary, setSummary] = useState<DashboardSnapshot | null>(null);
@@ -131,11 +131,13 @@ export default function HomeScreen({ navigation }: Props) {
         overdueLoans,
         readyReservations: readyRows.length,
         waitingReservations: waitingRows.length,
-        outstandingFines: profile?.totalOutstandingFines ?? 0,
         nextDueLabel: nextDue?.label,
         nextDueOverdue: nextDue?.overdue,
         readyTitle: readyRows[0]?.title,
         continueReading,
+        outstandingFines: Number(
+          loansRes.data.outstandingFines ?? profile?.totalOutstandingFines ?? 0
+        ),
         fetchedAt: Date.now(),
       };
 
@@ -419,6 +421,15 @@ export default function HomeScreen({ navigation }: Props) {
             { label: "Catalog", icon: "library-outline" as const, onPress: goToCatalog },
             { label: "E-books", icon: "tablet-portrait-outline" as const, onPress: goToEbooks },
             { label: "Bookshelf", icon: "bookmarks-outline" as const, onPress: goToBookshelf },
+            ...(isStaff
+              ? [
+                  {
+                    label: "Collect fines",
+                    icon: "cash-outline" as const,
+                    onPress: () => navigation.navigate("CollectFines"),
+                  },
+                ]
+              : []),
           ].map((action) => (
             <PressableScale
               key={action.label}

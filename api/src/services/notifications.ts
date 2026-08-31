@@ -1,5 +1,6 @@
 import axios from "axios";
 import { db, messaging } from "../config/firebase";
+import { persistAccruedFines } from "./fines";
 
 function sanitizeDedupeKey(raw: string) {
   return raw.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 180);
@@ -227,6 +228,8 @@ async function runDailyLoanNotificationsInner() {
   let urgent = 0;
   let overdue = 0;
 
+  const usersToSync = new Set<string>();
+
   for (const doc of docs) {
     const loan = doc.data();
     const dueDate = toDate(loan.dueDate);
@@ -269,9 +272,14 @@ async function runDailyLoanNotificationsInner() {
       const lateDays = Math.abs(daysUntilDue);
       const fineAmount = lateDays * finePerDay;
 
-      if (loan.status !== "overdue") {
-        await doc.ref.update({ status: "overdue", updatedAt: new Date() });
+      if (loan.status !== "overdue" || Number(loan.fineAmount || 0) !== fineAmount) {
+        await doc.ref.update({
+          status: "overdue",
+          fineAmount,
+          updatedAt: new Date(),
+        });
       }
+      usersToSync.add(String(loan.userId || ""));
 
       const loanId = String(loan.loanId || doc.id);
       if (await alreadySentLoanNotice(loanId, "overdue", todayKey, timezone)) {
@@ -288,6 +296,10 @@ async function runDailyLoanNotificationsInner() {
       });
       overdue += 1;
     }
+  }
+
+  for (const uid of usersToSync) {
+    if (uid) await persistAccruedFines(uid);
   }
 
   return { reminders, urgent, overdue, checked: docs.length };

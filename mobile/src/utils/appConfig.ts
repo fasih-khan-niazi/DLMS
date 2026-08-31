@@ -37,7 +37,7 @@ async function writeStoredConfig(config: AppConfig): Promise<void> {
   }
 }
 
-/** Load cached config from disk into memory — call early at app start. */
+/** Load cached config from disk into memory. Call early at app start. */
 export async function hydrateAppConfig(): Promise<AppConfig | null> {
   if (memory) return memory;
   if (!hydratePromise) {

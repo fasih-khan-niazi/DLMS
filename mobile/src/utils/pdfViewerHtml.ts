@@ -1,4 +1,4 @@
-/** In-app PDF.js viewer — continuous pinch without re-render flash, hi-DPI buffers. */
+/** In-app PDF.js viewer. Continuous pinch without re-render flash, hi-DPI buffers. */
 
 const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174";
 
@@ -104,7 +104,7 @@ export function buildPdfViewerHtml(input: {
 <div class="bar">
   <button class="nav" id="prev" disabled>‹</button>
   <input id="pageInput" type="number" inputmode="numeric" min="1" value="${startPage}" />
-  <span id="pageTotal">/ —</span>
+  <span id="pageTotal">/ -</span>
   <button class="go" id="goPage" type="button">Go</button>
   <button class="nav" id="next" disabled>›</button>
 </div>
@@ -177,7 +177,7 @@ export function buildPdfViewerHtml(input: {
     return pageCanvas(pageNum);
   }
 
-  /** Resize existing canvases only — no PDF.js redraw (avoids shimmer). */
+  /** Resize existing canvases only, no PDF.js redraw (avoids shimmer). */
   function applyZoomSizes(z) {
     z = clampZoom(z);
     document.querySelectorAll('.pageSlot canvas').forEach(function (c) {
@@ -399,7 +399,7 @@ export function buildPdfViewerHtml(input: {
       if (opts.fromPinch) {
         pinFocusToScreen();
       } else {
-        // Settings pills: absolute zoom as if from 100%, page centered — one step, no reset flash
+        // Settings pills: absolute zoom as if from 100%, page centered. One step, no reset flash
         centerPageInView(pageNum);
       }
     });

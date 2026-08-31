@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { useTheme } from "../../theme";
 
-type Tone = "default" | "success" | "warning" | "danger" | "muted";
+type Tone = "default" | "info" | "success" | "warning" | "danger" | "muted";
 
 type Props = {
   label: string;
@@ -11,10 +11,14 @@ type Props = {
 };
 
 export function Badge({ label, tone = "default", style }: Props) {
-  const { colors, radius, fontFamily, type } = useTheme();
+  const { colors, radius, fontFamily, type, mode } = useTheme();
 
   const tones: Record<Tone, { bg: string; fg: string }> = {
     default: { bg: colors.overlay, fg: colors.navy },
+    info:
+      mode === "dark"
+        ? { bg: "rgba(232, 168, 56, 0.22)", fg: colors.amber }
+        : { bg: colors.overlay, fg: colors.navy },
     success: { bg: "#E8F5EC", fg: colors.success },
     warning: { bg: "#FEF3C7", fg: colors.warning },
     danger: { bg: "#FEE4E2", fg: colors.danger },

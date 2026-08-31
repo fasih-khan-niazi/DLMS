@@ -311,8 +311,8 @@ export default function CatalogScreen({
   };
 
   const sortChips: { id: SortOption; label: string }[] = [
-    { id: "title_asc", label: "A–Z" },
-    { id: "title_desc", label: "Z–A" },
+    { id: "title_asc", label: "A-Z" },
+    { id: "title_desc", label: "Z-A" },
     { id: "newest", label: "Newest" },
   ];
 

@@ -35,7 +35,7 @@ const defaults: SystemConfig = {
 const FIELD_LABELS: Record<string, string> = {
   allowInAppCopyBorrow: "Allow in-app copy borrow/return",
   librariansCanBorrow: "Librarians can borrow physical books",
-  blockCheckoutIfUnpaidFine: "Block checkout when fines unpaid",
+  blockCheckoutIfUnpaidFine: "Block new borrows and reservations while unpaid fines exist",
   catalogPageSize: "Catalog page size",
   maxPdfSizeMb: "Max PDF size",
   reservationHoldHours: "Reservation hold hours",
@@ -273,7 +273,7 @@ export function ConfigPage() {
               />
               Allow in-app copy borrow/return (Scan remains primary; default off)
               {unsupported.includes("allowInAppCopyBorrow") ? (
-                <span className="muted small"> — not supported by the connected API</span>
+                <span className="muted small"> (not supported by the connected API)</span>
               ) : null}
             </label>
           </div>
@@ -282,7 +282,10 @@ export function ConfigPage() {
         <section className="config-section">
           <div className="config-section-head">
             <h2>Fines</h2>
-            <p className="muted small">Late return charges and checkout blocking</p>
+            <p className="muted small">
+              Late charges. Returning a copy with an unpaid fine is always blocked until the desk
+              records payment. This toggle only controls new borrows and reservations.
+            </p>
           </div>
           <div className="config-grid">
             <label>
@@ -302,7 +305,13 @@ export function ConfigPage() {
                   setForm((p) => ({ ...p, blockCheckoutIfUnpaidFine: e.target.checked }))
                 }
               />
-              Block borrow and reserve while unpaid fines exist
+              <span>
+                Block new borrows and reservations while unpaid fines exist
+                <span className="muted small" style={{ display: "block", fontWeight: 400 }}>
+                  Off means they can still borrow or reserve with a balance. They still cannot
+                  return a late copy until that fine is paid.
+                </span>
+              </span>
             </label>
           </div>
         </section>

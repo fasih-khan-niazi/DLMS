@@ -367,6 +367,12 @@ export default function ProfileScreen({ navigation }: Props) {
               onPress={() => navigation.navigate("UploadDigitalBook")}
             />
             <MenuRow
+              label="Collect fines"
+              subtitle="Record cash payments"
+              icon="cash-outline"
+              onPress={() => navigation.navigate("CollectFines")}
+            />
+            <MenuRow
               label="Print shelf labels"
               subtitle="QR labels from a book page"
               icon="print-outline"

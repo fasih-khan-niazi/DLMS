@@ -12,7 +12,7 @@ type Props = {
   size?: number;
 };
 
-/** Shared icon-only back control — use everywhere instead of "← Back" text. */
+/** Shared icon-only back control. Use everywhere instead of "← Back" text. */
 export function BackButton({ onPress, light = false, style, size = 24 }: Props) {
   const { colors } = useTheme();
 

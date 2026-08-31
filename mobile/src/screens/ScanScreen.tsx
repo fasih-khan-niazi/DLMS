@@ -27,7 +27,13 @@ import { dismissScanCoach, isScanCoachDismissed } from "../utils/onboarding";
 import { invalidateCatalogCache } from "../utils/catalogCache";
 import { invalidateDigitalCache } from "../utils/digitalCache";
 import { clearDashboardCache } from "../utils/dashboardCache";
-import { extractApiError, runSideEffect } from "../utils/apiError";
+import { AppModal } from "../components/AppModal";
+import {
+  extractApiError,
+  isOutstandingFinesError,
+  isUnpaidCopyFineError,
+  runSideEffect,
+} from "../utils/apiError";
 import { getAppConfig, peekLibrariansCanBorrow } from "../utils/appConfig";
 
 type Mode = "borrow" | "return";
@@ -44,6 +50,12 @@ const ON_AMBER_TEXT = "#1A2834";
 
 function friendlyScanError(message: string): string {
   const lower = message.toLowerCase();
+  if (lower.includes("outstanding fines") && lower.includes("borrowing")) {
+    return "You have outstanding fines. Pay at the library desk, then scan again to borrow.";
+  }
+  if (lower.includes("this copy has an unpaid fine") || lower.includes("scan again to return")) {
+    return "This copy has an unpaid fine. Pay at the desk with Collect fines, then scan again to return.";
+  }
   if (lower.includes("reserved for another")) {
     return "This copy is held for another reader in the reservation queue. Please choose a different available copy, or another title.";
   }
@@ -94,6 +106,9 @@ export default function ScanScreen({ navigation }: Props) {
   const [busy, setBusy] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [result, setResult] = useState<ScanResult | null>(null);
+  const [fineModal, setFineModal] = useState<{ title: string; message: string } | null>(
+    null
+  );
   const [history, setHistory] = useState<ScanHistoryEntry[]>([]);
   const [lastPayload, setLastPayload] = useState<string | null>(null);
   const [showScanCoach, setShowScanCoach] = useState(false);
@@ -151,11 +166,24 @@ export default function ScanScreen({ navigation }: Props) {
       response = await api.post(endpoint, { qrPayload: data });
     } catch (error: any) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-      setResult({
-        kind: "error",
-        message: friendlyScanError(extractApiError(error, "Scan action failed")),
-        mode,
-      });
+      const apiMessage = extractApiError(error, "Scan action failed");
+      if (isOutstandingFinesError(apiMessage)) {
+        setFineModal({
+          title: "Pay fines first",
+          message: friendlyScanError(apiMessage),
+        });
+      } else if (isUnpaidCopyFineError(apiMessage)) {
+        setFineModal({
+          title: "Pay at the desk",
+          message: friendlyScanError(apiMessage),
+        });
+      } else {
+        setResult({
+          kind: "error",
+          message: friendlyScanError(apiMessage),
+          mode,
+        });
+      }
       setBusy(false);
       return;
     }
@@ -209,11 +237,13 @@ export default function ScanScreen({ navigation }: Props) {
 
   const dismissResult = () => {
     setResult(null);
+    setFineModal(null);
     resetScan();
   };
 
   const retryScan = () => {
     setResult(null);
+    setFineModal(null);
     resetScan();
   };
 
@@ -257,7 +287,7 @@ export default function ScanScreen({ navigation }: Props) {
           mute
           enableTorch={torchOn}
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-          onBarcodeScanned={scanned ? undefined : handleBarcode}
+          onBarcodeScanned={scanned || !!fineModal || !!result ? undefined : handleBarcode}
         />
       ) : (
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: ON_CAMERA_BACKDROP }]} />
@@ -475,6 +505,15 @@ export default function ScanScreen({ navigation }: Props) {
           dismissResult();
           navigation.navigate("Home");
         }}
+      />
+      <AppModal
+        visible={!!fineModal}
+        variant="info"
+        title={fineModal?.title || ""}
+        message={fineModal?.message || ""}
+        confirmLabel="OK"
+        onClose={dismissResult}
+        onConfirm={dismissResult}
       />
     </View>
   );

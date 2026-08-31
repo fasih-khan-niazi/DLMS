@@ -7,7 +7,7 @@ type Props = PressableProps & {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   haptic?: "light" | "selection" | "none";
-  /** Opacity dip only — no glow, no haptic. Use on dense menu rows. */
+  /** Opacity dip only. No glow, no haptic. Use on dense menu rows. */
   quiet?: boolean;
 };
 

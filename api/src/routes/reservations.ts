@@ -2,6 +2,7 @@ import { Router, Response } from "express";
 import { db } from "../config/firebase";
 import { authenticate, AuthRequest } from "../middleware/authenticate";
 import { createId } from "../utils/ids";
+import { persistAccruedFines } from "../services/fines";
 import { getSystemConfig } from "../services/loans";
 import {
   assignCopyToNextReservation,
@@ -31,6 +32,14 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
       await reconcileReservationsForIsbn(isbn);
     } catch (error) {
       console.error("[reserve] pre-create reconcile failed:", error);
+    }
+
+    const outstandingFines = await persistAccruedFines(req.uid!);
+    if (config.blockCheckoutIfUnpaidFine === true && outstandingFines > 0) {
+      res.status(403).json({
+        error: "You have outstanding fines. Pay at the library desk, then try reserving again.",
+      });
+      return;
     }
 
     const userRef = db.collection("users").doc(req.uid!);
@@ -81,8 +90,10 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    if (config.blockCheckoutIfUnpaidFine && user.hasUnpaidFines) {
-      res.status(403).json({ error: "Clear unpaid fines before reserving" });
+    if (config.blockCheckoutIfUnpaidFine === true && user.hasUnpaidFines) {
+      res.status(403).json({
+        error: "You have outstanding fines. Pay at the library desk, then try reserving again.",
+      });
       return;
     }
 

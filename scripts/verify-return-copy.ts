@@ -5,7 +5,9 @@
  * when they scan Copy 1 (available or issued to someone else). Their own
  * loan must stay open until they scan the issued copy.
  *
- * Restores config flags and any copies it borrows. Usage (from repo root):
+ * A student must not be able to return (or take) another student's issued copy
+ * by scanning that copy's QR from their own account.
+ *
  *   npx tsx scripts/verify-return-copy.ts [apiBaseUrl]
  */
 import axios, { type AxiosInstance } from "axios";
@@ -85,10 +87,10 @@ async function pickTitleWithTwoFreeCopies(): Promise<{
   throw new Error("Need a live title with at least two free copies and no holds");
 }
 
-async function pickUser(role: "student" | "librarian", isbn: string): Promise<string> {
-  const snap = await db.collection("users").where("role", "==", role).limit(12).get();
+async function pickUsers(role: "student" | "librarian", isbn: string, count: number): Promise<string[]> {
+  const snap = await db.collection("users").where("role", "==", role).limit(16).get();
   const active = snap.docs.filter((d) => d.data().isActive !== false);
-  const ranked = [];
+  const ranked: Array<{ id: string; count: number }> = [];
   for (const doc of active) {
     const [loansA, loansB] = await Promise.all([
       db.collection("loans").where("userId", "==", doc.id).where("status", "==", "active").get(),
@@ -99,10 +101,10 @@ async function pickUser(role: "student" | "librarian", isbn: string): Promise<st
     ranked.push({ id: doc.id, count: live.length });
   }
   ranked.sort((a, b) => a.count - b.count);
-  if (ranked.length === 0) {
-    throw new Error(`No active ${role} free of a live loan on ${isbn}`);
+  if (ranked.length < count) {
+    throw new Error(`Need ${count} active ${role}(s) free of a live loan on ${isbn}`);
   }
-  return ranked[0].id;
+  return ranked.slice(0, count).map((row) => row.id);
 }
 
 async function copyDoc(copyId: string) {
@@ -134,16 +136,18 @@ async function main() {
   const copyTwo = isbnTarget.copyTwo.copyId;
   const n1 = isbnTarget.copyOne.copyNumber;
   const n2 = isbnTarget.copyTwo.copyNumber;
-  const studentId = await pickUser("student", isbnTarget.isbn);
-  const librarianId = await pickUser("librarian", isbnTarget.isbn);
+  const [studentId, studentBId] = await pickUsers("student", isbnTarget.isbn, 2);
+  const [librarianId] = await pickUsers("librarian", isbnTarget.isbn, 1);
 
   console.log(`\nTitle: ${isbnTarget.title} (${isbnTarget.isbn})`);
   console.log(`Copy ${n1} ${copyOne}`);
   console.log(`Copy ${n2} ${copyTwo}`);
-  console.log(`Student ${studentId}`);
+  console.log(`Student A ${studentId}`);
+  console.log(`Student B ${studentBId}`);
   console.log(`Librarian ${librarianId}`);
 
   const student = await client(studentId);
+  const studentB = await client(studentBId);
   const librarian = await client(librarianId);
 
   const cfgRef = db.collection("config").doc("system");
@@ -302,10 +306,74 @@ async function main() {
     } else {
       fail(`catalog indexes Copy ${n1}=${i1 + 1}, Copy ${n2}=${i2 + 1}`);
     }
+
+    console.log(`\n4) Student B cannot return or steal Student A's issued copy`);
+    const aBorrow = await student.post("/api/loans/borrow", { copyId: copyOne });
+    if (aBorrow.status >= 200 && aBorrow.status < 300) {
+      borrowed.add(copyOne);
+      pass(`Student A borrowed Copy ${n1}`);
+    } else {
+      fail(`Student A borrow Copy ${n1} → ${aBorrow.status} ${JSON.stringify(aBorrow.data)}`);
+      return;
+    }
+
+    const loansBeforeTamper = await liveLoanCount(studentId);
+    const bQr = await studentB.post("/api/loans/return", {
+      qrPayload: qrPayload(copyOne, isbnTarget.isbn),
+    });
+    const bMsg = String(bQr.data?.error || "");
+    if (bQr.status === 403 && bMsg.toLowerCase().includes("another reader")) {
+      pass(`Student B QR return blocked: "${bMsg}"`);
+    } else {
+      fail(`Student B QR return → ${bQr.status} ${JSON.stringify(bQr.data)}`);
+    }
+
+    const bCopyId = await studentB.post("/api/loans/return", { copyId: copyOne });
+    if (bCopyId.status === 403) {
+      pass("Student B in-app return of A's copy is also blocked");
+    } else {
+      fail(`Student B copyId return → ${bCopyId.status} ${JSON.stringify(bCopyId.data)}`);
+    }
+
+    const bSteal = await studentB.post("/api/loans/borrow", { copyId: copyOne });
+    if (bSteal.status >= 400) {
+      pass(`Student B cannot borrow an issued copy (${bSteal.status})`);
+    } else {
+      fail(`Student B borrowed A's issued copy: ${JSON.stringify(bSteal.data)}`);
+    }
+
+    const stillA = await copyDoc(copyOne);
+    if (String(stillA.status) === "issued" && String(stillA.currentLoanId || "")) {
+      pass(`Copy ${n1} is still issued after Student B's attempts`);
+    } else {
+      fail(`Copy ${n1} status is ${stillA.status} after tamper attempts`);
+    }
+    if ((await liveLoanCount(studentId)) === loansBeforeTamper) {
+      pass("Student A's loan count is unchanged");
+    } else {
+      fail("Student A's loan count changed after Student B scanned their copy");
+    }
+    const bMine = await studentB.get("/api/loans/mine", { params: { status: "active" } });
+    const stole = (bMine.data?.loans || []).some(
+      (row: { copyId?: string }) => row.copyId === copyOne
+    );
+    if (!stole) pass("Student B's Loans tab does not show A's copy");
+    else fail("Student B now lists Student A's copy as their loan");
+
+    const aReturn = await student.post("/api/loans/return", {
+      qrPayload: qrPayload(copyOne, isbnTarget.isbn),
+    });
+    if (aReturn.status >= 200 && aReturn.status < 300) {
+      borrowed.delete(copyOne);
+      pass("Student A can still return their own copy");
+    } else {
+      fail(`Student A return → ${aReturn.status} ${JSON.stringify(aReturn.data)}`);
+    }
   } finally {
     for (const copyId of [...borrowed]) {
       try {
         await returnIfIssued(student, copyId, isbnTarget.isbn);
+        await returnIfIssued(studentB, copyId, isbnTarget.isbn);
         await returnIfIssued(librarian, copyId, isbnTarget.isbn);
       } catch {
         /* restore best-effort */

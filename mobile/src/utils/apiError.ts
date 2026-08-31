@@ -32,6 +32,15 @@ export function extractApiError(error: unknown, fallback: string): string {
   return fallback;
 }
 
+export function isOutstandingFinesError(message: string): boolean {
+  return message.toLowerCase().includes("outstanding fines");
+}
+
+export function isUnpaidCopyFineError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes("this copy has an unpaid fine") || lower.includes("scan again to return");
+}
+
 /** True when the throw never reached the server (network / timeout / local bug). */
 export function isTransportError(error: unknown): boolean {
   const err = error as { response?: unknown };

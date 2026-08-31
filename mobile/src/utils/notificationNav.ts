@@ -26,6 +26,8 @@ export function typeLabel(type: string): string {
       return "Ready for pickup";
     case "reservation_cancelled":
       return "Reservation";
+    case "fine_paid":
+      return "Fine paid";
     default:
       return "Alert";
   }
@@ -39,6 +41,8 @@ export function typeTone(type: string): "warning" | "danger" | "success" | "mute
     case "due_reminder":
       return "warning";
     case "reservation_ready":
+      return "success";
+    case "fine_paid":
       return "success";
     default:
       return "muted";
@@ -82,7 +86,7 @@ export function openNotificationTarget(navigation: Nav, item: InboxNotification)
     return;
   }
 
-  if (type === "due_reminder" || type === "due_reminder_urgent" || type === "overdue") {
+  if (type === "due_reminder" || type === "due_reminder_urgent" || type === "overdue" || type === "fine_paid") {
     tabs?.navigate("Activity", { initialTab: "loans" });
     return;
   }

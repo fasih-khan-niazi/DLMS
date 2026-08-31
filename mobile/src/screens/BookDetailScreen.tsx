@@ -27,7 +27,12 @@ import {
   getLibrariansCanBorrow,
   invalidateAppConfigCache,
 } from "../utils/appConfig";
-import { extractApiError, runSideEffect } from "../utils/apiError";
+import {
+  extractApiError,
+  isOutstandingFinesError,
+  isUnpaidCopyFineError,
+  runSideEffect,
+} from "../utils/apiError";
 import { useTheme } from "../theme";
 
 type Props = {
@@ -79,7 +84,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
   const [addingCopies, setAddingCopies] = useState(false);
   const [copyActionId, setCopyActionId] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<{
-    variant: "success" | "error";
+    variant: "success" | "error" | "info";
     title: string;
     message: string;
   } | null>(null);
@@ -188,10 +193,11 @@ export default function BookDetailScreen({ navigation, route }: Props) {
       const already =
         /already have an active reservation/i.test(apiMessage) ||
         /already have this book on loan/i.test(apiMessage);
+      const unpaid = isOutstandingFinesError(apiMessage);
       setReserving(false);
       setReserveFeedback({
-        variant: already ? "info" : "error",
-        title: already ? "Already reserved" : "Could not reserve",
+        variant: unpaid ? "info" : already ? "info" : "error",
+        title: unpaid ? "Pay fines first" : already ? "Already reserved" : "Could not reserve",
         message: apiMessage,
       });
       return;
@@ -228,10 +234,19 @@ export default function BookDetailScreen({ navigation, route }: Props) {
       response = await api.post(endpoint, { copyId });
     } catch (error: any) {
       setCopyActionId(null);
+      const apiMessage = extractApiError(error, "Request failed");
+      const unpaidBorrow = isOutstandingFinesError(apiMessage);
+      const unpaidReturn = isUnpaidCopyFineError(apiMessage);
       setCopyFeedback({
-        variant: "error",
-        title: action === "borrow" ? "Could not borrow" : "Could not return",
-        message: extractApiError(error, "Request failed"),
+        variant: unpaidBorrow || unpaidReturn ? "info" : "error",
+        title: unpaidBorrow
+          ? "Pay fines first"
+          : unpaidReturn
+            ? "Pay at the desk"
+            : action === "borrow"
+              ? "Could not borrow"
+              : "Could not return",
+        message: apiMessage,
       });
       return;
     }
@@ -927,7 +942,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
                       {copyLabel}
                     </Text>
                     {copy.status === "issued" && isMine ? (
-                      <Badge label="Issued by you" tone="success" />
+                      <Badge label="Issued by you" tone="info" />
                     ) : copy.status === "issued" ? (
                       <Badge label="Issued" tone="muted" />
                     ) : copy.status === "reserved" && heldForMe ? (
@@ -1060,7 +1075,13 @@ export default function BookDetailScreen({ navigation, route }: Props) {
 
       <AppModal
         visible={!!copyFeedback}
-        variant={copyFeedback?.variant === "success" ? "success" : "error"}
+        variant={
+          copyFeedback?.variant === "success"
+            ? "success"
+            : copyFeedback?.variant === "info"
+              ? "info"
+              : "error"
+        }
         title={copyFeedback?.title || ""}
         message={copyFeedback?.message || ""}
         confirmLabel="OK"

@@ -76,16 +76,67 @@ export async function calculateDueDate(from = new Date()): Promise<Date> {
   return due;
 }
 
+export function pktCalendarDaysLate(
+  dueDate: Date,
+  asOf: Date,
+  timeZone = "Asia/Karachi"
+): number {
+  const dayKey = (value: Date) =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(value);
+  const today = new Date(`${dayKey(asOf)}T12:00:00`);
+  const dueNoon = new Date(`${dayKey(dueDate)}T12:00:00`);
+  return Math.max(0, Math.round((today.getTime() - dueNoon.getTime()) / DAY_MS));
+}
+
 export function calculateFineAmount(
   dueDate: Date,
   returnedAt: Date,
-  finePerDayRs: number
+  finePerDayRs: number,
+  timeZone = "Asia/Karachi"
 ): number {
-  if (returnedAt.getTime() <= dueDate.getTime()) {
-    return 0;
-  }
+  return pktCalendarDaysLate(dueDate, returnedAt, timeZone) * Number(finePerDayRs || 0);
+}
 
-  const lateMs = returnedAt.getTime() - dueDate.getTime();
-  const lateDays = Math.ceil(lateMs / DAY_MS);
-  return lateDays * finePerDayRs;
+export function toFineDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === "object" && value !== null && "toDate" in value) {
+    const fn = (value as { toDate?: () => Date }).toDate;
+    if (typeof fn === "function") {
+      const d = fn.call(value);
+      return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+    }
+  }
+  const d = new Date(value as string);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function fineRemaining(loan: {
+  fineAmount?: unknown;
+  finePaidAmount?: unknown;
+  finePaid?: unknown;
+}): number {
+  if (loan.finePaid === true) return 0;
+  return Math.max(Number(loan.fineAmount || 0) - Number(loan.finePaidAmount || 0), 0);
+}
+
+/** Accrued or already-assessed fine for a live loan; frozen amount after return. */
+export function assessedFineForLoan(
+  loan: Record<string, unknown>,
+  now: Date,
+  finePerDayRs: number,
+  timeZone = "Asia/Karachi"
+): number {
+  const stored = Number(loan.fineAmount || 0);
+  const status = String(loan.status || "");
+  if (status === "returned") return stored;
+  const due = toFineDate(loan.dueDate);
+  if (!due) return stored;
+  const accrued = calculateFineAmount(due, now, finePerDayRs, timeZone);
+  return Math.max(stored, accrued);
 }
