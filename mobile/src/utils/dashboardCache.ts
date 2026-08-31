@@ -41,3 +41,11 @@ export async function getDashboardCache(): Promise<DashboardSnapshot | null> {
 export async function setDashboardCache(data: DashboardSnapshot): Promise<void> {
   await AsyncStorage.setItem(KEY, JSON.stringify(data));
 }
+
+export async function clearDashboardCache(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(KEY);
+  } catch {
+    // ignore
+  }
+}

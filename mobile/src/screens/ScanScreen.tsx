@@ -26,6 +26,7 @@ import {
 import { dismissScanCoach, isScanCoachDismissed } from "../utils/onboarding";
 import { invalidateCatalogCache } from "../utils/catalogCache";
 import { invalidateDigitalCache } from "../utils/digitalCache";
+import { clearDashboardCache } from "../utils/dashboardCache";
 import { extractApiError, runSideEffect } from "../utils/apiError";
 import { getAppConfig, peekLibrariansCanBorrow } from "../utils/appConfig";
 
@@ -170,6 +171,17 @@ export default function ScanScreen({ navigation }: Props) {
     const isLastReturnForLibrarian =
       mode === "return" && isLibrarianReturnBlocked && loansBeforeReturn <= 1;
 
+    runSideEffect(() => {
+      invalidateCatalogCache();
+      invalidateDigitalCache();
+      void clearDashboardCache();
+    });
+    try {
+      await refresh();
+    } catch {
+      // counts still refresh on next focus
+    }
+
     setResult({
       kind: "success",
       title,
@@ -179,13 +191,6 @@ export default function ScanScreen({ navigation }: Props) {
       isLastReturnForLibrarian,
     });
     setBusy(false);
-
-    // Refresh derived state in the background so counts are current everywhere.
-    runSideEffect(() => {
-      invalidateCatalogCache();
-      invalidateDigitalCache();
-    });
-    void refresh().catch(() => {});
 
     if (isStaff && parsed.copyId && parsed.isbn) {
       try {
@@ -258,7 +263,10 @@ export default function ScanScreen({ navigation }: Props) {
         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: ON_CAMERA_BACKDROP }]} />
       )}
 
-      <View style={[styles.frameOverlay, StyleSheet.absoluteFillObject]} pointerEvents="none">
+      <View
+        style={[styles.frameOverlay, { marginTop: insets.top + 48, marginBottom: 12 }]}
+        pointerEvents="none"
+      >
         <View style={styles.dimTop} />
         <View style={styles.frameRow}>
           <View style={styles.dimSide} />
@@ -495,12 +503,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   bottomPanel: {
-    position: "absolute",
     left: 0,
     right: 0,
-    bottom: 0,
     paddingHorizontal: 20,
+    paddingTop: 8,
     zIndex: 2,
+    backgroundColor: "rgba(20, 31, 40, 0.72)",
   },
   modeRow: {
     flexDirection: "row",
@@ -521,6 +529,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   frameOverlay: {
+    flex: 1,
     justifyContent: "center",
     zIndex: 1,
   },

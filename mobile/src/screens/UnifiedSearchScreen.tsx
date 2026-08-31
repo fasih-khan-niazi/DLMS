@@ -29,6 +29,7 @@ type DigitalHit = {
   digitalBookId: string;
   title: string;
   author?: string;
+  thumbnailUrl?: string;
 };
 
 export default function UnifiedSearchScreen({ navigation, route }: Props) {
@@ -229,7 +230,7 @@ export default function UnifiedSearchScreen({ navigation, route }: Props) {
                   marginBottom: 10,
                 }}
               >
-                <BookCover width={52} height={72} />
+                <BookCover uri={item.thumbnailUrl} width={52} height={72} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text
                     style={{

@@ -922,20 +922,24 @@ export default function BookDetailScreen({ navigation, route }: Props) {
 
               const statusBlock = (
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: fontFamily.bodyBold, color: colors.navy }}>
-                    {copyLabel}
-                  </Text>
-                  <Text
-                    style={{
-                      marginTop: 4,
-                      fontFamily: fontFamily.body,
-                      fontSize: type.small,
-                      color: colors.muted,
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    Status: {copy.status}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                    <Text style={{ fontFamily: fontFamily.bodyBold, color: colors.navy }}>
+                      {copyLabel}
+                    </Text>
+                    {copy.status === "issued" && isMine ? (
+                      <Badge label="Issued by you" tone="success" />
+                    ) : copy.status === "issued" ? (
+                      <Badge label="Issued" tone="muted" />
+                    ) : copy.status === "reserved" && heldForMe ? (
+                      <Badge label="Held for you" tone="warning" />
+                    ) : copy.status === "reserved" ? (
+                      <Badge label="Reserved" tone="warning" />
+                    ) : copy.status === "available" ? (
+                      <Badge label="Available" tone="success" />
+                    ) : (
+                      <Badge label={String(copy.status)} tone="muted" />
+                    )}
+                  </View>
                 </View>
               );
 

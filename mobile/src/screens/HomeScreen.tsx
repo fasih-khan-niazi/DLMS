@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { Text, View, ScrollView } from "react-native";
+import { Text, View } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,6 +15,7 @@ import { useTheme } from "../theme";
 import {
   getDashboardCache,
   setDashboardCache,
+  clearDashboardCache,
   type DashboardSnapshot,
 } from "../utils/dashboardCache";
 import { dueCountdown } from "../utils/loanDates";
@@ -42,7 +43,8 @@ function hourInKarachi(now = new Date()): number {
     hour: "numeric",
     hour12: false,
   }).format(now);
-  return Number(hour);
+  const n = Number(hour);
+  return n === 24 ? 0 : n;
 }
 
 function dateLineKarachi(now = new Date()): string {
@@ -65,9 +67,10 @@ function timeLineKarachi(now = new Date()): string {
 
 function greetingInKarachi(now = new Date()): string {
   const hour = hourInKarachi(now);
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
+  if (hour >= 5 && hour < 12) return "Good morning";
+  if (hour >= 12 && hour < 17) return "Good afternoon";
+  if (hour >= 17 && hour < 21) return "Good evening";
+  return "Welcome back";
 }
 
 export default function HomeScreen({ navigation }: Props) {
@@ -169,6 +172,7 @@ export default function HomeScreen({ navigation }: Props) {
     runSideEffect(() => {
       invalidateCatalogCache();
       invalidateDigitalCache();
+      void clearDashboardCache();
     });
     void refreshProfile().catch(() => {});
     void loadDashboard({ skipCache: true });
@@ -462,7 +466,7 @@ export default function HomeScreen({ navigation }: Props) {
             Open a digital copy from Catalog to pick up where you left off.
           </Text>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View>
             {summary?.continueReading.map((item) => (
               <PressableScale
                 key={item.digitalBookId}
@@ -479,38 +483,52 @@ export default function HomeScreen({ navigation }: Props) {
                     },
                   })
                 }
-                style={{ width: 92, marginRight: 12 }}
+                style={{
+                  flexDirection: "row",
+                  gap: 12,
+                  marginBottom: 12,
+                  alignItems: "center",
+                }}
               >
-                <BookCover
-                  uri={item.thumbnailUrl}
-                  width={92}
-                  height={138}
-                  style={{ alignSelf: "center" }}
-                />
-                <Text
-                  numberOfLines={2}
-                  style={{
-                    marginTop: 8,
-                    fontFamily: fontFamily.bodySemiBold,
-                    fontSize: type.caption,
-                    color: colors.navy,
-                  }}
-                >
-                  {item.title}
-                </Text>
-                <Text
-                  style={{
-                    marginTop: 2,
-                    fontFamily: fontFamily.body,
-                    fontSize: type.caption,
-                    color: colors.muted,
-                  }}
-                >
-                  {item.progress}%
-                </Text>
+                <BookCover uri={item.thumbnailUrl} width={56} height={84} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text
+                    numberOfLines={2}
+                    style={{
+                      fontFamily: fontFamily.bodySemiBold,
+                      fontSize: type.body,
+                      color: colors.navy,
+                    }}
+                  >
+                    {item.title}
+                  </Text>
+                  {item.author ? (
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        marginTop: 4,
+                        fontFamily: fontFamily.body,
+                        fontSize: type.small,
+                        color: colors.muted,
+                      }}
+                    >
+                      {item.author}
+                    </Text>
+                  ) : null}
+                  <Text
+                    style={{
+                      marginTop: 6,
+                      fontFamily: fontFamily.body,
+                      fontSize: type.caption,
+                      color: colors.muted,
+                    }}
+                  >
+                    {item.progress}% read
+                  </Text>
+                </View>
               </PressableScale>
             ))}
-          </ScrollView>
+          </View>
         )}
       </Card>
     </Screen>

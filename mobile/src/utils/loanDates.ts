@@ -26,9 +26,18 @@ export function dueCountdown(dueDateValue: unknown): { label: string; tone: DueT
   const due = parseFirestoreDate(dueDateValue);
   if (!due) return { label: "Due date unknown", tone: "muted", overdue: false };
 
-  const now = new Date();
-  const diffMs = due.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffMs / DAY_MS);
+  const tz = "Asia/Karachi";
+  const dayKey = (value: Date) =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(value);
+
+  const today = new Date(`${dayKey(new Date())}T12:00:00`);
+  const dueNoon = new Date(`${dayKey(due)}T12:00:00`);
+  const diffDays = Math.round((dueNoon.getTime() - today.getTime()) / DAY_MS);
 
   if (diffDays < 0) {
     const days = Math.abs(diffDays);

@@ -93,12 +93,24 @@ export default function LoanHistoryScreen({ navigation, embedded }: Props) {
                   }}
                 >
                   {item.title}
-                </Text>
-                <Badge label="Returned" tone="muted" />
-              </View>
-              <Text
-                style={{
-                  marginTop: space.xs,
+                  </Text>
+                  <Badge label="Returned" tone="muted" />
+                </View>
+                {item.copyNumber ? (
+                  <Text
+                    style={{
+                      marginTop: space.xs,
+                      fontFamily: fontFamily.bodySemiBold,
+                      fontSize: type.small,
+                      color: colors.navy,
+                    }}
+                  >
+                    Copy {item.copyNumber}
+                  </Text>
+                ) : null}
+                <Text
+                  style={{
+                    marginTop: item.copyNumber ? 4 : space.xs,
                   fontFamily: fontFamily.body,
                   fontSize: type.small,
                   color: colors.muted,

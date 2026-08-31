@@ -105,9 +105,21 @@ export default function MyLoansScreen({ navigation, embedded }: Props) {
                   </Text>
                   <Badge label={status.label} tone={status.tone} />
                 </View>
+                {item.copyNumber ? (
+                  <Text
+                    style={{
+                      marginTop: space.xs,
+                      fontFamily: fontFamily.bodySemiBold,
+                      fontSize: type.small,
+                      color: colors.navy,
+                    }}
+                  >
+                    Copy {item.copyNumber}
+                  </Text>
+                ) : null}
                 <Text
                   style={{
-                    marginTop: space.xs,
+                    marginTop: item.copyNumber ? 4 : space.xs,
                     fontFamily: fontFamily.body,
                     fontSize: type.small,
                     color: colors.muted,
