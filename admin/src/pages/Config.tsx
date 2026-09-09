@@ -57,6 +57,34 @@ function labelFor(field: string) {
   return FIELD_LABELS[field] || field;
 }
 
+const TIMEZONE_OPTIONS = [
+  "Asia/Karachi",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "UTC",
+  "Europe/London",
+  "America/New_York",
+];
+
+const WEEKDAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+function isValidIanaTimeZone(tz: string): boolean {
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone: tz }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const TOGGLE_FIELDS = ["allowInAppCopyBorrow", "librariansCanBorrow"] as const;
 
 export function ConfigPage() {
@@ -64,7 +92,8 @@ export function ConfigPage() {
   const [tab, setTab] = useState<ConfigTab>("loans");
   const [form, setForm] = useState<SystemConfig>(defaults);
   const [reminderText, setReminderText] = useState("2,1");
-  const [daysOffText, setDaysOffText] = useState("Sunday");
+  const [daysOff, setDaysOff] = useState<string[]>(["Sunday"]);
+  const [customTimezone, setCustomTimezone] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +111,10 @@ export function ConfigPage() {
             ? cfg.reminderDaysBefore.join(",")
             : String(cfg.reminderDaysBefore ?? "2,1");
           setReminderText(reminders);
-          setDaysOffText((cfg.workingDaysOff || ["Sunday"]).join(","));
+          setDaysOff(cfg.workingDaysOff || ["Sunday"]);
+          if (cfg.timezone && !TIMEZONE_OPTIONS.includes(cfg.timezone)) {
+            setCustomTimezone(cfg.timezone);
+          }
           setLoading(false);
         }
 
@@ -114,7 +146,12 @@ export function ConfigPage() {
           ? cfg.reminderDaysBefore.join(",")
           : String(cfg.reminderDaysBefore ?? "2,1");
         setReminderText(reminders);
-        setDaysOffText((cfg.workingDaysOff || ["Sunday"]).join(","));
+        setDaysOff(cfg.workingDaysOff || ["Sunday"]);
+        if (cfg.timezone && !TIMEZONE_OPTIONS.includes(cfg.timezone)) {
+          setCustomTimezone(cfg.timezone);
+        } else {
+          setCustomTimezone("");
+        }
       } catch (err) {
         if (!cancelled) {
           const msg = extractApiError(err, "Failed to load config");
@@ -145,7 +182,11 @@ export function ConfigPage() {
     if ((form.maxPdfSizeMb ?? 0) < 1) return "Max PDF size must be at least 1 MB.";
     const pageSize = form.catalogPageSize ?? 10;
     if (pageSize < 5 || pageSize > 50) return "Catalog page size must be between 5 and 50.";
-    if (!(form.timezone || "").trim()) return "Timezone is required.";
+    const tz = (form.timezone || "").trim();
+    if (!tz) return "Timezone is required.";
+    if (!isValidIanaTimeZone(tz)) {
+      return "Timezone must be a valid IANA name (example: Asia/Karachi).";
+    }
 
     const reminders = reminderText
       .split(",")
@@ -174,10 +215,6 @@ export function ConfigPage() {
         .split(",")
         .map((s) => Number(s.trim()))
         .filter((n) => Number.isFinite(n));
-      const workingDaysOff = daysOffText
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
 
       const payload = {
         maxBorrowLimit: form.maxBorrowLimit,
@@ -186,7 +223,7 @@ export function ConfigPage() {
         reservationHoldHours: form.reservationHoldHours,
         blockCheckoutIfUnpaidFine: !!form.blockCheckoutIfUnpaidFine,
         reminderDaysBefore,
-        workingDaysOff,
+        workingDaysOff: daysOff,
         maxPdfSizeMb: form.maxPdfSizeMb,
         librariansCanBorrow: !!form.librariansCanBorrow,
         allowInAppCopyBorrow: !!form.allowInAppCopyBorrow,
@@ -394,12 +431,48 @@ export function ConfigPage() {
             <div className="config-grid">
               <label>
                 Timezone
-                <input
-                  type="text"
-                  value={form.timezone || "Asia/Karachi"}
-                  onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
-                />
+                <select
+                  value={
+                    TIMEZONE_OPTIONS.includes(form.timezone || "")
+                      ? form.timezone
+                      : "__custom__"
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "__custom__") {
+                      setForm((p) => ({
+                        ...p,
+                        timezone: customTimezone || "Asia/Karachi",
+                      }));
+                      return;
+                    }
+                    setCustomTimezone("");
+                    setForm((p) => ({ ...p, timezone: v }));
+                  }}
+                >
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {tz}
+                    </option>
+                  ))}
+                  <option value="__custom__">Other IANA…</option>
+                </select>
               </label>
+              {!TIMEZONE_OPTIONS.includes(form.timezone || "") || customTimezone ? (
+                <label>
+                  Custom IANA timezone
+                  <input
+                    type="text"
+                    value={customTimezone || form.timezone || ""}
+                    onChange={(e) => {
+                      setCustomTimezone(e.target.value);
+                      setForm((p) => ({ ...p, timezone: e.target.value }));
+                    }}
+                    placeholder="Asia/Karachi"
+                  />
+                  <span className="field-hint">Must be a valid IANA name</span>
+                </label>
+              ) : null}
               <label>
                 Reminder days before due
                 <input
@@ -410,16 +483,34 @@ export function ConfigPage() {
                 />
                 <span className="field-hint">Comma-separated day offsets (example: 2,1)</span>
               </label>
-              <label className="config-span">
-                Working days off
-                <input
-                  type="text"
-                  value={daysOffText}
-                  onChange={(e) => setDaysOffText(e.target.value)}
-                  placeholder="Sunday"
-                />
-                <span className="field-hint">Comma-separated weekday names</span>
-              </label>
+              <div className="config-span">
+                <p className="muted small" style={{ marginBottom: "0.5rem" }}>
+                  Working days off
+                </p>
+                <div className="filter-chips" role="group" aria-label="Working days off">
+                  {WEEKDAYS.map((day) => {
+                    const active = daysOff.includes(day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        className={active ? "filter-chip active" : "filter-chip"}
+                        aria-pressed={active}
+                        onClick={() =>
+                          setDaysOff((prev) =>
+                            active ? prev.filter((d) => d !== day) : [...prev, day]
+                          )
+                        }
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="field-hint">
+                  Due dates roll forward past selected days and holidays
+                </span>
+              </div>
             </div>
           </section>
         ) : null}

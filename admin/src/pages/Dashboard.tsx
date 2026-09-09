@@ -99,8 +99,8 @@ export function DashboardPage() {
           label: "Overdue loans",
           value: stats.overdueLoans,
           tone: "danger" as const,
-          to: "/fines",
-          hint: "Check late returns and fines",
+          to: "/reports",
+          hint: "Late returns. Open Reports for trends; clear fines on Fines.",
         },
         {
           label: "Unpaid fines (Rs)",

@@ -174,19 +174,31 @@ export function CatalogPage() {
           "success"
         );
       } else {
-        await Promise.all(
-          pending.isbns.map((isbn) =>
-            api.patch(`/api/catalog/books/${encodeURIComponent(isbn)}/status`, {
+        let ok = 0;
+        let fail = 0;
+        for (const isbn of pending.isbns) {
+          try {
+            await api.patch(`/api/catalog/books/${encodeURIComponent(isbn)}/status`, {
               isActive: pending.nextActive,
-            })
-          )
-        );
-        showToast(
-          pending.nextActive
-            ? `Reactivated ${pending.isbns.length} titles`
-            : `Deactivated ${pending.isbns.length} titles`,
-          "success"
-        );
+            });
+            ok += 1;
+          } catch {
+            fail += 1;
+          }
+        }
+        if (fail === 0) {
+          showToast(
+            pending.nextActive
+              ? `Reactivated ${ok} titles`
+              : `Deactivated ${ok} titles`,
+            "success"
+          );
+        } else {
+          showToast(
+            `${ok} updated, ${fail} failed (often still on loan). Refresh and retry.`,
+            "error"
+          );
+        }
       }
       setPending(null);
       await reload(q.trim(), page);
@@ -491,7 +503,7 @@ export function CatalogPage() {
               ? `${pending.isbns.length} physical titles will be updated.`
               : pending?.nextActive
                 ? `"${pending?.title}" will appear in the student catalog again.`
-                : `"${pending?.title}" will be hidden from students. History stays.`
+                : `"${pending?.title}" will be hidden from students. Waiting and ready reservations for this title are cancelled.`
         }
         confirmLabel="Confirm"
         variant={

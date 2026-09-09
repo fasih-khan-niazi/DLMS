@@ -25,6 +25,7 @@ type DayBucket = {
 type SummaryResponse = {
   from: string;
   to: string;
+  timeZone?: string;
   metrics: ReportMetrics;
   series: DayBucket[];
 };
@@ -259,6 +260,7 @@ export function ReportsPage() {
         <>
           <p className="muted">
             Showing {summary.from} to {summary.to}
+            {summary.timeZone ? ` · ${summary.timeZone}` : ""}
           </p>
           <div className="stat-grid">
             {cards.map((card) => (

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../config/api";
 import {
   Avatar,
@@ -55,34 +55,50 @@ export function UsersPage() {
   const [drawerUser, setDrawerUser] = useState<AdminUser | null>(null);
 
   const load = useCallback(
-    async (search: string, nextPage: number, opts?: { background?: boolean }) => {
+    async (
+      search: string,
+      nextPage: number,
+      nextFilter = filter,
+      opts?: { background?: boolean }
+    ) => {
       if (opts?.background) setRefreshing(true);
       else setLoading(true);
       setError(null);
       try {
+        const params: Record<string, string | number> = {
+          page: nextPage,
+          pageSize: 20,
+        };
+        if (search) params.q = search;
+        if (nextFilter === "student" || nextFilter === "librarian") {
+          params.role = nextFilter;
+        } else if (nextFilter === "suspended") {
+          params.status = "suspended";
+        } else if (nextFilter === "fines") {
+          params.fines = "unpaid";
+        }
+
         const { data } = await api.get<{
           users: AdminUser[];
           page: number;
           pageSize: number;
           total: number;
           totalPages: number;
-        }>("/api/admin/users", {
-          params: {
-            page: nextPage,
-            pageSize: 20,
-            ...(search ? { q: search } : {}),
-          },
-        });
+          truncated?: boolean;
+        }>("/api/admin/users", { params });
         setUsers(data.users);
         setPage(data.page || nextPage);
         setTotal(data.total || data.users.length);
-        setTotalPages(data.totalPages || 1);
+        setTotalPages(data.totalPages || 0);
         const drafts: Record<string, string> = {};
         data.users.forEach((u) => {
           drafts[u.id] = u.role || "student";
         });
         setRoleDraft(drafts);
         setSelected(new Set());
+        if (data.truncated) {
+          showToast("Showing first 500 matching users. Narrow search if needed.", "info");
+        }
       } catch (err) {
         const msg = extractApiError(err, "Failed to load users");
         setError(msg);
@@ -92,33 +108,22 @@ export function UsersPage() {
         setRefreshing(false);
       }
     },
-    [showToast]
+    [filter, showToast]
   );
 
   useEffect(() => {
-    void load("", 1);
-  }, [load]);
-
-  const visibleUsers = useMemo(() => {
-    return users.filter((user) => {
-      switch (filter) {
-        case "student":
-          return user.role === "student";
-        case "librarian":
-          return user.role === "librarian";
-        case "suspended":
-          return user.isActive === false;
-        case "fines":
-          return !!user.hasUnpaidFines;
-        default:
-          return true;
-      }
-    });
-  }, [users, filter]);
+    void load(q.trim(), 1, filter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
 
   function onSearch(e: FormEvent) {
     e.preventDefault();
-    void load(q.trim(), 1);
+    void load(q.trim(), 1, filter);
+  }
+
+  function onFilterChange(id: string) {
+    setFilter(id);
+    setPage(1);
   }
 
   function toggleSelect(id: string) {
@@ -131,13 +136,12 @@ export function UsersPage() {
   }
 
   function toggleSelectAll() {
-    if (selected.size === visibleUsers.filter((u) => u.role !== "admin").length) {
+    const selectable = users.filter((u) => u.role !== "admin");
+    if (selected.size === selectable.length) {
       setSelected(new Set());
       return;
     }
-    setSelected(
-      new Set(visibleUsers.filter((u) => u.role !== "admin").map((u) => u.id))
-    );
+    setSelected(new Set(selectable.map((u) => u.id)));
   }
 
   function requestRoleChange(user: AdminUser, role: string) {
@@ -169,21 +173,35 @@ export function UsersPage() {
         await api.post("/api/admin/login-locks/unlock", { email: pending.email });
         showToast(`Login lock cleared for ${pending.email}`, "success");
       } else {
-        await Promise.all(
-          pending.ids.map((id) =>
-            api.post(`/api/admin/users/${id}/status`, { isActive: pending.activate })
-          )
-        );
-        showToast(
-          pending.activate
-            ? `Activated ${pending.ids.length} accounts`
-            : `Suspended ${pending.ids.length} accounts`,
-          "success"
-        );
+        let ok = 0;
+        let fail = 0;
+        for (const id of pending.ids) {
+          try {
+            await api.post(`/api/admin/users/${id}/status`, {
+              isActive: pending.activate,
+            });
+            ok += 1;
+          } catch {
+            fail += 1;
+          }
+        }
+        if (fail === 0) {
+          showToast(
+            pending.activate
+              ? `Activated ${ok} accounts`
+              : `Suspended ${ok} accounts`,
+            "success"
+          );
+        } else {
+          showToast(
+            `${ok} updated, ${fail} failed. Refresh and retry the rest.`,
+            "error"
+          );
+        }
       }
       setPending(null);
       setDrawerUser(null);
-      await load(q.trim(), page, { background: true });
+      await load(q.trim(), page, filter, { background: true });
     } catch (err) {
       const msg = extractApiError(err, "Action failed");
       setError(msg);
@@ -191,7 +209,7 @@ export function UsersPage() {
       if (pending.kind === "role") {
         setRoleDraft((d) => ({ ...d, [pending.uid]: pending.previous }));
       }
-      await load(q.trim(), page, { background: true });
+      await load(q.trim(), page, filter, { background: true });
     } finally {
       setBusy(false);
     }
@@ -209,7 +227,7 @@ export function UsersPage() {
     if (pending.kind === "role") {
       return {
         title: `Change role to ${pending.role}?`,
-        message: `${pending.name} will become a ${pending.role}.`,
+        message: `${pending.name} will become a ${pending.role}. Promoting a student cancels their waiting reservations. Ready holds block promote until claimed or cancelled.`,
         confirm: "Change role",
         variant: "info" as const,
       };
@@ -260,7 +278,7 @@ export function UsersPage() {
         </button>
       </form>
 
-      <FilterChips chips={FILTERS} value={filter} onChange={setFilter} ariaLabel="User filters" />
+      <FilterChips chips={FILTERS} value={filter} onChange={onFilterChange} ariaLabel="User filters" />
 
       {selected.size > 0 ? (
         <div className="bulk-bar">
@@ -311,9 +329,9 @@ export function UsersPage() {
                       type="checkbox"
                       aria-label="Select all"
                       checked={
-                        visibleUsers.filter((u) => u.role !== "admin").length > 0 &&
+                        users.filter((u) => u.role !== "admin").length > 0 &&
                         selected.size ===
-                          visibleUsers.filter((u) => u.role !== "admin").length
+                          users.filter((u) => u.role !== "admin").length
                       }
                       onChange={toggleSelectAll}
                     />
@@ -326,14 +344,14 @@ export function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {visibleUsers.length === 0 ? (
+                {users.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="empty-cell">
                       No users match this view.
                     </td>
                   </tr>
                 ) : (
-                  visibleUsers.map((user) => (
+                  users.map((user) => (
                     <tr key={user.id}>
                       <td>
                         <input
@@ -414,7 +432,7 @@ export function UsersPage() {
             totalPages={totalPages}
             total={total}
             disabled={loading || refreshing}
-            onPageChange={(next) => void load(q.trim(), next, { background: true })}
+            onPageChange={(next) => void load(q.trim(), next, filter, { background: true })}
           />
         </>
       )}
