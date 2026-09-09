@@ -25,6 +25,7 @@ const STEPS: Array<{ name: string; file: string; args?: boolean }> = [
   { name: "circulation flow", file: "verify-circulation-flow.ts", args: true },
   { name: "return copy match", file: "verify-return-copy.ts", args: true },
   { name: "fine collection", file: "verify-fines-collect.ts", args: true },
+  { name: "park smoke", file: "verify-park-smoke.ts", args: true },
 ];
 
 function runStep(step: (typeof STEPS)[number]): { ok: boolean; code: number } {
