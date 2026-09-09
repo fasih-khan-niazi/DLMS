@@ -21,7 +21,7 @@ Mobile circulation for Week 2 is shipped. Still later:
 - Profile photo upload
 - Interactive onboarding extras beyond the current tour
 
-Admin UI/UX revamp (theme sync with mobile) is in progress on **`dev`**.
+Admin UI/UX revamp (theme sync with mobile) is complete on **`dev`** (Phases 1 to 3).
 
 ### Google Books (API already in use for ISBN lookup)
 

@@ -45,7 +45,8 @@ See also `docs/auth.md`.
 - Reservations: waiting/ready list
 - Fines: unpaid users/loans and mark fine paid
 - Reports: date-range summary, daily series, CSV and PDF download
-- Shared UI kit: toasts, confirm dialogs, page headers, Poppins + mobile color tokens
+- Shared UI kit: toasts, confirm dialogs (including sign out), page headers, Poppins + mobile color tokens
+- Light / dark theme toggle in the sidebar (persisted in the browser)
 
 ### Reports API
 
