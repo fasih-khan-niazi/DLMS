@@ -20,6 +20,7 @@ import { persistAccruedFines } from "../services/fines";
 import { notifyUser } from "../services/notifications";
 import { paginateArray, parseListQuery, LIST_FETCH_CAP } from "../utils/pagination";
 
+// Admin/librarian: dashboard, users, config, holidays, fines oversight
 const router = Router();
 
 router.use(authenticate);
@@ -41,13 +42,14 @@ const CONFIG_ALLOWED_FIELDS = [
 
 type ConfigField = (typeof CONFIG_ALLOWED_FIELDS)[number];
 
-/** Fields stored as real booleans so a checkbox can never round-trip as a string. */
+
 const CONFIG_BOOLEAN_FIELDS = new Set<ConfigField>([
   "blockCheckoutIfUnpaidFine",
   "librariansCanBorrow",
   "allowInAppCopyBorrow",
 ]);
 
+// Checkbox values ko real boolean banao (string round-trip na ho)
 function coerceConfigValue(field: ConfigField, value: unknown): unknown {
   if (CONFIG_BOOLEAN_FIELDS.has(field)) {
     if (typeof value === "string") {
@@ -69,6 +71,7 @@ function serializeDoc(id: string, data: Record<string, any>) {
   }
   return out;
 }
+
 
 // Dashboard counts (librarian + admin)
 router.get(
@@ -125,7 +128,8 @@ router.get(
   }
 );
 
-// List users (admin-only)
+
+// Users list (sirf admin)
 router.get("/users", requireRole("admin"), async (req: AuthRequest, res: Response) => {
   try {
     const q = String(req.query.q || "")
@@ -187,13 +191,13 @@ router.get("/users", requireRole("admin"), async (req: AuthRequest, res: Respons
   }
 });
 
-// Read system config (admin-only)
+
+// System config read (admin)
 router.get("/config", requireRole("admin"), async (_req: AuthRequest, res: Response) => {
   try {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate");
     const config = await getSystemConfig();
-    // supportedFields lets the portal detect an older API that would silently
-    // drop newer settings instead of quietly reverting the control.
+
     res.json({ config, supportedFields: [...CONFIG_ALLOWED_FIELDS] });
   } catch (error) {
     console.error("Admin config read error:", error);
@@ -201,7 +205,8 @@ router.get("/config", requireRole("admin"), async (_req: AuthRequest, res: Respo
   }
 });
 
-// Merge-update system config (admin-only)
+
+// System config merge-update (admin)
 router.put("/config", requireRole("admin"), async (req: AuthRequest, res: Response) => {
   try {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate");
@@ -301,7 +306,8 @@ router.put("/config", requireRole("admin"), async (req: AuthRequest, res: Respon
   }
 });
 
-// Active reservations (librarian + admin)
+
+// Active reservations overview
 router.get(
   "/reservations",
   requireRole("librarian", "admin"),
@@ -322,7 +328,8 @@ router.get(
   }
 );
 
-// Unpaid fines overview (librarian + admin)
+
+// Unpaid fines overview
 router.get(
   "/fines",
   requireRole("librarian", "admin"),
@@ -405,7 +412,8 @@ router.get(
   }
 );
 
-// Mark fine paid (librarian + admin) - mirrors loans route (partial-safe)
+
+// Fine paid mark (partial-safe, loans route jaisa)
 router.post(
   "/loans/:loanId/mark-fine-paid",
   requireRole("librarian", "admin"),
@@ -497,7 +505,8 @@ router.post(
   }
 );
 
-// Promote or demote a user's role (admin-only)
+
+// User role promote/demote (admin)
 router.post("/users/:uid/role", requireRole("admin"), async (req: AuthRequest, res: Response) => {
   try {
     const uid = req.params.uid as string;
@@ -530,19 +539,19 @@ router.post("/users/:uid/role", requireRole("admin"), async (req: AuthRequest, r
       return;
     }
 
-    // Block promotion if user has unpaid fines
+
     if (role !== "student" && userData.hasUnpaidFines) {
       res.status(400).json({ error: "Cannot promote user with unpaid fines" });
       return;
     }
 
-    // Block promotion if user is suspended
+
     if (!userData.isActive) {
       res.status(400).json({ error: "Cannot change role of a suspended account" });
       return;
     }
 
-    // If promoting from student, cancel waiting reservations
+
     if (userData.role === "student" && role !== "student") {
       const waitingReservations = await db
         .collection("reservations")
@@ -555,7 +564,7 @@ router.post("/users/:uid/role", requireRole("admin"), async (req: AuthRequest, r
         batch.update(doc.ref, { status: "cancelled", updatedAt: new Date() });
       });
 
-      // Check for ready reservations (block promotion)
+
       const readyReservations = await db
         .collection("reservations")
         .where("userId", "==", uid)
@@ -572,11 +581,11 @@ router.post("/users/:uid/role", requireRole("admin"), async (req: AuthRequest, r
       await batch.commit();
     }
 
-    // Update custom claims and Firestore
+
     await auth.setCustomUserClaims(uid, { role });
     await db.collection("users").doc(uid).update({ role, updatedAt: new Date() });
 
-    // Audit log
+
     await db.collection("auditLog").add({
       action: "role_changed",
       actorId: req.uid,
@@ -592,7 +601,8 @@ router.post("/users/:uid/role", requireRole("admin"), async (req: AuthRequest, r
   }
 });
 
-// Suspend or activate a user (admin-only)
+
+// User suspend / activate (admin)
 router.post("/users/:uid/status", requireRole("admin"), async (req: AuthRequest, res: Response) => {
   try {
     const uid = req.params.uid as string;
@@ -635,7 +645,8 @@ router.post("/users/:uid/status", requireRole("admin"), async (req: AuthRequest,
   }
 });
 
-/** Heal reservation/copy drift for one ISBN or all waiting queues (admin). */
+
+// Reservation/copy drift heal (ek ISBN ya saari queues)
 router.post(
   "/reservations/reconcile",
   requireRole("librarian", "admin"),
@@ -657,7 +668,8 @@ router.post(
   }
 );
 
-/** Clear login lock for an email (admin). */
+
+// Login lock clear (admin)
 router.post("/login-locks/unlock", requireRole("admin"), async (req: AuthRequest, res: Response) => {
   try {
     const email = String(req.body?.email || "").trim();
@@ -685,7 +697,8 @@ router.post("/login-locks/unlock", requireRole("admin"), async (req: AuthRequest
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** List library holidays (due-date skip dates). */
+
+// Library holidays list (due-date skip)
 router.get("/holidays", requireRole("admin"), async (_req: AuthRequest, res: Response) => {
   try {
     const snap = await db.collection("config").doc("holidays").collection("dates").get();
@@ -705,7 +718,7 @@ router.get("/holidays", requireRole("admin"), async (_req: AuthRequest, res: Res
   }
 });
 
-/** Add or update a holiday date. */
+
 router.post("/holidays", requireRole("admin"), async (req: AuthRequest, res: Response) => {
   try {
     const date = String(req.body?.date || "").trim();
@@ -737,7 +750,7 @@ router.post("/holidays", requireRole("admin"), async (req: AuthRequest, res: Res
   }
 });
 
-/** Remove a holiday date. */
+
 router.delete(
   "/holidays/:date",
   requireRole("admin"),
@@ -767,7 +780,8 @@ router.delete(
   }
 );
 
-/** Active / overdue loans oversight. */
+
+// Active / overdue loans oversight
 router.get(
   "/loans",
   requireRole("librarian", "admin"),

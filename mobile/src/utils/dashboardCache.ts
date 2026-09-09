@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// home dashboard ka snapshot cache
 const KEY = "dlms.dashboard";
 const TTL_MS = 2 * 60 * 1000;
 
@@ -46,6 +47,5 @@ export async function clearDashboardCache(): Promise<void> {
   try {
     await AsyncStorage.removeItem(KEY);
   } catch {
-    // ignore
   }
 }

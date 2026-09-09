@@ -1,5 +1,4 @@
-/** In-app PDF.js viewer. Continuous pinch without re-render flash, hi-DPI buffers. */
-
+// in-app PDF.js viewer - pinch zoom bina re-render flash
 const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174";
 
 export type ReaderMode = "scroll" | "page";
@@ -55,7 +54,6 @@ export function buildPdfViewerHtml(input: {
   }
   body.page-mode .pageSlot {
     display: none; height: 100%; width: 100%; min-width: 100%;
-    /* flex-start so zoomed pages can scroll to every edge (center clips the left) */
     align-items: flex-start; justify-content: flex-start;
     overflow: auto; -webkit-overflow-scrolling: touch;
     touch-action: pan-x pan-y;
@@ -177,7 +175,7 @@ export function buildPdfViewerHtml(input: {
     return pageCanvas(pageNum);
   }
 
-  /** Resize existing canvases only, no PDF.js redraw (avoids shimmer). */
+  // sirf canvas size change - PDF.js redraw nahi
   function applyZoomSizes(z) {
     z = clampZoom(z);
     document.querySelectorAll('.pageSlot canvas').forEach(function (c) {
@@ -202,11 +200,7 @@ export function buildPdfViewerHtml(input: {
     }
   }
 
-  /**
-   * Page mode: keep the page visually centered when it fits, but when zoomed
-   * larger than the viewport use top-left layout + scroll so every edge is reachable.
-   * (justify-content:center makes the left overflow unreachable.)
-   */
+  // page mode: fit pe center, zoom pe top-left + scroll
   function layoutPageMode() {
     if (readMode !== 'page') return;
     var slot = document.querySelector('.pageSlot.active');
@@ -257,7 +251,7 @@ export function buildPdfViewerHtml(input: {
     el.scrollTop += (atY - focusScreenY);
   }
 
-  /** Absolute zoom from settings: show current page centered in the viewport. */
+  // settings zoom: current page viewport mein center
   function centerPageInView(num) {
     var canvas = pageCanvas(num || pageNum);
     var el = scroller();
@@ -295,7 +289,7 @@ export function buildPdfViewerHtml(input: {
       var fitScale = Math.min(fit.maxW / base.width, fit.maxH / base.height, 3.5);
       fitScale = Math.max(fitScale, 0.55);
       var pixelRatio = dpr();
-      // Bitmap is sharp up to max zoom; display size follows current zoom (CSS only)
+      // sharp bitmap; display size CSS zoom se aati hai
       var renderScale = fitScale * MAX_Z * pixelRatio;
       var viewport = page.getViewport({ scale: renderScale });
       var baseW = (viewport.width / pixelRatio) / MAX_Z;
@@ -399,7 +393,6 @@ export function buildPdfViewerHtml(input: {
       if (opts.fromPinch) {
         pinFocusToScreen();
       } else {
-        // Settings pills: absolute zoom as if from 100%, page centered. One step, no reset flash
         centerPageInView(pageNum);
       }
     });
@@ -408,7 +401,7 @@ export function buildPdfViewerHtml(input: {
   function goToPage(num) {
     pageNum = Math.min(Math.max(Math.floor(num), 1), totalPages || 1);
     if (readMode === 'page') {
-      // In page-by-page mode: reset temporary page pinch zoom back to the zoom set in settings
+      // page mode: pinch zoom wapas settings zoom pe
       currentZoom = baseSettingsZoom;
       liveZoom = baseSettingsZoom;
       applyZoomSizes(baseSettingsZoom);

@@ -1,9 +1,4 @@
-/**
- * Final park smoke: every admin portal page backend + student/librarian mobile paths.
- *
- * Restores config/catalog fixtures it creates. Usage:
- *   npx tsx scripts/verify-park-smoke.ts [apiBaseUrl]
- */
+/** ye script park smoke: admin pages + student/librarian mobile paths check karta hai */
 import axios, { type AxiosInstance } from "axios";
 import PDFDocument from "pdfkit";
 import FormData from "form-data";
@@ -92,12 +87,13 @@ async function main() {
   const lib = await mint(librarian.uid);
   const stu = await mint(student.uid);
 
-  // Restore borrowability for student paths
+  // Student paths ke liye borrowability restore
   await db.collection("config").doc("system").set(
     { allowInAppCopyBorrow: true, blockCheckoutIfUnpaidFine: true, librariansCanBorrow: false },
     { merge: true }
   );
 
+  // A) Admin portal backends
   console.log("\nA) Admin portal page backends");
 
   const dash = await admin.get("/api/admin/dashboard");
@@ -174,6 +170,7 @@ async function main() {
     pass("Reports PDF");
   } else fail(`Reports PDF ${pdf.status}`);
 
+  // B) Catalog create / edit / digital
   console.log("\nB) Admin Catalog create / edit / status / digital");
 
   const addBook = await admin.post("/api/catalog/books", {
@@ -249,6 +246,7 @@ async function main() {
     fail(`Digital upload exception: ${String(err)}`);
   }
 
+  // C) Mobile student paths
   console.log("\nC) Mobile student paths");
 
   const appCfg = await stu.get("/api/config/app");
@@ -267,8 +265,8 @@ async function main() {
   if (digitalList.status === 200) pass("Student digital library");
   else fail(`Student digital ${digitalList.status}`);
 
-  // Clear any leftover unpaid balance so borrow smoke is not blocked by demo fines
   {
+    // Leftover unpaid balance clear taake borrow smoke block na ho
     const loansSnap = await db.collection("loans").where("userId", "==", student.uid).get();
     for (const loanDoc of loansSnap.docs) {
       await admin.post(`/api/admin/loans/${loanDoc.id}/mark-fine-paid`);
@@ -301,6 +299,7 @@ async function main() {
   if (notices.status === 200) pass("Student notifications inbox");
   else fail(`notifications ${notices.status}`);
 
+  // D) Mobile librarian paths
   console.log("\nD) Mobile librarian paths");
 
   const libMe = await lib.get("/api/auth/me");
@@ -317,7 +316,6 @@ async function main() {
   if (student.email) {
     const desk = await lib.get("/api/fines/lookup", { params: { email: student.email } });
     if (desk.status === 200 || desk.status === 403) {
-      // 403 if collecting own / not allowed; student email should be 200 for librarian
       if (desk.status === 200) pass("Librarian Collect fines lookup");
       else fail(`Librarian lookup ${desk.status} ${JSON.stringify(desk.data)}`);
     } else fail(`Librarian lookup ${desk.status}`);
@@ -331,13 +329,13 @@ async function main() {
   } else if (gateBorrow.status === 403) {
     pass(`Librarian borrow blocked (${gateBorrow.data?.error})`);
   } else {
-    // unexpected success or other error
     fail(`Librarian gate borrow ${gateBorrow.status} ${JSON.stringify(gateBorrow.data)}`);
   }
 
+  // E) Fixture cleanup
   console.log("\nE) Cleanup fixtures");
   try {
-    // Remove fixture copies then soft-deactivate title (keep history like product)
+    // Fixture copies hatao, title soft-deactivate
     const copies = await db.collection("bookCopies").where("isbn", "==", FIXTURE_ISBN).get();
     for (const c of copies.docs) {
       await c.ref.delete();

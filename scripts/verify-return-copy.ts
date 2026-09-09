@@ -1,15 +1,4 @@
-/**
- * Return must match the copy that is actually issued to the scanner.
- *
- * A librarian/student with Copy 2 on loan must not get a success payload
- * when they scan Copy 1 (available or issued to someone else). Their own
- * loan must stay open until they scan the issued copy.
- *
- * A student must not be able to return (or take) another student's issued copy
- * by scanning that copy's QR from their own account.
- *
- *   npx tsx scripts/verify-return-copy.ts [apiBaseUrl]
- */
+/** ye script return/copy match verify karta hai - galat copy scan fail hona chahiye */
 import axios, { type AxiosInstance } from "axios";
 import { auth, db } from "../api/src/config/firebase";
 import { sortCopies } from "../api/src/utils/copies";
@@ -128,6 +117,7 @@ async function returnIfIssued(api: AxiosInstance, copyId: string, isbn: string) 
 }
 
 async function main() {
+  // Scan galat copy pe success nahi aana chahiye
   console.log(`Return-copy match against ${API_BASE}`);
   console.log("====================================");
 
@@ -162,6 +152,7 @@ async function main() {
   const borrowed = new Set<string>();
 
   try {
+    // 1) Galat copy scan pe return fail
     console.log(`\n1) Student borrows Copy ${n2}, then scans Copy ${n1} to return`);
     const borrowTwo = await student.post("/api/loans/borrow", { copyId: copyTwo });
     if (borrowTwo.status >= 200 && borrowTwo.status < 300) {
@@ -196,6 +187,7 @@ async function main() {
     if (loanTwo && Number(loanTwo.copyNumber) === n2) pass(`loan card copyNumber is ${n2}`);
     else if (loanTwo) fail(`loan copyNumber is ${loanTwo.copyNumber}, expected ${n2}`);
 
+    // 2) Sahi issued copy pe return OK
     console.log(`\n2) Student scans the issued Copy ${n2}`);
     const right = await student.post("/api/loans/return", {
       qrPayload: qrPayload(copyTwo, isbnTarget.isbn),
@@ -233,6 +225,7 @@ async function main() {
       fail(`returned copyNumber is ${returnedRow.copyNumber}, expected ${n2}`);
     }
 
+    // 3) Librarian dusre ka copy return na kare
     console.log(`\n3) Librarian has Copy ${n2}; student has Copy ${n1}; librarian scans Copy ${n1}`);
     const libBorrow = await librarian.post("/api/loans/borrow", { copyId: copyTwo });
     if (libBorrow.status >= 200 && libBorrow.status < 300) {
@@ -307,6 +300,7 @@ async function main() {
       fail(`catalog indexes Copy ${n1}=${i1 + 1}, Copy ${n2}=${i2 + 1}`);
     }
 
+    // 4) Student B dusre ka issued copy na le / return
     console.log(`\n4) Student B cannot return or steal Student A's issued copy`);
     const aBorrow = await student.post("/api/loans/borrow", { copyId: copyOne });
     if (aBorrow.status >= 200 && aBorrow.status < 300) {
@@ -376,7 +370,6 @@ async function main() {
         await returnIfIssued(studentB, copyId, isbnTarget.isbn);
         await returnIfIssued(librarian, copyId, isbnTarget.isbn);
       } catch {
-        /* restore best-effort */
       }
     }
     await cfgRef.set(

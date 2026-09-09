@@ -146,6 +146,7 @@ function StatRow({ label, value, last }: { label: string; value: string; last?: 
   );
 }
 
+// ye screen user profile aur settings dikhati hai
 export default function ProfileScreen({ navigation }: Props) {
   const { colors, fontFamily, space, type, mode, setMode } = useTheme();
   const { profile, isStaff, refresh } = useProfile();
@@ -162,7 +163,6 @@ export default function ProfileScreen({ navigation }: Props) {
       const res = await api.get("/api/notifications/unread-count");
       setUnread(Number(res.data.unreadCount) || 0);
     } catch {
-      // keep last known values
     }
   }, [refresh]);
 

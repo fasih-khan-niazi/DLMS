@@ -1,5 +1,6 @@
 import { db } from "../config/firebase";
 
+// Digital book reviews + NPS / recommend summary
 export type DigitalBookReview = {
   userId: string;
   displayName: string;
@@ -86,7 +87,7 @@ export function summarizeReviews(reviews: Array<Record<string, unknown>>) {
   const recommendPercent =
     nps.length > 0 ? Math.round(((promoters - detractors) / nps.length) * 100) : null;
 
-  // Word band from NPS score (-100..100)
+  // NPS score se English label
   let recommendLabel: string | null = null;
   if (recommendPercent !== null) {
     if (recommendPercent <= -50) recommendLabel = "Rarely recommended";

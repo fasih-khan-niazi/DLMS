@@ -27,6 +27,7 @@ type ModalState =
   | { kind: "success"; message: string }
   | { kind: "error"; message: string };
 
+// ye screen staff digital PDF upload karti hai
 export default function UploadDigitalBookScreen({ navigation }: Props) {
   const { colors, fontFamily, space, type } = useTheme();
   const [title, setTitle] = useState("");

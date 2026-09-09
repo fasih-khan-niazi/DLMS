@@ -1,13 +1,4 @@
-﻿/**
- * End-to-end HTTP check for the admin config round trip.
- *
- * Mints an admin ID token, then drives the real endpoints to prove that
- * `allowInAppCopyBorrow` persists and that the mobile config endpoint reports
- * the same value. Restores the original value when finished.
- *
- * Usage (from api/):
- *   npx tsx scripts/verify-config-http.ts [apiBaseUrl]
- */
+/** ye script admin config HTTP round-trip verify karta hai (allowInAppCopyBorrow) */
 import axios from "axios";
 import { auth, db } from "../api/src/config/firebase";
 
@@ -52,7 +43,7 @@ async function main() {
     timeout: 30000,
   });
 
-  // 1. Read current config and capability list.
+  // 1) Current config padho
   const read = await client.get("/api/admin/config", { params: { _t: Date.now() } });
   const original = read.data.config?.allowInAppCopyBorrow;
   const supported: string[] = read.data.supportedFields || [];
@@ -66,7 +57,7 @@ async function main() {
     fail("API does not advertise allowInAppCopyBorrow (portal will disable the control)");
   }
 
-  // 2. Flip it on and confirm the server acknowledges the field.
+  // 2) Toggle on karo
   console.log(`\n2) PUT allowInAppCopyBorrow = true`);
   const putOn = await client.put("/api/admin/config", { allowInAppCopyBorrow: true });
   const appliedOn: string[] = putOn.data.appliedFields || [];
@@ -81,7 +72,7 @@ async function main() {
     fail(`response echoed ${String(putOn.data.config?.allowInAppCopyBorrow)}`);
   }
 
-  // 3. Firestore must hold a real boolean, not a string.
+  // 3) Firestore mein real boolean hona chahiye
   const doc = await db.collection("config").doc("system").get();
   const storedValue = doc.data()?.allowInAppCopyBorrow;
   console.log(`\n3) Firestore config/system`);
@@ -91,7 +82,7 @@ async function main() {
     fail(`persisted as ${String(storedValue)} (typeof ${typeof storedValue})`);
   }
 
-  // 4. A fresh GET must still report true (this is where it used to revert).
+  // 4) Fresh GET ab bhi true
   const reread = await client.get("/api/admin/config", { params: { _t: Date.now() } });
   console.log(`\n4) Re-read GET /api/admin/config`);
   if (reread.data.config?.allowInAppCopyBorrow === true) {
@@ -100,7 +91,7 @@ async function main() {
     fail(`reverted to ${String(reread.data.config?.allowInAppCopyBorrow)}`);
   }
 
-  // 5. The mobile endpoint must expose the same value.
+  // 5) Mobile endpoint same value
   const appCfg = await client.get("/api/config/app", { params: { _t: Date.now() } });
   console.log(`\n5) GET /api/config/app (mobile)`);
   if (appCfg.data.allowInAppCopyBorrow === true) {
@@ -110,7 +101,7 @@ async function main() {
   }
   console.log(`   cache-control: ${appCfg.headers["cache-control"]}`);
 
-  // 6. String coercion guard: "false" must not be stored as a truthy string.
+  // 6) String "false" coercion guard
   console.log(`\n6) PUT allowInAppCopyBorrow = "false" (string coercion guard)`);
   await client.put("/api/admin/config", { allowInAppCopyBorrow: "false" as any });
   const coerced = (await db.collection("config").doc("system").get()).data()
@@ -121,7 +112,7 @@ async function main() {
     fail(`string "false" stored as ${String(coerced)} (typeof ${typeof coerced})`);
   }
 
-  // 7. Restore the original value so the environment is unchanged.
+  // 7) Original value restore
   const restore = original === true;
   await client.put("/api/admin/config", { allowInAppCopyBorrow: restore });
   console.log(`\n7) Restored allowInAppCopyBorrow = ${restore}`);

@@ -1,3 +1,4 @@
+// page pehle/agla pagination + result count
 type Props = {
   page: number;
   totalPages: number;

@@ -1,14 +1,4 @@
-﻿/**
- * Phase 16 acceptance test: borrow -> reserve -> return -> ready -> claim.
- *
- * Drives the real HTTP endpoints with two student accounts and asserts the
- * invariants that used to break: the returned copy must be promoted to the
- * waiting reader, the catalog must report live counts, and cancelling must
- * release a held copy.
- *
- * Restores every document it touches. Usage (from api/):
- *   npx tsx scripts/verify-circulation-flow.ts [apiBaseUrl]
- */
+/** ye script circulation flow verify karta hai: borrow -> reserve -> return -> ready -> claim */
 import axios, { type AxiosInstance } from "axios";
 import { auth, db } from "../api/src/config/firebase";
 
@@ -35,11 +25,7 @@ async function client(uid: string): Promise<AxiosInstance> {
   });
 }
 
-/**
- * Picks a title with 1â€“4 available copies and no live reservations.
- * Every free copy will be borrowed before the reserve step, because the API
- * (correctly) refuses a reservation while any copy of that title is on the shelf.
- */
+/** Title pick: 1-4 free copies, koi live reservation nahi */
 async function pickTestTitle(): Promise<{ isbn: string; title: string; copyIds: string[] }> {
   const catalogSnap = await db.collection("catalog").get();
   let fallback: { isbn: string; title: string; copyIds: string[] } | null = null;
@@ -101,17 +87,16 @@ async function main() {
   const a = await client(uidA);
   const b = await client(uidB);
 
-  // In-app borrow/return needs the toggle on; remember the original value.
+  // In-app borrow toggle on (baad mein restore)
   const cfgRef = db.collection("config").doc("system");
   const originalToggle = (await cfgRef.get()).data()?.allowInAppCopyBorrow;
   await cfgRef.set({ allowInAppCopyBorrow: true }, { merge: true });
 
   const createdReservationIds: string[] = [];
-  /** Copies this test issued, so cleanup can always put them back on the shelf. */
   const borrowedCopyIds = new Set<string>();
 
   try {
-    // 1. Student A borrows every free copy so a reserve is legal.
+    // 1) Student A saari free copies borrow
     console.log(`\n1) Student A borrows ${target.copyIds.length} free copy(ies)`);
     for (const copyId of target.copyIds) {
       await a.post("/api/loans/borrow", { copyId });
@@ -121,7 +106,7 @@ async function main() {
     if (state.status === "issued") pass("copy is issued");
     else fail(`copy status is ${state.status}, expected issued`);
 
-    // 2. Catalog must report the copy as gone from the shelf.
+    // 2) Catalog pe issued count live hona chahiye
     const detailAfterBorrow = await a.get(`/api/catalog/books/${target.isbn}`);
     if (Number(detailAfterBorrow.data.issuedCount) >= 1) {
       pass(`catalog issuedCount = ${detailAfterBorrow.data.issuedCount} (live count)`);
@@ -129,7 +114,7 @@ async function main() {
       fail(`catalog issuedCount = ${detailAfterBorrow.data.issuedCount}, expected >= 1`);
     }
 
-    // 3. Student B reserves while no copy is free.
+    // 3) Student B reserve jab copy free na ho
     console.log(`\n2) Student B reserves ${target.title}`);
     const reserveRes = await b.post("/api/reservations", { isbn: target.isbn });
     const reservationId = String(reserveRes.data.reservationId || reserveRes.data.id || "");
@@ -139,7 +124,7 @@ async function main() {
     if (reservationId) pass("reservation accepted into the waiting queue");
     else fail("no reservation id returned");
 
-    // 4. Student A returns. The queue must be promoted in the same request.
+    // 4) Return pe queue promote
     console.log(`\n3) Student A returns copy ${testCopy}`);
     const returnRes = await a.post("/api/loans/return", { copyId: testCopy });
     borrowedCopyIds.delete(testCopy);
@@ -150,7 +135,7 @@ async function main() {
       pass("return completed with no fulfil error");
     }
 
-    // 5. No reader may still be waiting while a copy of the title sits free.
+    // 5) Waiting + free copy ek saath nahi (starvation check)
     const waitingSnap = await db
       .collection("reservations")
       .where("isbn", "==", target.isbn)
@@ -168,7 +153,7 @@ async function main() {
       pass("no starvation: queue promoted or nobody left waiting");
     }
 
-    // 6. Student B should now hold a ready reservation on a real reserved copy.
+    // 6) Student B ready hold + reserved copy
     const readySnap = await db
       .collection("reservations")
       .where("isbn", "==", target.isbn)
@@ -185,13 +170,13 @@ async function main() {
       }
       if (!createdReservationIds.includes(bReady.id)) createdReservationIds.push(bReady.id);
 
-      // 7. Student B's activity feed must show it as ready.
+      // 7) Activity mein ready dikhe
       const mine = await b.get("/api/reservations/mine");
       const row = (mine.data.reservations || []).find((r: any) => r.reservationId === bReady.id || r.id === bReady.id);
       if (row && row.status === "ready") pass("Student B sees status ready in Activity");
       else fail(`Student B's Activity shows ${row ? row.status : "no row"}`);
 
-      // 8. Student B claims the hold by borrowing the held copy.
+      // 8) Student B hold claim (borrow)
       console.log(`\n5) Student B claims copy ${heldCopyId}`);
       await b.post("/api/loans/borrow", { copyId: heldCopyId });
       borrowedCopyIds.add(heldCopyId);
@@ -199,7 +184,7 @@ async function main() {
       if (claimed.status === "issued") pass("hold claimed, copy issued to Student B");
       else fail(`after claim the copy is ${claimed.status}`);
 
-      // Return it so the shelf is restored.
+      // Shelf restore
       await b.post("/api/loans/return", { copyId: heldCopyId });
       borrowedCopyIds.delete(heldCopyId);
       const restored = await copyStatus(heldCopyId);
@@ -209,7 +194,7 @@ async function main() {
       fail("Student B has no ready reservation after the return");
     }
 
-    // 9. Catalog counters must match live copy statuses at the end.
+    // 9) Final catalog counters vs live
     const finalDetail = await a.get(`/api/catalog/books/${target.isbn}`);
     const liveCopies = await db.collection("bookCopies").where("isbn", "==", target.isbn).get();
     const liveAvailable = liveCopies.docs.filter((d) => d.data().status === "available").length;
@@ -227,7 +212,7 @@ async function main() {
       fail(`availability label "${finalDetail.data.availability}" is inconsistent`);
     }
   } finally {
-    // Cleanup: return anything still issued, close test reservations, restore toggle.
+    // Cleanup: leftover return, reservations cancel, toggle restore
     console.log(`\n7) Cleanup`);
     for (const copyId of borrowedCopyIds) {
       try {

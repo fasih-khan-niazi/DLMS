@@ -9,7 +9,7 @@ type Props = {
   id?: string;
 } & Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "checked" | "onChange">;
 
-/** Sliding on/off switch (toggle). */
+// sliding on/off toggle switch
 export function ToggleSwitch({
   checked,
   onChange,

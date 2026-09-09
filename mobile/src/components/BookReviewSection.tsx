@@ -134,6 +134,7 @@ type Props = {
   onToggleReviews: () => void;
 };
 
+// book reviews list aur submit
 export function BookReviewSection({
   locked,
   busy,

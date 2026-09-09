@@ -20,6 +20,7 @@ import { lightTheme, type AppTheme } from "./lightTheme";
 import { darkTheme } from "./darkTheme";
 import { getStoredThemeMode, setStoredThemeMode, type ThemeMode } from "../utils/themePrefs";
 
+// light/dark theme + fonts load karta hai
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 type ThemeContextValue = AppTheme & {

@@ -1,3 +1,4 @@
+// shared UI components ka barrel export
 export { ToastProvider, useToast } from "./Toast";
 export type { ToastVariant } from "./Toast";
 export { ConfirmDialog } from "./ConfirmDialog";

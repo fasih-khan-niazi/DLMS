@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// pehli baar onboarding / scan coach flags
 const ONBOARDING_KEY = "dlms.onboarding.done";
 const SCAN_COACH_KEY = "dlms.onboarding.scanCoach";
 
@@ -23,7 +24,6 @@ export async function setOnboardingDone(uid?: string): Promise<void> {
       await AsyncStorage.setItem(ONBOARDING_KEY, "1");
     }
   } catch {
-    // ignore
   }
 }
 
@@ -34,7 +34,6 @@ export async function clearOnboardingDone(uid?: string): Promise<void> {
     }
     await AsyncStorage.removeItem(ONBOARDING_KEY);
   } catch {
-    // ignore
   }
 }
 
@@ -50,6 +49,5 @@ export async function dismissScanCoach(): Promise<void> {
   try {
     await AsyncStorage.setItem(SCAN_COACH_KEY, "1");
   } catch {
-    // ignore
   }
 }

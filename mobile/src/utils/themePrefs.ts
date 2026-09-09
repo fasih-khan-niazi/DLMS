@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// light / dark theme preference save
 const KEY = "dlms.theme.mode";
 
 export type ThemeMode = "light" | "dark";

@@ -1,3 +1,4 @@
+// Firebase app/auth setup admin web ke liye
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 

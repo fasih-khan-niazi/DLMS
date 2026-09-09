@@ -2,6 +2,7 @@ import { Router, Response } from "express";
 import { db } from "../config/firebase";
 import { authenticate, AuthRequest } from "../middleware/authenticate";
 
+// User ki inbox notifications list / read mark
 const router = Router();
 
 router.use(authenticate);
@@ -26,7 +27,6 @@ function serializeNotification(id: string, data: Record<string, any>) {
   };
 }
 
-// List current user's notifications (newest first)
 router.get("/", async (req: AuthRequest, res: Response) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 50, 100);

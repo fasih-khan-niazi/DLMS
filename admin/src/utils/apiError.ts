@@ -1,4 +1,4 @@
-/** Pull a usable message from an Axios-style API failure. */
+// Axios error se readable message nikalta hai
 export function extractApiError(error: unknown, fallback: string): string {
   if (error && typeof error === "object" && "response" in error) {
     const msg = (error as { response?: { data?: { error?: string } } }).response?.data

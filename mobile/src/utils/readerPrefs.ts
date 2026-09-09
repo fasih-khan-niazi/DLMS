@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { ReaderMode } from "./pdfViewerHtml";
 
+// PDF reader ki settings (mode / orientation)
 const KEY = "dlms.reader.prefs";
 
 export type ReaderPrefs = {

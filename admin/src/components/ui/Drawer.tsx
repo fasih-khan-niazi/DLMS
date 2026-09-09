@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+// side drawer panel - header/body/footer
 type Props = {
   open: boolean;
   title: string;

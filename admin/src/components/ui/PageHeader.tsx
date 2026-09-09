@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
+// page ka intro header - title optional hai kyunke top bar pe naam pehle se hai
 type Props = {
-  /** Optional. Shell top bar already shows the page name. */
   title?: string;
   subtitle?: string;
   actions?: ReactNode;

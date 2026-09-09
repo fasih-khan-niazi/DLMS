@@ -1,5 +1,6 @@
 import { db } from "../config/firebase";
 
+// Failed login pe 3 attempts ke baad 15 min lock
 const MAX_ATTEMPTS = 3;
 const LOCK_MS = 15 * 60 * 1000;
 
@@ -10,7 +11,7 @@ function normalizeEmail(email: string) {
 }
 
 function lockDocId(email: string) {
-  // Firestore doc ids cannot contain /
+  // Firestore doc id mein / nahi ho sakta
   return normalizeEmail(email).replace(/\//g, "_");
 }
 
@@ -61,7 +62,7 @@ export async function getLoginLockStatus(emailRaw: string): Promise<LockStatus> 
     };
   }
 
-  // Lock expired — clear for a clean slate
+  // Lock expire ho gaya - counter reset
   if (lockedUntil && lockedUntil.getTime() <= now) {
     await ref.set(
       { failedAttempts: 0, lockedUntil: null, updatedAt: new Date() },
@@ -117,7 +118,6 @@ export async function recordLoginAttempt(input: {
     };
   }
 
-  // Failed attempt
   const current = await getLoginLockStatus(email);
   if (current.locked) {
     return current;

@@ -25,6 +25,7 @@ type Props = {
   qrPayload: string;
 };
 
+// copy QR dikhao / share
 export function CopyQrModal({
   visible,
   onClose,

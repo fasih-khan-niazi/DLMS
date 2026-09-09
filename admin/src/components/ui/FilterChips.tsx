@@ -1,3 +1,4 @@
+// filter chip row - ek time pe ek select
 type Chip = {
   id: string;
   label: string;

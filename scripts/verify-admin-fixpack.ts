@@ -1,11 +1,4 @@
-/**
- * Deep regression for the admin fix pack (C1–C3, H1–H6).
- *
- * Mutating but restores holidays/config/catalog where practical.
- *
- * Usage (from repo root, API must be on the same Firestore as service account):
- *   npx tsx scripts/verify-admin-fixpack.ts [apiBaseUrl]
- */
+/** ye script admin fix-pack (C1-C3, H1-H6) verify karta hai */
 import axios, { type AxiosInstance } from "axios";
 import { auth, db } from "../api/src/config/firebase";
 import {
@@ -49,7 +42,7 @@ async function main() {
   console.log(`Admin fix-pack verification against ${API_BASE}`);
   console.log("================================================");
 
-  // --- Unit: C1 remaining math + C3 helpers (no network) ---
+  // Unit helpers: fineRemaining + timezone/working days
   console.log("\n0) Pure helpers");
   if (fineRemaining({ fineAmount: 100, finePaidAmount: 40, finePaid: false }) === 60) {
     pass("fineRemaining after partial = 60");
@@ -72,7 +65,7 @@ async function main() {
   const admin = await mintClient(adminUid);
   const librarian = await mintClient(librarianUid);
 
-  // --- Health / role gates ---
+  // Health aur role gates
   console.log("\n1) Health and role gates");
   const health = await axios.get(`${API_BASE}/health`, { timeout: 10000, validateStatus: () => true });
   if (health.status === 200) pass("/health");
@@ -82,7 +75,7 @@ async function main() {
   if (libUsers.status === 403) pass("librarian blocked from Users");
   else fail(`librarian Users ${libUsers.status}`);
 
-  // --- H1 users filters ---
+  // H1: users filters
   console.log("\n2) Users filters (H1)");
   const students = await admin.get("/api/admin/users", {
     params: { role: "student", page: 1, pageSize: 10 },
@@ -102,7 +95,7 @@ async function main() {
     else fail("suspended filter leaked active users");
   } else fail(`suspended ${suspended.status}`);
 
-  // --- C3 config validation ---
+  // C3: config validation
   console.log("\n3) Config calendar validation (C3)");
   const badTz = await admin.put("/api/admin/config", { timezone: "Not/ARealZone" });
   if (badTz.status === 400) pass("rejects invalid timezone");
@@ -122,10 +115,10 @@ async function main() {
     pass("normalizes sunday/Saturday");
   } else fail(`weekday normalize ${okDays.status} ${JSON.stringify(okDays.data.config?.workingDaysOff)}`);
 
-  // restore Sunday only
+  // Sunday-only restore
   await admin.put("/api/admin/config", { workingDaysOff: ["Sunday"] });
 
-  // --- H3 holidays ---
+  // H3: holidays CRUD
   console.log("\n4) Holidays CRUD (H3)");
   const testDate = "2099-12-31";
   const upsert = await admin.post("/api/admin/holidays", {
@@ -147,7 +140,7 @@ async function main() {
   if (del.status === 200) pass("holiday deleted");
   else fail(`holiday delete ${del.status}`);
 
-  // --- H4 loans ---
+  // H4: loans oversight
   console.log("\n5) Loans oversight (H4)");
   const loans = await admin.get("/api/admin/loans", {
     params: { status: "all", page: 1, pageSize: 10 },
@@ -156,7 +149,7 @@ async function main() {
     pass(`loans list total=${loans.data.total} overdue=${loans.data.overdueCount}`);
   } else fail(`loans ${loans.status} ${JSON.stringify(loans.data)}`);
 
-  // --- H5 reports TZ ---
+  // H5: reports timezone
   console.log("\n6) Reports timezone (H5)");
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Karachi",
@@ -173,7 +166,7 @@ async function main() {
     fail("reports missing timeZone field (API not redeployed with H5?)");
   } else fail(`reports ${summary.status}`);
 
-  // --- Catalog / digital staff filters (H6 prerequisites) ---
+  // H6: catalog / digital filters
   console.log("\n7) Catalog + digital staff filters");
   const catalog = await admin.get("/api/catalog/books", {
     params: { catalogStatus: "all", page: 1, pageSize: 5 },
@@ -187,7 +180,7 @@ async function main() {
   if (digital.status === 200) pass(`digital all page total=${digital.data.total}`);
   else fail(`digital ${digital.status}`);
 
-  // --- H2 fines list accrual shape ---
+  // H2: fines list shape
   console.log("\n8) Fines list shape (H2)");
   const fines = await admin.get("/api/admin/fines", {
     params: { view: "loans", page: 1, pageSize: 10 },
@@ -199,7 +192,7 @@ async function main() {
     } else fail("fines loan rows missing remaining");
   } else fail(`fines ${fines.status} ${JSON.stringify(fines.data)}`);
 
-  // --- C1 mark-paid accounting against a synthetic unpaid loan if we can create one ---
+  // C1: mark-paid accounting
   console.log("\n9) Mark-paid remaining accounting (C1)");
   const studentSnap = await db
     .collection("users")
@@ -225,7 +218,7 @@ async function main() {
     const isbn = String(copyDoc.data().isbn || "");
     const stuClient = await mintClient(student.id);
 
-    // Enable in-app borrow temporarily
+    // Temporary in-app borrow on
     await db.collection("config").doc("system").set({ allowInAppCopyBorrow: true }, { merge: true });
 
     const borrow = await stuClient.post("/api/loans/borrow", { copyId: fixtureCopyId });
@@ -243,8 +236,8 @@ async function main() {
       });
       const userRef = db.collection("users").doc(student.id);
       const userSnap = await userRef.get();
+      // Outstanding kam az kam remaining 60
       priorOutstanding = Number(userSnap.data()?.totalOutstandingFines || 0);
-      // Set outstanding to at least remaining 60 for clean math
       await userRef.update({
         totalOutstandingFines: Math.max(priorOutstanding, 60),
         hasUnpaidFines: true,
@@ -274,11 +267,10 @@ async function main() {
         }
       }
 
-      // Return the copy to clean shelf
+      // Copy wapas shelf pe
       const ret = await stuClient.post("/api/loans/return", { copyId: fixtureCopyId });
       if (ret.status >= 200 && ret.status < 300) pass("fixture loan returned");
       else {
-        // Fine already paid so return should work; if not, force restore
         fail(`return after mark-paid ${ret.status} ${JSON.stringify(ret.data)}`);
         await db.collection("bookCopies").doc(fixtureCopyId).update({
           status: "available",
@@ -298,7 +290,7 @@ async function main() {
     }
   }
 
-  // --- Dashboard ---
+  // Dashboard check
   console.log("\n10) Dashboard");
   const dash = await admin.get("/api/admin/dashboard");
   if (dash.status === 200 && typeof dash.data.overdueLoans === "number") {

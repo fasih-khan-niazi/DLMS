@@ -21,7 +21,7 @@ type Props = {
   footer?: ReactNode;
 };
 
-/** Shared auth shell: navy hero + cream card */
+// login/register ka shared layout - navy hero + cream card
 export function AuthLayout({
   brandLine,
   panelTitle,
@@ -43,7 +43,6 @@ export function AuthLayout({
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
     >
-      {/* Auth shell is dark in both themes, so status bar icons stay light. */}
       <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={[
@@ -138,7 +137,6 @@ export function AuthLink({
 }: {
   label: string;
   onPress: () => void;
-  /** Use on navy auth background (footer links). */
   onDark?: boolean;
 }) {
   const { colors, fontFamily, type, space, mode } = useTheme();

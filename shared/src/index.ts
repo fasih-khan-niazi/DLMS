@@ -1,3 +1,4 @@
+/** shared package: roles, copy status, QR payload aur availability label helpers */
 export type UserRole = "student" | "librarian" | "admin";
 
 export type CopyStatus = "available" | "issued" | "reserved" | "damaged";

@@ -1,3 +1,4 @@
+// routes + auth gate - protected pages Layout ke andar
 import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";

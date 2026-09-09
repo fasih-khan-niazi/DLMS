@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useToast } from "./Toast";
 
+// truncated ID click pe clipboard pe copy
 type Props = {
   value: string;
   label?: string;

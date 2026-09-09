@@ -46,6 +46,7 @@ type QrModalState = {
   authors?: string[];
 };
 
+// ye screen physical book detail aur borrow/return dikhati hai
 export default function BookDetailScreen({ navigation, route }: Props) {
   const { isbn } = route.params;
   const { isStaff, profile, refresh: refreshProfile } = useProfile();
@@ -251,7 +252,7 @@ export default function BookDetailScreen({ navigation, route }: Props) {
       return;
     }
 
-    // Server committed the change. Report success first, then reconcile the view.
+    // server pe change ho gaya - pehle success dikhao
     setCopyActionId(null);
     setCopyFeedback({
       variant: "success",

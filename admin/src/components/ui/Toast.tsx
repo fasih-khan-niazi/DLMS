@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
+// toast notifications - auto dismiss ke sath
 export type ToastVariant = "success" | "error" | "info";
 
 type ToastItem = {

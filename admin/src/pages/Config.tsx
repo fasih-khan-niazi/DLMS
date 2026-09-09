@@ -1,3 +1,4 @@
+// system config tabs + holidays management
 import { useEffect, useState, type FormEvent } from "react";
 import { api } from "../config/api";
 import { ConfirmDialog, PageHeader, ToggleSwitch, useToast } from "../components/ui";
@@ -106,6 +107,7 @@ export function ConfigPage() {
     null
   );
 
+  // holidays list load
   async function loadHolidays() {
     try {
       const { data } = await api.get<{ holidays: Array<{ date: string; name: string }> }>(
@@ -187,6 +189,7 @@ export function ConfigPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showToast]);
 
+  // naya holiday add
   async function addHoliday(e: FormEvent) {
     e.preventDefault();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(holidayDate)) {
@@ -257,6 +260,7 @@ export function ConfigPage() {
     return null;
   }
 
+  // config form save
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     const validationError = validate();

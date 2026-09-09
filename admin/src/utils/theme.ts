@@ -1,3 +1,4 @@
+// light/dark theme localStorage mein save hota hai
 const THEME_KEY = "dlms.admin.theme";
 
 export type ThemeMode = "light" | "dark";
@@ -16,7 +17,7 @@ export function applyTheme(mode: ThemeMode) {
   try {
     localStorage.setItem(THEME_KEY, mode);
   } catch {
-    // ignore
+    // storage fail ho to ignore
   }
 }
 

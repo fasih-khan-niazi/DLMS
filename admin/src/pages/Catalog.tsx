@@ -1,3 +1,4 @@
+// physical/digital catalog - CRUD, copies, publish
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../config/api";
 import {
@@ -75,6 +76,7 @@ export function CatalogPage() {
   const [editDescription, setEditDescription] = useState("");
   const [editBusy, setEditBusy] = useState(false);
 
+  // physical books list load
   const loadPhysical = useCallback(
     async (search: string, nextPage: number, status: string) => {
       setLoading(true);
@@ -110,6 +112,7 @@ export function CatalogPage() {
     [showToast]
   );
 
+  // digital books list load
   const loadDigital = useCallback(
     async (search: string, nextPage: number, status: string) => {
       setLoading(true);
@@ -241,6 +244,7 @@ export function CatalogPage() {
     }
   }
 
+  // copies add form submit (qty 1-50)
   async function addCopies(e: FormEvent) {
     e.preventDefault();
     if (!copiesBook?.isbn) return;
@@ -312,6 +316,7 @@ export function CatalogPage() {
     }
   }
 
+  // activate/deactivate ya publish confirm
   async function confirmPending() {
     if (!pending) return;
     setBusy(true);
@@ -833,7 +838,7 @@ export function CatalogPage() {
       >
         <form id="add-copies-form" onSubmit={addCopies}>
           <label>
-            Quantity (1–50)
+            Quantity (1-50)
             <input
               type="number"
               min={1}

@@ -1,13 +1,4 @@
-/**
- * Runs the QA scripts in order and reports a combined scorecard.
- *
- * Read-only / math checks first, then HTTP config, then mutating circulation
- * flows so a failure early does not leave the library mid-borrow.
- *
- * Usage (from repo root):
- *   npm run verify:suite
- *   npx tsx scripts/verify-suite.ts [apiBaseUrl]
- */
+/** ye script saari QA verify scripts order mein chala ke scorecard deta hai */
 import { spawnSync } from "child_process";
 import path from "path";
 
@@ -45,6 +36,7 @@ function runStep(step: (typeof STEPS)[number]): { ok: boolean; code: number } {
 }
 
 function main() {
+  // Har step order mein; pehle read-only phir mutating
   console.log(`DLMS QA suite against ${API_BASE}`);
   console.log("================================");
 

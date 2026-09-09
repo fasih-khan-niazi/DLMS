@@ -1,3 +1,4 @@
+// reservation queue list + reconcile action
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../config/api";
 import {
@@ -56,6 +57,7 @@ export function ReservationsPage() {
     void load();
   }, [load]);
 
+  // queue reconcile - waiting titles pe copies assign
   async function runReconcile() {
     setBusy(true);
     try {

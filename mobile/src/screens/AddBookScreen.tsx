@@ -19,6 +19,7 @@ type Feedback = {
   goCatalog?: boolean;
 };
 
+// ye screen staff ko naya physical book add karne deti hai
 export default function AddBookScreen({ navigation }: Props) {
   const { colors, fontFamily, space, type, mode } = useTheme();
   const [isbn, setIsbn] = useState("");

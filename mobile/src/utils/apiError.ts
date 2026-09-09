@@ -1,10 +1,4 @@
-/**
- * Turns an unknown thrown value into a message safe to show a user.
- *
- * A thrown value is only treated as a server rejection when it carries an HTTP
- * response. Network faults and client-side programming errors get distinct copy
- * so a bug after a successful request never reads as "the action failed".
- */
+// API errors ko user-friendly message banata hai
 export function extractApiError(error: unknown, fallback: string): string {
   const err = error as {
     response?: { status?: number; data?: { error?: string } };
@@ -41,16 +35,13 @@ export function isUnpaidCopyFineError(message: string): boolean {
   return lower.includes("this copy has an unpaid fine") || lower.includes("scan again to return");
 }
 
-/** True when the throw never reached the server (network / timeout / local bug). */
+// network / timeout - server tak request nahi gayi
 export function isTransportError(error: unknown): boolean {
   const err = error as { response?: unknown };
   return !err?.response;
 }
 
-/**
- * Runs post-success side effects (cache busting, analytics) without letting a
- * failure inside them roll back into the caller's error path.
- */
+// success ke baad side effects - fail hone pe bhi caller ko error na do
 export function runSideEffect(fn: () => void): void {
   try {
     fn();

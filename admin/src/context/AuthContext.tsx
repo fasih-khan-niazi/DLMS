@@ -1,3 +1,4 @@
+// admin auth state - login/logout aur /api/auth/me role check
 import {
   createContext,
   useCallback,
@@ -88,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(firebaseAuth, email, password);
-      // profile load handled by onAuthStateChanged
+      // profile onAuthStateChanged se load hoga
     } catch (err: unknown) {
       setLoading(false);
       const message =

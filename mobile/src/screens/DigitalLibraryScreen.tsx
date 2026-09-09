@@ -56,6 +56,7 @@ function formatFileSize(bytes?: number): string {
   return `${Math.round(bytes / 1024)} KB`;
 }
 
+// ye screen digital books catalog dikhati hai
 export default function DigitalLibraryScreen({ navigation, embedded = false }: Props) {
   const { colors, fontFamily, space, type } = useTheme();
   const { isStaff } = useProfile();
@@ -308,30 +309,6 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
               />
             ) : null}
           </Pressable>
-
-          {/* Upload PDF lives under Profile for staff; keep catalog free of add-book CTAs
-          {isStaff ? (
-            <Pressable
-              onPress={() => navigation.navigate("UploadDigitalBook")}
-              style={[
-                styles.uploadBtn,
-                { backgroundColor: colors.amber, borderRadius: 999 },
-              ]}
-            >
-              <Ionicons name="cloud-upload-outline" size={18} color={colors.navy} />
-              <Text
-                style={{
-                  marginLeft: 6,
-                  fontFamily: fontFamily.bodySemiBold,
-                  fontSize: type.small,
-                  color: colors.navy,
-                }}
-              >
-                Upload PDF
-              </Text>
-            </Pressable>
-          ) : null}
-          */}
         </View>
 
         <View style={styles.viewToggle}>
@@ -402,9 +379,6 @@ export default function DigitalLibraryScreen({ navigation, embedded = false }: P
                     ? "Add digital books from Profile when you are ready."
                     : "Check back later for new uploads."
                 }
-                // Upload CTA removed from catalog; staff uploads from Profile
-                // actionLabel={isStaff ? "Upload PDF" : undefined}
-                // onAction={isStaff ? () => navigation.navigate("UploadDigitalBook") : undefined}
               />
             }
             renderItem={renderBook}

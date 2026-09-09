@@ -1,6 +1,6 @@
 # Park status
 
-DLMS Week 2 is locked as **`v2.0.0-week2`** on branch **`main`**. Continue work on **`dev`**.
+DLMS Week 2 is locked as **`v2.0.0-week2`** on branch **`main`**. Week 3 admin uplift lives on **`dev`** and will ship as **`v3.0.0-week3`** after merge to `main`.
 
 Week 1 history: [`week1-archive.md`](week1-archive.md).
 
@@ -24,7 +24,7 @@ Admin portal polish and audit fix-pack are done and verified. Includes:
 - Fines desk (`/api/fines/lookup` + collect) with accrual-aware remaining
 - Config holidays CRUD + IANA timezone / weekday validation
 - Reports use system timezone; range chips (7 / 30 / 90)
-- Critical/high audit items C1–C3, H1–H6 addressed
+- Critical/high audit items C1-C3, H1-H6 addressed
 
 **Automated coverage:** `npm run verify:suite` (includes fix-pack + park smoke). Park smoke hits every admin page backend plus student/librarian HTTP paths (borrow/return, digital upload, holidays). True browser clicks and Expo UI gestures are not in CI; treat those as optional manual spot-checks only.
 

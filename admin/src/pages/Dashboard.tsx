@@ -1,3 +1,4 @@
+// ye page dashboard stats aur 7-day activity dikhata hai
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../config/api";
@@ -89,7 +90,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     void load({ silent: !!stats });
-    // Initial load only
+    // sirf pehli mount pe load
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

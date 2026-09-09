@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 
+// Local uploads folders - digital books ke liye
 export const UPLOADS_ROOT = path.resolve(__dirname, "../../uploads");
 export const DIGITAL_BOOKS_DIR = path.join(UPLOADS_ROOT, "digital-books");
 

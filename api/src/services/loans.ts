@@ -1,5 +1,6 @@
 import { db } from "../config/firebase";
 
+// Loan helpers: due date, holidays, fine calculate
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function toDateKey(date: Date, timeZone: string): string {
@@ -32,7 +33,7 @@ const WEEKDAY_LOOKUP = new Map(
   WEEKDAY_NAMES.map((name) => [name.toLowerCase(), name] as const)
 );
 
-/** Normalize free-text weekday lists to English long names (Sunday…). */
+// Free-text weekday list ko English long names mein normalize
 export function normalizeWorkingDaysOff(raw: unknown): string[] {
   if (!Array.isArray(raw)) return ["Sunday"];
   const out: string[] = [];
@@ -72,6 +73,7 @@ const DEFAULT_SYSTEM_CONFIG = {
   catalogPageSize: 10,
 };
 
+// Config Firestore se read karo
 export async function getSystemConfig() {
   const snap = await db.collection("config").doc("system").get();
   if (!snap.exists) return { ...DEFAULT_SYSTEM_CONFIG };
@@ -99,6 +101,7 @@ export async function getHolidaySet(): Promise<Set<string>> {
   return new Set(snap.docs.map((doc) => doc.id));
 }
 
+// Due date: loan days + Sunday/holiday skip
 export async function calculateDueDate(from = new Date()): Promise<Date> {
   const config = await getSystemConfig();
   const holidays = await getHolidaySet();
@@ -106,10 +109,8 @@ export async function calculateDueDate(from = new Date()): Promise<Date> {
   const loanDays = Number(config.loanPeriodDays || 14);
   const daysOff = normalizeWorkingDaysOff(config.workingDaysOff || ["Sunday"]);
 
-  // Start from issue date + loanDays calendar days
   let due = new Date(from.getTime() + loanDays * DAY_MS);
 
-  // Roll forward while Sunday/holiday
   for (let i = 0; i < 30; i += 1) {
     const key = toDateKey(due, timezone);
     const weekday = getWeekdayName(due, timezone);
@@ -139,6 +140,7 @@ export function pktCalendarDaysLate(
   return Math.max(0, Math.round((today.getTime() - dueNoon.getTime()) / DAY_MS));
 }
 
+// Yahan fine calculate hota hai (late days * finePerDay)
 export function calculateFineAmount(
   dueDate: Date,
   returnedAt: Date,
@@ -171,7 +173,7 @@ export function fineRemaining(loan: {
   return Math.max(Number(loan.fineAmount || 0) - Number(loan.finePaidAmount || 0), 0);
 }
 
-/** Accrued or already-assessed fine for a live loan; frozen amount after return. */
+// Live loan pe accruing fine; return ke baad freeze
 export function assessedFineForLoan(
   loan: Record<string, unknown>,
   now: Date,

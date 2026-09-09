@@ -1,3 +1,4 @@
+// unpaid fines list, email lookup, aur payment collect
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../config/api";
 import {
@@ -72,6 +73,7 @@ export function FinesPage() {
 
   const load = useCallback(
     async (nextView: string, nextPage: number) => {
+      // fines users/loans view load
       setLoading(true);
       setError(null);
       try {
@@ -110,6 +112,7 @@ export function FinesPage() {
     void load(view, 1);
   }, [load, view]);
 
+  // fine paid mark confirm dialog
   async function confirmMarkPaid() {
     if (!pending) return;
     setBusy(true);
@@ -163,6 +166,7 @@ export function FinesPage() {
     void runLookup(lookupEmail.trim().toLowerCase());
   }
 
+  // payment collect by amount
   async function onCollect(e: FormEvent) {
     e.preventDefault();
     if (!lookup) return;

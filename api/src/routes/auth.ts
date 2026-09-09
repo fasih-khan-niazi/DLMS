@@ -3,6 +3,7 @@ import { auth, db } from "../config/firebase";
 import { authenticate, AuthRequest } from "../middleware/authenticate";
 import { getLoginLockStatus, recordLoginAttempt } from "../services/loginLock";
 
+// Auth routes: register, profile, FCM, login lock
 const router = Router();
 
 function serializeLock(status: Awaited<ReturnType<typeof getLoginLockStatus>>) {
@@ -16,7 +17,7 @@ function serializeLock(status: Awaited<ReturnType<typeof getLoginLockStatus>>) {
   };
 }
 
-/** Check whether an email is temporarily locked after failed sign-ins. */
+// Email temporarily lock hai ya nahi (3 fail ke baad)
 router.get("/login-lock", async (req: Request, res: Response) => {
   try {
     const email = String(req.query.email || "").trim();
@@ -32,11 +33,7 @@ router.get("/login-lock", async (req: Request, res: Response) => {
   }
 });
 
-/**
- * Record a client-side sign-in attempt.
- * success:false increments failures and may lock for 15 minutes after 3 fails.
- * success:true clears the lock counter.
- */
+// Client sign-in attempt record - fail pe counter, success pe clear
 router.post("/login-attempt", async (req: Request, res: Response) => {
   try {
     const email = String(req.body?.email || "").trim();
@@ -53,7 +50,7 @@ router.post("/login-attempt", async (req: Request, res: Response) => {
   }
 });
 
-// Register a new user (always as student)
+// Naya user hamesha student role se register
 router.post("/register", async (req: Request, res: Response) => {
   try {
     const { email, password, displayName } = req.body;
@@ -82,10 +79,8 @@ router.post("/register", async (req: Request, res: Response) => {
       displayName: nameStr,
     });
 
-    // Set custom claims (role = student by default)
     await auth.setCustomUserClaims(userRecord.uid, { role: "student" });
 
-    // Create Firestore user document
     await db.collection("users").doc(userRecord.uid).set({
       email: emailStr,
       displayName: nameStr,
@@ -115,7 +110,6 @@ router.post("/register", async (req: Request, res: Response) => {
   }
 });
 
-// Get current user profile
 router.get("/me", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const userDoc = await db.collection("users").doc(req.uid!).get();
@@ -132,7 +126,7 @@ router.get("/me", authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Update FCM token
+// Push notification ke liye FCM token save
 router.post("/fcm-token", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { token } = req.body;

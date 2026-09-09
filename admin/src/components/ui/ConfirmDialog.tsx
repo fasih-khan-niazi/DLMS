@@ -1,3 +1,4 @@
+// confirm/cancel dialog - danger ya info
 type Props = {
   open: boolean;
   title: string;

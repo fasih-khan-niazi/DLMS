@@ -13,9 +13,9 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApps()[0]! : initializeApp(firebaseConfig);
 
+// Firebase Auth - RN AsyncStorage pe session save
 function createAuth() {
   try {
-    // RN persistence helper is on the React Native build entry.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const rnAuth = require("@firebase/auth/dist/rn/index.js") as {
       getReactNativePersistence: (storage: typeof ReactNativeAsyncStorage) => unknown;

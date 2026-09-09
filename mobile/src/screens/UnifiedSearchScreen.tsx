@@ -32,6 +32,7 @@ type DigitalHit = {
   thumbnailUrl?: string;
 };
 
+// ye screen physical + digital search results dikhati hai
 export default function UnifiedSearchScreen({ navigation, route }: Props) {
   const { colors, fontFamily, space, type } = useTheme();
   const query = (route.params?.query || "").trim();
@@ -83,7 +84,6 @@ export default function UnifiedSearchScreen({ navigation, route }: Props) {
     <Screen
       scroll
       contentStyle={{ paddingHorizontal: 20 }}
-      // refresh via pull is optional; keep simple
     >
       <BackButton onPress={() => navigation.goBack()} style={{ marginBottom: space.sm, marginLeft: -8 }} />
 

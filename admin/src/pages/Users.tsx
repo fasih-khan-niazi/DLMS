@@ -1,3 +1,4 @@
+// ye page users list dikhata hai - search, role, suspend, bulk
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../config/api";
 import {
@@ -61,6 +62,7 @@ export function UsersPage() {
       nextFilter = filter,
       opts?: { background?: boolean }
     ) => {
+      // users API se list load
       if (opts?.background) setRefreshing(true);
       else setLoading(true);
       setError(null);
@@ -157,6 +159,7 @@ export function UsersPage() {
     });
   }
 
+  // bulk action / role / suspend confirm
   async function runPending() {
     if (!pending) return;
     setBusy(true);

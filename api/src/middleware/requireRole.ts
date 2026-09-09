@@ -1,6 +1,7 @@
 import { Response, NextFunction } from "express";
 import { AuthRequest } from "./authenticate";
 
+// Sirf di gayi roles (librarian/admin waghera) ko aage jaane do
 export function requireRole(...roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.role || !roles.includes(req.role)) {

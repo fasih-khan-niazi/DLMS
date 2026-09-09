@@ -9,6 +9,7 @@ import {
   toFineDate,
 } from "./loans";
 
+// Fine lookup aur desk pe payment collect (oldest due pehle)
 export type FineLoanRow = {
   loanId: string;
   copyId: string | null;
@@ -73,6 +74,7 @@ async function loadUserLoans(userId: string) {
   return db.collection("loans").where("userId", "==", userId).get();
 }
 
+// Active loans pe accruing fine Firestore mein likho + user outstanding update
 export async function persistAccruedFines(userId: string): Promise<number> {
   const config = await getSystemConfig();
   const timezone = String(config.timezone || "Asia/Karachi");

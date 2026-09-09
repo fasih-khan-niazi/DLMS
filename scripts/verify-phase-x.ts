@@ -1,17 +1,4 @@
-﻿/**
- * Phase X verification harness.
- *
- * Read-only audit of the live Firestore data plus an optional reconcile pass.
- * Proves the invariants Phase 16 depends on:
- *   - catalog counters match live copy statuses
- *   - nobody is waiting while a copy of that title sits available
- *   - no copy is `reserved` without a matching `ready` reservation
- *   - config booleans are stored as real booleans
- *
- * Usage (from api/):
- *   npx tsx scripts/verify-phase-x.ts            audit only
- *   npx tsx scripts/verify-phase-x.ts --reconcile audit, reconcile, re-audit
- */
+/** ye script Phase X audit: counters, queues, reserved copies, config booleans check karta hai */
 import { db } from "../api/src/config/firebase";
 import {
   normalizeIsbn,
@@ -101,7 +88,7 @@ async function auditCirculation(): Promise<Finding[]> {
     `  ${catalogSnap.size} titles, ${copiesSnap.size} copies, ${reservationsSnap.size} reservations`
   );
 
-  // 1. Counter drift: stored counters vs live copy statuses.
+  // 1) Counter drift: stored vs live copy statuses
   let driftCount = 0;
   for (const doc of catalogSnap.docs) {
     const isbn = normalizeIsbn(doc.id);
@@ -137,7 +124,7 @@ async function auditCirculation(): Promise<Finding[]> {
   }
   console.log(`  counter drift: ${driftCount} title(s)`);
 
-  // 2. Someone waiting while a copy of that title is free (the Phase R symptom).
+  // 2) Waiting queue jab copy free ho (starvation)
   let starvedQueues = 0;
   for (const [isbn, waiting] of waitingByIsbn) {
     if (waiting === 0) continue;
@@ -155,7 +142,7 @@ async function auditCirculation(): Promise<Finding[]> {
   }
   console.log(`  starved queues: ${starvedQueues}`);
 
-  // 3. Reserved copies with no matching ready reservation.
+  // 3) Reserved copies bina ready reservation
   let orphanReserved = 0;
   for (const [isbn, copies] of copiesByIsbn) {
     for (const copy of copies) {
@@ -176,7 +163,7 @@ async function auditCirculation(): Promise<Finding[]> {
   }
   console.log(`  orphan reserved copies: ${orphanReserved}`);
 
-  // 4. Ready reservations pointing at a copy that is not held for them.
+  // 4) Ready reservation galat copy pe
   let brokenReady = 0;
   for (const row of readyRows) {
     if (!row.copyId) {
@@ -206,7 +193,7 @@ async function auditCirculation(): Promise<Finding[]> {
   }
   console.log(`  broken ready holds: ${brokenReady}`);
 
-  // 5. Issued copies must point at an open loan (active or overdue).
+  // 5) Issued copies ka open loan hona chahiye
   const [activeLoansSnap, overdueLoansSnap] = await Promise.all([
     db.collection("loans").where("status", "==", "active").get(),
     db.collection("loans").where("status", "==", "overdue").get(),

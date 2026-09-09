@@ -4,6 +4,7 @@ import { authenticate, AuthRequest } from "../middleware/authenticate";
 import { requireRole } from "../middleware/requireRole";
 import { getSystemConfig } from "../services/loans";
 
+// Admin/librarian reports: summary, CSV, PDF (Karachi timezone)
 const router = Router();
 
 router.use(authenticate);
@@ -28,7 +29,7 @@ function dateKeyInTz(date: Date, timeZone: string): string {
   }).format(date);
 }
 
-/** First UTC instant that falls on `dateStr` in `timeZone`, and last ms of that day. */
+// Us calendar din ka UTC start/end (timezone ke hisaab se)
 function dayBoundsInTz(
   dateStr: string,
   timeZone: string
@@ -43,7 +44,7 @@ function dayBoundsInTz(
       return { start, end: new Date(d.getTime() - 1) };
     }
   }
-  // Fallback: treat as UTC calendar day
+  // Fallback: UTC calendar day
   return {
     start: new Date(`${dateStr}T00:00:00.000Z`),
     end: new Date(`${dateStr}T23:59:59.999Z`),

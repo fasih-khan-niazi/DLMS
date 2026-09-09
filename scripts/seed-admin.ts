@@ -1,9 +1,4 @@
-/**
- * Idempotent seed: system config, holidays, and a catalog of real books + copies.
- * Does NOT create users (you already have accounts).
- *
- * From project root: npm run seed
- */
+/** ye script config, holidays aur demo catalog seed karta hai (users nahi) */
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import path from "path";
@@ -41,7 +36,7 @@ type SeedBook = {
   copies: number;
 };
 
-/** Well-known titles with stable ISBNs for a believable demo catalog. */
+/** Demo catalog titles - stable ISBNs wale books */
 const BOOKS: SeedBook[] = [
   {
     isbn: "9780141439518",
@@ -279,7 +274,7 @@ async function seedBook(book: SeedBook) {
     });
     console.log(`  + ${book.title}`);
   } else {
-    // Refresh metadata for nicer covers/descriptions without wiping live counts
+    // Metadata refresh; live counts wipe nahi
     await catalogRef.set(
       {
         title: book.title,

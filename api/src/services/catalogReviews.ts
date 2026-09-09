@@ -1,6 +1,7 @@
 import { db } from "../config/firebase";
 import { summarizeReviews } from "./digitalBookReviews";
 
+// Physical catalog title pe student reviews
 function reviewsRef(isbn: string) {
   return db.collection("catalog").doc(isbn).collection("reviews");
 }

@@ -53,7 +53,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
     Constants.expoConfig?.extra?.eas?.projectId ||
     Constants.easConfig?.projectId;
 
-  // Expo Go needs a projectId when available; never crash the app if push setup fails.
+  // push token le kar server pe register
   try {
     const tokenResponse = projectId
       ? await Notifications.getExpoPushTokenAsync({ projectId })

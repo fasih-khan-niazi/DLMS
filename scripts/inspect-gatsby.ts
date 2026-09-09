@@ -1,4 +1,5 @@
-﻿import { db } from "../api/src/config/firebase";
+/** ye script Gatsby title / copies inspect karta hai */
+import { db } from "../api/src/config/firebase";
 
 async function main() {
   const catalog = await db.collection("catalog").get();

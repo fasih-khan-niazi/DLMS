@@ -23,6 +23,7 @@ function formatLockMinutes(seconds: number) {
   return m === 1 ? "1 minute" : `${m} minutes`;
 }
 
+// ye screen login form hai
 export default function LoginScreen({ navigation }: Props) {
   const { colors, fontFamily, type, space } = useTheme();
   const { showToast } = useToast();

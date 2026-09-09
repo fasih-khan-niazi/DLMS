@@ -1,14 +1,4 @@
-﻿/**
- * Due-date / holiday / fine math plus a live loan audit.
- *
- * 1. Unit-tests calculateFineAmount (on-time, 1 day late, multi-day).
- * 2. Calls calculateDueDate with the live config and asserts it never lands
- *    on a configured day-off or holiday (Asia/Karachi).
- * 3. Read-only scan of active loans: overdue rows should look overdue.
- *
- * Usage (from api/):
- *   npx tsx scripts/verify-due-fines.ts
- */
+/** ye script due-date, holiday aur fine math verify karta hai */
 import { db } from "../api/src/config/firebase";
 import { calculateDueDate, calculateFineAmount, getSystemConfig } from "../api/src/services/loans";
 
@@ -58,6 +48,7 @@ async function main() {
   console.log(`\nConfig: timezone=${timezone} loanPeriodDays=${loanDays} finePerDayRs=${finePerDay}`);
   console.log(`        workingDaysOff=${daysOff.join(", ") || "(none)"}`);
 
+  // 1) Fine amount unit checks
   console.log(`\n1) Fine math`);
   const due = new Date("2026-08-20T12:00:00+05:00");
   if (calculateFineAmount(due, due, finePerDay) === 0) pass("on-time return is Rs 0");
@@ -77,6 +68,7 @@ async function main() {
     fail("early return produced a fine");
   }
 
+  // 2) Due date holiday/day-off pe na pade
   console.log(`\n2) Due date never lands on a closed day`);
   const holidaysSnap = await db.collection("config").doc("holidays").collection("dates").get();
   const holidays = new Set(holidaysSnap.docs.map((d) => d.id));
@@ -128,6 +120,7 @@ async function main() {
     pass("hour-ceil happened to match calendar days on this sample");
   }
 
+  // 3) Active loans overdue shape (read-only)
   console.log(`\n3) Live active-loan audit (read-only)`);
   const loans = await db.collection("loans").where("status", "in", ["active", "overdue"]).get();
   const now = Date.now();

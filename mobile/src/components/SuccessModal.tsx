@@ -8,7 +8,7 @@ type Props = {
   onClose: () => void;
 };
 
-/** @deprecated Prefer AppModal with variant="success". Kept for older call sites. */
+// purana success modal - AppModal prefer karo
 export function SuccessModal({ visible, title, message, onClose }: Props) {
   return (
     <AppModal

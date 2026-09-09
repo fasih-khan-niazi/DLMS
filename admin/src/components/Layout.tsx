@@ -1,3 +1,4 @@
+// admin shell - sidebar, theme/density, sign-out, page outlet
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -140,7 +141,7 @@ export function Layout() {
     try {
       localStorage.setItem(DENSITY_KEY, density);
     } catch {
-      // ignore
+      // storage fail ho to ignore
     }
   }, [density]);
 
@@ -179,6 +180,7 @@ export function Layout() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // sign-out confirm dialog
   async function confirmSignOut() {
     setSigningOut(true);
     try {
@@ -189,6 +191,7 @@ export function Layout() {
     }
   }
 
+  // yahan dark mode toggle hai
   function onToggleTheme() {
     const next: ThemeMode = theme === "dark" ? "light" : "dark";
     applyTheme(next);

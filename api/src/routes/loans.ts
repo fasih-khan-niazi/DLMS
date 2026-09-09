@@ -17,6 +17,7 @@ import {
 import { copyNumberMap } from "../utils/copies";
 import { persistAccruedFines } from "../services/fines";
 
+// Ye route loan borrow / return handle karta hai
 const router = Router();
 
 function parseQrPayload(payload: string): { copyId: string; isbn: string } | null {
@@ -40,7 +41,8 @@ async function resolveCopyId(input: { copyId?: string; qrPayload?: string }) {
   return null;
 }
 
-// Borrow a physical copy via copyId or QR payload
+
+// QR / copyId se book borrow
 router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const copyId = await resolveCopyId(req.body);
@@ -68,7 +70,7 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
     const userRef = db.collection("users").doc(req.uid!);
     const copyRef = db.collection("bookCopies").doc(copyId);
 
-    // Pre-lookup ready reservation for this user+copy (claim flow)
+
     const readyReservationSnap = await db
       .collection("reservations")
       .where("userId", "==", req.uid)
@@ -80,7 +82,7 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
       ? null
       : readyReservationSnap.docs[0].id;
 
-    // Peek copy to heal claim when hold exists without a ready row
+
     const peekCopy = await copyRef.get();
     if (
       !readyReservationId &&
@@ -99,7 +101,7 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
       );
       if (match) {
         readyReservationId = match.id;
-        // Promote to ready immediately so borrow tx can fulfill it
+
         const configPeek = await getSystemConfig();
         const holdHours = Number(configPeek.reservationHoldHours || 72);
         const nowPeek = new Date();
@@ -154,7 +156,7 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
 
       if (copy.status === "reserved") {
         const heldFor = copy.reservedForUserId ? String(copy.reservedForUserId) : "";
-        // Orphan reserved (no holder) should not block forever — treat as unavailable until heal
+
         if (!heldFor) {
           throw new Error("COPY_ORPHAN_RESERVED");
         }
@@ -244,7 +246,7 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
     const dueDate = await calculateDueDate(result.borrowedAt);
     await db.collection("loans").doc(result.loanId).update({ dueDate });
 
-    // Cancel any waiting reservation this user had for the same ISBN
+
     try {
       const waiting = await db
         .collection("reservations")
@@ -305,7 +307,7 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
 
     const mapped = map[error.message];
     if (mapped) {
-      // Kick a heal so a retry can succeed after orphan / stuck holds
+
       if (error.message === "COPY_ORPHAN_RESERVED" || error.message === "RESERVED_FOR_OTHER") {
         resolveCopyId(req.body)
           .then((copyId) => {
@@ -329,7 +331,8 @@ router.post("/borrow", authenticate, async (req: AuthRequest, res: Response) => 
   }
 });
 
-// Return a physical copy via copyId or QR payload
+
+// Book return + fine assess + next waiter hold
 router.post("/return", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const copyId = await resolveCopyId(req.body);
@@ -426,7 +429,7 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
         updatedAt: now,
       });
 
-      // Temporarily mark available; may become reserved if queue exists (handled after tx)
+
       tx.update(copyRef, {
         status: "available",
         isbn,
@@ -460,7 +463,7 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
       };
     });
 
-    // Fulfill queue: direct assign this copy, then reconcile to heal any drift
+
     let reservationHold = null as Awaited<ReturnType<typeof assignCopyToNextReservation>>;
     let reconcileSummary: Awaited<ReturnType<typeof reconcileReservationsForIsbn>> | null =
       null;
@@ -484,7 +487,7 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
         title: result.title,
       });
       if (!reservationHold && reconcileSummary.assigned > 0) {
-        // Direct assign missed; reconcile held a copy — report that a hold was created
+
         reservationHold = {
           reservationId: "reconciled",
           userId: "",
@@ -556,7 +559,8 @@ router.post("/return", authenticate, async (req: AuthRequest, res: Response) => 
   }
 });
 
-// List current user's loans
+
+// Current user ke active/overdue loans
 router.get("/mine", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const status = String(req.query.status || "").trim();
@@ -614,7 +618,8 @@ router.get("/mine", authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Librarian/admin marks a fine as paid
+
+// Desk: ek loan ki fine paid mark
 router.post(
   "/:loanId/mark-fine-paid",
   authenticate,

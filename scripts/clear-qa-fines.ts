@@ -1,7 +1,4 @@
-/**
- * Clear known unpaid QA fines so circulation verify scripts can borrow.
- *   npx tsx scripts/clear-qa-fines.ts [apiBaseUrl]
- */
+/** ye script QA unpaid fines clear karta hai taake borrow scripts chal saken */
 import axios from "axios";
 import { auth, db } from "../api/src/config/firebase";
 import { fineRemaining } from "../api/src/services/loans";
@@ -23,6 +20,7 @@ async function main() {
     validateStatus: () => true,
   });
 
+  // Unpaid users ke loans mark-paid
   const unpaidUsers = await db.collection("users").where("hasUnpaidFines", "==", true).get();
   for (const userDoc of unpaidUsers.docs) {
     const loans = await db.collection("loans").where("userId", "==", userDoc.id).get();

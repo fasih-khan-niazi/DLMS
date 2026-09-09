@@ -1,6 +1,7 @@
 import api from "../config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// app settings ka cache (page size, PDF limit, borrow gates)
 const STORAGE_KEY = "dlms.app.config";
 const TTL_MS = 10 * 60 * 1000;
 const FALLBACK_PAGE_SIZE = 10;
@@ -33,11 +34,10 @@ async function writeStoredConfig(config: AppConfig): Promise<void> {
   try {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(config));
   } catch {
-    // ignore
   }
 }
 
-/** Load cached config from disk into memory. Call early at app start. */
+// disk se config memory mein load karo - app start pe
 export async function hydrateAppConfig(): Promise<AppConfig | null> {
   if (memory) return memory;
   if (!hydratePromise) {
@@ -96,8 +96,7 @@ export async function getAppConfig(force = false): Promise<{
       librariansCanBorrow,
     };
   } catch {
-    // Offline or server down. Prefer the last known values (memory, then disk)
-    // over defaults so gates such as the librarian Scan check stay accurate.
+    // offline: last known values use karo, defaults se pehle
     const fallback = memory ?? (await readStoredConfig());
     if (fallback) memory = fallback;
 
@@ -130,7 +129,7 @@ export async function getLibrariansCanBorrow(force = false): Promise<boolean> {
   return config.librariansCanBorrow;
 }
 
-/** Returns cached max PDF size immediately when available (no network). */
+// cached PDF size - network ke bina
 export function peekMaxPdfSizeMb(): number | null {
   return memory?.maxPdfSizeMb ?? null;
 }
@@ -143,11 +142,7 @@ export function peekLibrariansCanBorrow(): boolean | null {
   return memory?.librariansCanBorrow ?? null;
 }
 
-/**
- * Drops the in-memory copy so the next read hits the network.
- * The persisted copy is intentionally kept: it seeds instant, offline-safe
- * decisions (such as the librarian Scan gate) on the next cold start.
- */
+// memory clear - disk cache rehti hai cold start ke liye
 export function invalidateAppConfigCache(): void {
   memory = null;
   hydratePromise = null;

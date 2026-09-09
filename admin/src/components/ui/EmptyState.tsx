@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+// empty list ka placeholder - optional action button
 type Props = {
   title: string;
   message?: string;

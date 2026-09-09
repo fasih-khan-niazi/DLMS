@@ -1,3 +1,4 @@
+// loans list - active/overdue filter aur search
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../config/api";
@@ -42,6 +43,7 @@ export function LoansPage() {
 
   const load = useCallback(
     async (nextStatus: string, search: string, nextPage: number) => {
+      // loans list status/search se
       setLoading(true);
       setError(null);
       try {

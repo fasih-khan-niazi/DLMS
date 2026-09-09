@@ -10,10 +10,10 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../theme";
 
+// labeled text input - password pe eye toggle
 type Props = TextInputProps & {
   label?: string;
   error?: string;
-  /** Shows an eye toggle and manages secure entry when true. */
   passwordToggle?: boolean;
 };
 

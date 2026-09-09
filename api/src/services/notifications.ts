@@ -2,6 +2,7 @@ import axios from "axios";
 import { db, messaging } from "../config/firebase";
 import { persistAccruedFines } from "./fines";
 
+// Inbox + push notifications (Expo / FCM)
 function sanitizeDedupeKey(raw: string) {
   return raw.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 180);
 }
@@ -12,7 +13,7 @@ export async function saveNotification(input: {
   title: string;
   body: string;
   metadata?: Record<string, unknown>;
-  /** Same key = one inbox row. Stops cron + /mine + reconcile double-fires. */
+  // Same key = ek hi inbox row (cron double-fire rokne ke liye)
   dedupeKey?: string;
 }): Promise<{ id: string; created: boolean }> {
   const now = new Date();
@@ -150,7 +151,6 @@ function startOfDayInTz(timeZone: string, base = new Date()): Date {
     month: "2-digit",
     day: "2-digit",
   }).format(base);
-  // Interpret as UTC midnight of that calendar day for day-diff math
   return new Date(`${key}T00:00:00.000Z`);
 }
 
@@ -159,12 +159,7 @@ function calendarDaysBetween(a: Date, b: Date): number {
   return Math.round(ms / (24 * 60 * 60 * 1000));
 }
 
-/**
- * Daily loan reminders:
- * - 2 days before due: reminder
- * - 1 day before due: urgent reminder
- * - due date passed: overdue + mark loan overdue + fine alert
- */
+// Daily job: due reminders, overdue mark, fine alert
 let dailyJobRunning = false;
 
 export async function runDailyLoanNotifications() {
@@ -242,7 +237,6 @@ async function runDailyLoanNotificationsInner() {
       day: "2-digit",
     }).format(dueDate);
 
-    // Approximate day difference using timezone calendar dates
     const today = new Date(`${todayKey}T12:00:00`);
     const due = new Date(`${dueKey}T12:00:00`);
     const daysUntilDue = calendarDaysBetween(today, due);

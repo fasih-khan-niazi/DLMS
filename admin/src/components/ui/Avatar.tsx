@@ -1,3 +1,4 @@
+// naam/email se initials avatar
 type Props = {
   name?: string;
   email?: string;

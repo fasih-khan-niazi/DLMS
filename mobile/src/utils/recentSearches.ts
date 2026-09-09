@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// recent search queries save karti hai
 const KEY = "dlms.recentSearches";
 const MAX = 8;
 

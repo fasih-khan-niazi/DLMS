@@ -1,3 +1,4 @@
+// date-range reports, charts, CSV/PDF export
 import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { api } from "../config/api";
 import { EmptyState, FilterChips, PageHeader, useToast } from "../components/ui";
@@ -78,6 +79,7 @@ export function ReportsPage() {
 
   const loadSummary = useCallback(
     async (fromDate: string, toDate: string) => {
+      // date range pe summary metrics
       if (fromDate > toDate) {
         const msg = "From date must be on or before To date.";
         setError(msg);
@@ -121,6 +123,7 @@ export function ReportsPage() {
     void loadSummary(from, to);
   }
 
+  // CSV ya PDF download
   async function download(kind: "csv" | "pdf") {
     if (from > to) {
       const msg = "From date must be on or before To date.";

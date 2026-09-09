@@ -79,7 +79,7 @@ export function SkeletonList({ rows = 5 }: { rows?: number }) {
   );
 }
 
-/** Matches physical / digital book detail layout while loading. */
+// book detail loading ka placeholder
 export function BookDetailSkeleton() {
   const { colors, radius } = useTheme();
   return (

@@ -1,8 +1,4 @@
-﻿/**
- * Read-only inspector for a single physical copy and its active loan.
- *
- * Usage (from api/): npx tsx scripts/inspect-copy.ts <copyId>
- */
+/** ye script ek physical copy aur uska active loan inspect karta hai */
 import { db } from "../api/src/config/firebase";
 
 async function main() {

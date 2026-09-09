@@ -1,7 +1,9 @@
+/** ye script QA students ke unpaid fines / blockers inspect karta hai */
 import { db } from "../api/src/config/firebase";
 import { fineRemaining } from "../api/src/services/loans";
 
 async function main() {
+  // Known QA student UIDs check
   const ids = [
     "10PoHROLkfU9TexgeLgdR6NJrkK2",
     "je1Rm99M3SeHp3o2KY2YD6pV3fI2",

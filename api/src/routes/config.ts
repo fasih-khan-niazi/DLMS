@@ -4,13 +4,13 @@ import { getSystemConfig } from "../services/loans";
 
 const router = Router();
 
+// Mobile app settings (page size, PDF limit, borrow flags)
 function clampCatalogPageSize(value: unknown): number {
   const n = Number(value);
   if (!Number.isFinite(n)) return 10;
   return Math.min(Math.max(Math.round(n), 5), 50);
 }
 
-/** Mobile-readable app settings (authenticated users). */
 router.get("/app", authenticate, async (_req: AuthRequest, res: Response) => {
   try {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate");
@@ -20,7 +20,7 @@ router.get("/app", authenticate, async (_req: AuthRequest, res: Response) => {
       catalogPageSize: clampCatalogPageSize(config.catalogPageSize),
       maxPdfSizeMb: Number.isFinite(maxPdfSizeMb) && maxPdfSizeMb > 0 ? maxPdfSizeMb : 25,
       allowInAppCopyBorrow: config.allowInAppCopyBorrow === true,
-      // Default true when unset so existing deployments keep librarian borrow allowed
+      // Agar unset ho to librarian borrow allow raho (purane deploys)
       librariansCanBorrow: config.librariansCanBorrow !== false,
     });
   } catch (error) {

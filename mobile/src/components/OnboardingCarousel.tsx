@@ -81,6 +81,7 @@ type Props = {
   onClose: () => void;
 };
 
+// pehli baar app tips carousel
 export function OnboardingCarousel({ visible, onClose }: Props) {
   const { colors, fontFamily, space, type, radius, mode } = useTheme();
   const { profile, isStaff } = useProfile();

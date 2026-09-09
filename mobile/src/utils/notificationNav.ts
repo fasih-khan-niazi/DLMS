@@ -1,5 +1,4 @@
-/** Deep-link a notification to the right tab/screen. */
-
+// notification ko sahi tab/screen pe kholta hai
 export type InboxNotification = {
   id: string;
   title: string;

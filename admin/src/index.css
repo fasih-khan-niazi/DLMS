@@ -1,5 +1,5 @@
 :root {
-  /* Match mobile light palette */
+  /* mobile light palette se match */
   --navy: #2e4a62;
   --navy-dark: #243a4e;
   --cream: #f8f7f4;
@@ -40,7 +40,7 @@
   color-scheme: light;
 }
 
-/* Match mobile darkTokens */
+/* dark mode tokens */
 html[data-theme="dark"] {
   --navy: #d7e4f0;
   --navy-dark: #a8bdd0;
@@ -174,7 +174,7 @@ select {
   font-size: 0.85rem;
 }
 
-/* ─── Shell ─── */
+/* shell / sidebar layout */
 .shell {
   display: flex;
   min-height: 100vh;
@@ -575,7 +575,7 @@ select {
   }
 }
 
-/* ─── Buttons ─── */
+/* buttons styles */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -656,7 +656,7 @@ select {
   width: 100%;
 }
 
-/* ─── Toast ─── */
+/* toast notifications */
 .toast-viewport {
   position: fixed;
   top: 1.15rem;
@@ -786,7 +786,7 @@ select {
   }
 }
 
-/* ─── Confirm dialog ─── */
+/* confirm dialog */
 .dialog-backdrop {
   position: fixed;
   inset: 0;
@@ -846,7 +846,7 @@ select {
   margin-top: 1.2rem;
 }
 
-/* ─── Auth ─── */
+/* login / auth screens */
 .auth-shell {
   min-height: 100vh;
   display: grid;
@@ -1038,7 +1038,7 @@ select {
   }
 }
 
-/* Legacy login aliases */
+/* purane login class aliases */
 .login-page {
   min-height: 100vh;
   display: grid;
@@ -1114,7 +1114,7 @@ table select {
   gap: 0.5rem !important;
 }
 
-/* Config sections (kept for Phase 2/3 pages) */
+/* config page sections */
 .config-form-sections {
   display: flex;
   flex-direction: column;
@@ -1200,7 +1200,7 @@ table select {
   }
 }
 
-/* Stats */
+/* dashboard stats cards */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -1228,7 +1228,7 @@ table select {
   color: var(--navy);
 }
 
-/* Tables */
+/* tables aur toolbar */
 .toolbar {
   display: flex;
   gap: 0.75rem;
@@ -1338,7 +1338,7 @@ html[data-theme="dark"] .config-tab.active {
   color: var(--btn-primary-fg);
 }
 
-/* Sliding toggle switch */
+/* sliding on/off toggle */
 .toggle-row {
   display: flex;
   align-items: flex-start;
@@ -1458,7 +1458,7 @@ html[data-theme="dark"] .toggle-thumb {
   color: var(--amber-dark);
 }
 
-/* ─── Shell content / top bar ─── */
+/* shell content / top bar */
 .shell-content {
   flex: 1;
   min-width: 0;
@@ -1504,7 +1504,7 @@ html[data-theme="dark"] .toggle-thumb {
   margin-top: 0;
 }
 
-/* ─── Filter chips / pagination / bulk / drawer ─── */
+/* filter chips, pagination, bulk bar, drawer */
 .filter-chips {
   display: flex;
   flex-wrap: wrap;
@@ -1832,7 +1832,7 @@ html[data-theme="dark"] .pill-amber {
   }
 }
 
-/* ─── Responsive shell ─── */
+/* responsive shell - mobile pe sidebar */
 @media (max-width: 900px) {
   .shell-menu-btn {
     display: flex;

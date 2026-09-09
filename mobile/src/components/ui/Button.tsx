@@ -101,8 +101,6 @@ export function Button({
             justifyContent: "center",
             minHeight: 52,
             transform: [{ scale: active ? 0.97 : 1 }],
-            // Outline buttons: no resting halo (that looked like a nested box).
-            // Filled buttons: soft glow only while pressed.
             shadowColor: p.glow || p.bg,
             shadowOpacity: isOutline ? 0 : active ? 0.32 : 0,
             shadowRadius: isOutline ? 0 : active ? 12 : 0,

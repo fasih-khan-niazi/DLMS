@@ -1,10 +1,4 @@
-/**
- * Heal orphan issued copies and clear unpaid-fine flags that block QA students.
- * Safe for demos: only fixes copies whose loan is not active/overdue, and
- * zeros outstanding for users whose unpaid loans are already paid/cleared.
- *
- *   npx tsx scripts/heal-qa-blockers.ts
- */
+/** ye script orphan issued copies aur unpaid-fine flags heal karta hai */
 import { db } from "../api/src/config/firebase";
 import { fineRemaining } from "../api/src/services/loans";
 
@@ -12,6 +6,7 @@ async function main() {
   console.log("Heal QA blockers");
   console.log("================");
 
+  // Orphan issued copies heal
   const copies = await db.collection("bookCopies").where("status", "==", "issued").get();
   let healedCopies = 0;
   for (const doc of copies.docs) {
@@ -43,6 +38,7 @@ async function main() {
   }
   console.log(`Copies healed: ${healedCopies}`);
 
+  // Unpaid-fine flags clear jab loans already paid
   const users = await db.collection("users").where("hasUnpaidFines", "==", true).limit(50).get();
   let usersFixed = 0;
   for (const userDoc of users.docs) {

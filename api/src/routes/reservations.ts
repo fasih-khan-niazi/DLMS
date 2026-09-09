@@ -13,9 +13,10 @@ import {
   reconcileReservationsForIsbn,
 } from "../services/reservations";
 
+// Reservation create, list, cancel
 const router = Router();
 
-// Create a reservation (queue) for an unavailable title
+// Nayi reservation (waiting ya turant ready hold)
 router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const isbnRaw = req.body.isbn;
@@ -27,7 +28,7 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
     const isbn = normalizeIsbn(String(isbnRaw));
     const config = await getSystemConfig();
 
-    // Heal drift before deciding whether reserve is allowed
+
     try {
       await reconcileReservationsForIsbn(isbn);
     } catch (error) {
@@ -171,11 +172,11 @@ router.post("/", authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// List current user's reservations (queue position computed live)
+
+// Meri reservations + queue position
 router.get("/mine", authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    // Opening Activity is a natural place to expire a hold that cron missed
-    // (for example while the local API was restarted).
+
     try {
       await expireReadyReservationHolds();
     } catch (error) {
@@ -214,7 +215,8 @@ router.get("/mine", authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Cancel a waiting reservation (owner only)
+
+// Reservation cancel (waiting/ready)
 router.delete("/:reservationId", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const reservationId = req.params.reservationId as string;
@@ -291,7 +293,7 @@ router.delete("/:reservationId", authenticate, async (req: AuthRequest, res: Res
         message: "Hold cancelled. The copy was released.",
       });
 
-      // Reassign after the client already has a response so Cancel does not hang.
+
       void (async () => {
         try {
           const assigned = copyId

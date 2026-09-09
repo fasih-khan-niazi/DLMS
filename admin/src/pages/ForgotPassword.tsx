@@ -1,3 +1,4 @@
+// password reset email Firebase se bhejta hai
 import { useState, type FormEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { sendPasswordResetEmail } from "firebase/auth";
