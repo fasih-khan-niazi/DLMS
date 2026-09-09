@@ -2,6 +2,7 @@ import { Router, Response } from "express";
 import { db } from "../config/firebase";
 import { authenticate, AuthRequest } from "../middleware/authenticate";
 import { requireRole } from "../middleware/requireRole";
+import { getSystemConfig } from "../services/loans";
 
 const router = Router();
 
@@ -9,7 +10,6 @@ router.use(authenticate);
 router.use(requireRole("librarian", "admin"));
 
 const FETCH_CAP = 3000;
-const TZ = "Asia/Karachi";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 type DayBucket = {
@@ -19,29 +19,54 @@ type DayBucket = {
   reservations: number;
 };
 
-function karachiToday(): string {
+function dateKeyInTz(date: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(new Date());
+  }).format(date);
 }
 
-function addCalendarDays(dateStr: string, deltaDays: number): string {
-  const base = new Date(`${dateStr}T12:00:00+05:00`);
-  base.setUTCDate(base.getUTCDate() + deltaDays);
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(base);
+/** First UTC instant that falls on `dateStr` in `timeZone`, and last ms of that day. */
+function dayBoundsInTz(
+  dateStr: string,
+  timeZone: string
+): { start: Date; end: Date } {
+  let start: Date | null = null;
+  const probe = new Date(`${dateStr}T00:00:00.000Z`);
+  for (let h = -14; h <= 36; h += 1) {
+    const d = new Date(probe.getTime() + h * 60 * 60 * 1000);
+    if (dateKeyInTz(d, timeZone) === dateStr) {
+      if (!start) start = d;
+    } else if (start) {
+      return { start, end: new Date(d.getTime() - 1) };
+    }
+  }
+  // Fallback: treat as UTC calendar day
+  return {
+    start: new Date(`${dateStr}T00:00:00.000Z`),
+    end: new Date(`${dateStr}T23:59:59.999Z`),
+  };
 }
 
-function parseRange(req: AuthRequest): { from: string; to: string; fromDate: Date; toDate: Date } | null {
-  const today = karachiToday();
-  const fromRaw = String(req.query.from || "").trim() || addCalendarDays(today, -30);
+function todayInTz(timeZone: string): string {
+  return dateKeyInTz(new Date(), timeZone);
+}
+
+function addCalendarDays(dateStr: string, deltaDays: number, timeZone: string): string {
+  const { start } = dayBoundsInTz(dateStr, timeZone);
+  const shifted = new Date(start.getTime() + deltaDays * 24 * 60 * 60 * 1000 + 12 * 60 * 60 * 1000);
+  return dateKeyInTz(shifted, timeZone);
+}
+
+async function parseRange(
+  req: AuthRequest
+): Promise<{ from: string; to: string; fromDate: Date; toDate: Date; timeZone: string } | null> {
+  const config = await getSystemConfig();
+  const timeZone = String(config.timezone || "Asia/Karachi");
+  const today = todayInTz(timeZone);
+  const fromRaw = String(req.query.from || "").trim() || addCalendarDays(today, -30, timeZone);
   const toRaw = String(req.query.to || "").trim() || today;
 
   if (!DATE_RE.test(fromRaw) || !DATE_RE.test(toRaw)) {
@@ -51,11 +76,15 @@ function parseRange(req: AuthRequest): { from: string; to: string; fromDate: Dat
     return null;
   }
 
+  const fromBounds = dayBoundsInTz(fromRaw, timeZone);
+  const toBounds = dayBoundsInTz(toRaw, timeZone);
+
   return {
     from: fromRaw,
     to: toRaw,
-    fromDate: new Date(`${fromRaw}T00:00:00+05:00`),
-    toDate: new Date(`${toRaw}T23:59:59.999+05:00`),
+    fromDate: fromBounds.start,
+    toDate: toBounds.end,
+    timeZone,
   };
 }
 
@@ -77,15 +106,10 @@ function toIso(value: unknown): string {
   return d ? d.toISOString() : "";
 }
 
-function karachiDateKey(value: unknown): string | null {
+function reportDateKey(value: unknown, timeZone: string): string | null {
   const d = toJsDate(value);
   if (!d) return null;
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
+  return dateKeyInTz(d, timeZone);
 }
 
 function inRange(value: unknown, fromDate: Date, toDate: Date): boolean {
@@ -95,12 +119,12 @@ function inRange(value: unknown, fromDate: Date, toDate: Date): boolean {
   return t >= fromDate.getTime() && t <= toDate.getTime();
 }
 
-function buildEmptySeries(from: string, to: string): DayBucket[] {
+function buildEmptySeries(from: string, to: string, timeZone: string): DayBucket[] {
   const series: DayBucket[] = [];
   let cursor = from;
   while (cursor <= to) {
     series.push({ date: cursor, loans: 0, returns: 0, reservations: 0 });
-    cursor = addCalendarDays(cursor, 1);
+    cursor = addCalendarDays(cursor, 1, timeZone);
   }
   return series;
 }
@@ -141,9 +165,15 @@ type LoanLine = {
   finePaid: boolean;
 };
 
-async function computeReport(from: string, to: string, fromDate: Date, toDate: Date) {
+async function computeReport(
+  from: string,
+  to: string,
+  fromDate: Date,
+  toDate: Date,
+  timeZone: string
+) {
   const now = new Date();
-  const series = buildEmptySeries(from, to);
+  const series = buildEmptySeries(from, to, timeZone);
   const byDate = new Map(series.map((b) => [b.date, b]));
 
   const [loansSnap, reservationsSnap, usersSnap, digitalSnap] = await Promise.all([
@@ -175,7 +205,7 @@ async function computeReport(from: string, to: string, fromDate: Date, toDate: D
 
     if (borrowedInRange) {
       loansCreated += 1;
-      const key = karachiDateKey(borrowedAt);
+      const key = reportDateKey(borrowedAt, timeZone);
       if (key && byDate.has(key)) {
         byDate.get(key)!.loans += 1;
       }
@@ -183,7 +213,7 @@ async function computeReport(from: string, to: string, fromDate: Date, toDate: D
 
     if (returnedInRange) {
       returnsCompleted += 1;
-      const key = karachiDateKey(returnedAt);
+      const key = reportDateKey(returnedAt, timeZone);
       if (key && byDate.has(key)) {
         byDate.get(key)!.returns += 1;
       }
@@ -202,6 +232,9 @@ async function computeReport(from: string, to: string, fromDate: Date, toDate: D
       if (due && due.getTime() < now.getTime()) {
         overdueLoans += 1;
       }
+    } else if (status === "overdue") {
+      overdueLoans += 1;
+      activeLoansNow += 1;
     }
 
     if (borrowedInRange || returnedInRange) {
@@ -222,10 +255,10 @@ async function computeReport(from: string, to: string, fromDate: Date, toDate: D
   let reservationsCreated = 0;
   for (const doc of reservationsSnap.docs) {
     const data = doc.data();
-    const createdAt = data.createdAt;
+    const createdAt = data.createdAt ?? data.requestedAt;
     if (!inRange(createdAt, fromDate, toDate)) continue;
     reservationsCreated += 1;
-    const key = karachiDateKey(createdAt);
+    const key = reportDateKey(createdAt, timeZone);
     if (key && byDate.has(key)) {
       byDate.get(key)!.reservations += 1;
     }
@@ -233,14 +266,14 @@ async function computeReport(from: string, to: string, fromDate: Date, toDate: D
 
   let newUsers = 0;
   for (const doc of usersSnap.docs) {
-    if (inRange(doc.data().createdAt, fromDate, toDate)) {
-      newUsers += 1;
-    }
+    const data = doc.data();
+    if (inRange(data.createdAt, fromDate, toDate)) newUsers += 1;
   }
 
   let digitalBooksUploaded = 0;
   for (const doc of digitalSnap.docs) {
-    if (inRange(doc.data().createdAt, fromDate, toDate)) {
+    const data = doc.data();
+    if (inRange(data.createdAt ?? data.uploadedAt, fromDate, toDate)) {
       digitalBooksUploaded += 1;
     }
   }
@@ -257,27 +290,29 @@ async function computeReport(from: string, to: string, fromDate: Date, toDate: D
     activeLoansNow,
   };
 
-  return { metrics, series, loanLines };
+  return { metrics, series, loanLines, timeZone };
 }
 
 router.get("/summary", async (req: AuthRequest, res: Response) => {
   try {
-    const range = parseRange(req);
+    const range = await parseRange(req);
     if (!range) {
       res.status(400).json({ error: "Invalid from/to. Use YYYY-MM-DD with from <= to" });
       return;
     }
 
-    const { metrics, series } = await computeReport(
+    const { metrics, series, timeZone } = await computeReport(
       range.from,
       range.to,
       range.fromDate,
-      range.toDate
+      range.toDate,
+      range.timeZone
     );
 
     res.json({
       from: range.from,
       to: range.to,
+      timeZone,
       metrics,
       series,
     });
@@ -289,41 +324,48 @@ router.get("/summary", async (req: AuthRequest, res: Response) => {
 
 router.get("/export.csv", async (req: AuthRequest, res: Response) => {
   try {
-    const range = parseRange(req);
+    const range = await parseRange(req);
     if (!range) {
       res.status(400).json({ error: "Invalid from/to. Use YYYY-MM-DD with from <= to" });
       return;
     }
 
-    const { metrics, series, loanLines } = await computeReport(
+    const { metrics, series, loanLines, timeZone } = await computeReport(
       range.from,
       range.to,
       range.fromDate,
-      range.toDate
+      range.toDate,
+      range.timeZone
     );
 
     const lines: string[] = [];
-    lines.push("section,key,value");
-    lines.push(csvRow(["summary", "from", range.from]));
-    lines.push(csvRow(["summary", "to", range.to]));
+    lines.push(`# DLMS report ${range.from} to ${range.to} (${timeZone})`);
+    lines.push(csvRow(["metric", "value"]));
     for (const [key, value] of Object.entries(metrics)) {
-      lines.push(csvRow(["summary", key, value]));
+      lines.push(csvRow([key, value]));
     }
-
     lines.push("");
-    lines.push("section,date,loans,returns,reservations");
+    lines.push(csvRow(["date", "loans", "returns", "reservations"]));
     for (const day of series) {
-      lines.push(csvRow(["daily", day.date, day.loans, day.returns, day.reservations]));
+      lines.push(csvRow([day.date, day.loans, day.returns, day.reservations]));
     }
-
     lines.push("");
     lines.push(
-      "section,loanId,userId,isbn,status,borrowedAt,dueDate,returnedAt,fineAmount,finePaid"
+      csvRow([
+        "loanId",
+        "userId",
+        "isbn",
+        "status",
+        "borrowedAt",
+        "dueDate",
+        "returnedAt",
+        "fineAmount",
+        "finePaid",
+      ])
     );
     for (const loan of loanLines) {
       lines.push(
         csvRow([
-          "loan",
           loan.loanId,
           loan.userId,
           loan.isbn,
@@ -342,24 +384,25 @@ router.get("/export.csv", async (req: AuthRequest, res: Response) => {
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(lines.join("\n"));
   } catch (error) {
-    console.error("Reports CSV export error:", error);
-    res.status(500).json({ error: "Failed to export report CSV" });
+    console.error("Reports CSV error:", error);
+    res.status(500).json({ error: "Failed to export CSV" });
   }
 });
 
 router.get("/export.pdf", async (req: AuthRequest, res: Response) => {
   try {
-    const range = parseRange(req);
+    const range = await parseRange(req);
     if (!range) {
       res.status(400).json({ error: "Invalid from/to. Use YYYY-MM-DD with from <= to" });
       return;
     }
 
-    const { metrics, series } = await computeReport(
+    const { metrics, series, timeZone } = await computeReport(
       range.from,
       range.to,
       range.fromDate,
-      range.toDate
+      range.toDate,
+      range.timeZone
     );
 
     const PDFDocument = (await import("pdfkit")).default;
@@ -375,8 +418,8 @@ router.get("/export.pdf", async (req: AuthRequest, res: Response) => {
     doc
       .fontSize(11)
       .fillColor("#667788")
-      .text(`Period: ${range.from} to ${range.to} (Asia/Karachi)`);
-    doc.text(`Generated: ${new Date().toLocaleString("en-PK", { timeZone: "Asia/Karachi" })}`);
+      .text(`Period: ${range.from} to ${range.to} (${timeZone})`);
+    doc.text(`Generated: ${new Date().toLocaleString("en-PK", { timeZone })}`);
     doc.moveDown();
 
     doc.fontSize(14).fillColor("#2E4A62").text("Summary metrics");
@@ -398,19 +441,14 @@ router.get("/export.pdf", async (req: AuthRequest, res: Response) => {
       doc.text(line);
       if (doc.y > 750) {
         doc.addPage();
-        doc.fontSize(10).fillColor("#2a2a2a");
       }
-    }
-
-    if (series.length === 0) {
-      doc.text("No daily activity in this range.");
     }
 
     doc.end();
   } catch (error) {
-    console.error("Reports PDF export error:", error);
+    console.error("Reports PDF error:", error);
     if (!res.headersSent) {
-      res.status(500).json({ error: "Failed to export report PDF" });
+      res.status(500).json({ error: "Failed to export PDF" });
     }
   }
 });

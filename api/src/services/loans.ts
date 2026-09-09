@@ -18,6 +18,45 @@ function getWeekdayName(date: Date, timeZone: string): string {
   }).format(date);
 }
 
+export const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+const WEEKDAY_LOOKUP = new Map(
+  WEEKDAY_NAMES.map((name) => [name.toLowerCase(), name] as const)
+);
+
+/** Normalize free-text weekday lists to English long names (Sunday…). */
+export function normalizeWorkingDaysOff(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return ["Sunday"];
+  const out: string[] = [];
+  for (const item of raw) {
+    const key = String(item || "")
+      .trim()
+      .toLowerCase();
+    const match = WEEKDAY_LOOKUP.get(key);
+    if (match && !out.includes(match)) out.push(match);
+  }
+  return out;
+}
+
+export function isValidIanaTimeZone(value: unknown): boolean {
+  const tz = String(value || "").trim();
+  if (!tz) return false;
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone: tz }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const DEFAULT_SYSTEM_CONFIG = {
   timezone: "Asia/Karachi",
   maxBorrowLimit: 5,
@@ -36,9 +75,16 @@ const DEFAULT_SYSTEM_CONFIG = {
 export async function getSystemConfig() {
   const snap = await db.collection("config").doc("system").get();
   if (!snap.exists) return { ...DEFAULT_SYSTEM_CONFIG };
+  const data = snap.data() || {};
   return {
     ...DEFAULT_SYSTEM_CONFIG,
-    ...(snap.data() || {}),
+    ...data,
+    workingDaysOff: normalizeWorkingDaysOff(
+      data.workingDaysOff ?? DEFAULT_SYSTEM_CONFIG.workingDaysOff
+    ),
+    timezone: isValidIanaTimeZone(data.timezone)
+      ? String(data.timezone).trim()
+      : DEFAULT_SYSTEM_CONFIG.timezone,
   };
 }
 
@@ -58,7 +104,7 @@ export async function calculateDueDate(from = new Date()): Promise<Date> {
   const holidays = await getHolidaySet();
   const timezone = config.timezone || "Asia/Karachi";
   const loanDays = Number(config.loanPeriodDays || 14);
-  const daysOff: string[] = config.workingDaysOff || ["Sunday"];
+  const daysOff = normalizeWorkingDaysOff(config.workingDaysOff || ["Sunday"]);
 
   // Start from issue date + loanDays calendar days
   let due = new Date(from.getTime() + loanDays * DAY_MS);

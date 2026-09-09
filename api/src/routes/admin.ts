@@ -2,7 +2,13 @@ import { Router, Response } from "express";
 import { auth, db } from "../config/firebase";
 import { authenticate, AuthRequest } from "../middleware/authenticate";
 import { requireRole } from "../middleware/requireRole";
-import { clampCatalogPageSize, getSystemConfig } from "../services/loans";
+import {
+  clampCatalogPageSize,
+  fineRemaining,
+  getSystemConfig,
+  isValidIanaTimeZone,
+  normalizeWorkingDaysOff,
+} from "../services/loans";
 import {
   normalizeIsbn,
   reconcileAllWaitingQueues,
@@ -10,7 +16,9 @@ import {
   cancelLibrarianReservations,
 } from "../services/reservations";
 import { clearLoginLock } from "../services/loginLock";
-import { paginateArray, parseListQuery } from "../utils/pagination";
+import { persistAccruedFines } from "../services/fines";
+import { notifyUser } from "../services/notifications";
+import { paginateArray, parseListQuery, LIST_FETCH_CAP } from "../utils/pagination";
 
 const router = Router();
 
@@ -123,9 +131,18 @@ router.get("/users", requireRole("admin"), async (req: AuthRequest, res: Respons
     const q = String(req.query.q || "")
       .trim()
       .toLowerCase();
+    const roleFilter = String(req.query.role || "")
+      .trim()
+      .toLowerCase();
+    const statusFilter = String(req.query.status || "")
+      .trim()
+      .toLowerCase();
+    const finesFilter = String(req.query.fines || "")
+      .trim()
+      .toLowerCase();
     const { page, pageSize } = parseListQuery(req.query as Record<string, unknown>, 20);
 
-    const snap = await db.collection("users").limit(500).get();
+    const snap = await db.collection("users").limit(LIST_FETCH_CAP).get();
     let users = snap.docs.map((doc) => serializeDoc(doc.id, doc.data()));
 
     if (q) {
@@ -136,10 +153,25 @@ router.get("/users", requireRole("admin"), async (req: AuthRequest, res: Respons
       });
     }
 
+    if (roleFilter === "student" || roleFilter === "librarian" || roleFilter === "admin") {
+      users = users.filter((user) => String(user.role || "student") === roleFilter);
+    }
+
+    if (statusFilter === "active") {
+      users = users.filter((user) => user.isActive !== false);
+    } else if (statusFilter === "suspended") {
+      users = users.filter((user) => user.isActive === false);
+    }
+
+    if (finesFilter === "unpaid" || finesFilter === "1" || finesFilter === "true") {
+      users = users.filter((user) => !!user.hasUnpaidFines);
+    }
+
     users.sort((a, b) =>
       String(a.displayName || a.email || "").localeCompare(String(b.displayName || b.email || ""))
     );
 
+    const truncated = snap.size >= LIST_FETCH_CAP;
     const paged = paginateArray(users, page, pageSize);
     res.json({
       users: paged.results,
@@ -147,6 +179,7 @@ router.get("/users", requireRole("admin"), async (req: AuthRequest, res: Respons
       pageSize: paged.pageSize,
       total: paged.total,
       totalPages: paged.totalPages,
+      truncated,
     });
   } catch (error) {
     console.error("Admin users list error:", error);
@@ -193,6 +226,33 @@ router.put("/config", requireRole("admin"), async (req: AuthRequest, res: Respon
 
     if (Object.prototype.hasOwnProperty.call(updates, "catalogPageSize")) {
       updates.catalogPageSize = clampCatalogPageSize(updates.catalogPageSize);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, "timezone")) {
+      const tz = String(updates.timezone || "").trim();
+      if (!isValidIanaTimeZone(tz)) {
+        res.status(400).json({
+          error: "Invalid timezone. Use a valid IANA name such as Asia/Karachi.",
+        });
+        return;
+      }
+      updates.timezone = tz;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, "workingDaysOff")) {
+      const normalized = normalizeWorkingDaysOff(updates.workingDaysOff);
+      if (
+        Array.isArray(updates.workingDaysOff) &&
+        updates.workingDaysOff.length > 0 &&
+        normalized.length === 0
+      ) {
+        res.status(400).json({
+          error:
+            "workingDaysOff must use English weekday names (Sunday, Monday, Tuesday, …).",
+        });
+        return;
+      }
+      updates.workingDaysOff = normalized;
     }
 
     const prevConfig = await getSystemConfig();
@@ -266,24 +326,78 @@ router.get(
 router.get(
   "/fines",
   requireRole("librarian", "admin"),
-  async (_req: AuthRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
+      const { page, pageSize } = parseListQuery(
+        req.query as Record<string, unknown>,
+        20
+      );
+      const view = String(req.query.view || "loans").trim().toLowerCase();
+
       const [usersSnap, loansSnap] = await Promise.all([
-        db.collection("users").where("hasUnpaidFines", "==", true).limit(100).get(),
         db
-          .collection("loans")
-          .where("finePaid", "==", false)
-          .limit(100)
+          .collection("users")
+          .where("hasUnpaidFines", "==", true)
+          .limit(LIST_FETCH_CAP)
           .get(),
+        db.collection("loans").where("finePaid", "==", false).limit(LIST_FETCH_CAP).get(),
       ]);
 
-      const users = usersSnap.docs.map((doc) => serializeDoc(doc.id, doc.data()));
+      const accrueIds = new Set<string>(
+        usersSnap.docs.map((doc) => doc.id).concat(
+          loansSnap.docs.map((doc) => String(doc.data().userId || "")).filter(Boolean)
+        )
+      );
+      await Promise.all(
+        [...accrueIds].map(async (uid) => {
+          try {
+            await persistAccruedFines(uid);
+          } catch (error) {
+            console.error("Admin fines accrual error:", uid, error);
+          }
+        })
+      );
 
-      const loans = loansSnap.docs
-        .map((doc) => serializeDoc(doc.id, doc.data()))
-        .filter((loan) => Number(loan.fineAmount || 0) > 0);
+      const [usersFresh, loansFresh] = await Promise.all([
+        db
+          .collection("users")
+          .where("hasUnpaidFines", "==", true)
+          .limit(LIST_FETCH_CAP)
+          .get(),
+        db.collection("loans").where("finePaid", "==", false).limit(LIST_FETCH_CAP).get(),
+      ]);
 
-      res.json({ users, loans });
+      const users = usersFresh.docs.map((doc) => serializeDoc(doc.id, doc.data()));
+      const loans = loansFresh.docs
+        .map((doc) => {
+          const row = serializeDoc(doc.id, doc.data());
+          const remaining = fineRemaining({
+            fineAmount: Number(row.fineAmount || 0),
+            finePaidAmount: Number(row.finePaidAmount || 0),
+            finePaid: row.finePaid === true,
+          });
+          return { ...row, remaining };
+        })
+        .filter((loan) => Number(loan.remaining || 0) > 0);
+
+      const truncated =
+        usersFresh.size >= LIST_FETCH_CAP || loansFresh.size >= LIST_FETCH_CAP;
+      const usersPaged = paginateArray(users, page, pageSize);
+      const loansPaged = paginateArray(loans, page, pageSize);
+      const active = view === "users" ? usersPaged : loansPaged;
+
+      res.json({
+        users: usersPaged.results,
+        loans: loansPaged.results,
+        page: active.page,
+        pageSize: active.pageSize,
+        total: active.total,
+        totalPages: active.totalPages,
+        usersTotal: usersPaged.total,
+        loansTotal: loansPaged.total,
+        truncated,
+        view: view === "users" ? "users" : "loans",
+      });
     } catch (error) {
       console.error("Admin fines list error:", error);
       res.status(500).json({ error: "Failed to list fines" });
@@ -291,7 +405,7 @@ router.get(
   }
 );
 
-// Mark fine paid (librarian + admin) - mirrors loans route
+// Mark fine paid (librarian + admin) - mirrors loans route (partial-safe)
 router.post(
   "/loans/:loanId/mark-fine-paid",
   requireRole("librarian", "admin"),
@@ -312,7 +426,14 @@ router.post(
         return;
       }
 
+      const unpaidOnLoan = fineRemaining(loan);
+      if (!unpaidOnLoan) {
+        res.status(400).json({ error: "No unpaid fine on this loan" });
+        return;
+      }
+
       const userRef = db.collection("users").doc(loan.userId);
+      let cleared = unpaidOnLoan;
 
       await db.runTransaction(async (tx) => {
         const userSnap = await tx.get(userRef);
@@ -321,13 +442,12 @@ router.post(
         }
 
         const user = userSnap.data()!;
-        const remaining = Math.max(
-          (user.totalOutstandingFines || 0) - (loan.fineAmount || 0),
-          0
-        );
+        const remaining = Math.max((user.totalOutstandingFines || 0) - unpaidOnLoan, 0);
+        cleared = unpaidOnLoan;
 
         tx.update(loanRef, {
           finePaid: true,
+          finePaidAmount: Number(loan.fineAmount || 0),
           finePaidAt: new Date(),
           finePaidBy: req.uid,
         });
@@ -343,11 +463,29 @@ router.post(
         action: "fine_paid",
         actorId: req.uid,
         targetId: loanId,
-        metadata: { amount: loan.fineAmount, userId: loan.userId, via: "admin" },
+        metadata: {
+          amount: cleared,
+          fineAmount: loan.fineAmount,
+          userId: loan.userId,
+          via: "admin",
+        },
         timestamp: new Date(),
       });
 
-      res.json({ success: true, loanId });
+      try {
+        await notifyUser({
+          userId: String(loan.userId),
+          type: "fine_paid",
+          title: "Fine cleared",
+          body: `Rs ${cleared} was marked paid at the desk.`,
+          metadata: { amount: String(cleared), loanId },
+          dedupeKey: `fine_paid:${loanId}:${cleared}`,
+        });
+      } catch (error) {
+        console.error("Admin mark fine paid notify error:", error);
+      }
+
+      res.json({ success: true, loanId, amountCleared: cleared });
     } catch (error: any) {
       if (error.message === "USER_NOT_FOUND") {
         res.status(404).json({ error: "User not found" });
