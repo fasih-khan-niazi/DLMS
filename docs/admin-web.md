@@ -1,6 +1,8 @@
 # DLMS Admin Web
 
-Phase 7 admin console for operators (admin role only).
+Admin console for operators with the **admin** role only.
+
+API and admin are both deployed on **Render** from git branch **`main`**. Day-to-day feature work happens on **`dev`**, then merges to `main` when ready.
 
 ## Run locally
 
@@ -20,6 +22,8 @@ npm run dev
 ```
 
 Open http://localhost:5173 (Vite default).
+
+Point `admin/.env` at your local API for development (`VITE_API_URL=http://localhost:5000`). Production builds use the Render API URL (or the fallback in `admin/src/config/api.ts`).
 
 ## Auth
 
@@ -41,7 +45,7 @@ See also `docs/auth.md`.
 - Reservations: waiting/ready list
 - Fines: unpaid users/loans and mark fine paid
 - Reports: date-range summary, daily series, CSV and PDF download
-- Snappier revisits via short-lived session cache + skeleton loaders on dashboard/users/config
+- Shared UI kit: toasts, confirm dialogs, page headers, Poppins + mobile color tokens
 
 ### Reports API
 
@@ -50,4 +54,6 @@ See also `docs/auth.md`.
 - `GET /api/admin/reports/export.pdf?from=&to=` (same roles; PDF download)
 - Default range: last 30 days through today (Asia/Karachi calendar dates on the API)
 
-API base URL is `http://localhost:5000` (see `admin/src/config/api.ts`).
+## Hosting note
+
+Admin is a Vite SPA. It is **not** served by Firebase Hosting. Production hosting is on Render alongside the API.

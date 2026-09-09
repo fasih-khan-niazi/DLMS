@@ -8,9 +8,9 @@
 |---------|------------|------------------|
 | **Firebase Authentication** | Login system (email/password) | Students/librarians/admins sign in. The app gets a secure ID token. |
 | **Cloud Firestore** | NoSQL database (documents & collections) | Stores users, books, copies, loans, reservations, config, reports. |
-| **Cloud Storage** | File storage | Planned for PDFs later (blocked on Spark for new projects). |
-| **Cloud Messaging (FCM)** | Push notifications | Due-date / overdue / reservation alerts later. |
-| **Firebase Hosting** | Static website hosting | Admin web panel later. |
+| **Cloud Storage** | File storage | Not used. Digital PDFs live in Supabase Storage. |
+| **Cloud Messaging (FCM)** | Push notifications | Expo push tokens registered from the mobile app. Native OS banners need a store/dev build. |
+| **Firebase Hosting** | Static website hosting | Not used. Admin is a Vite SPA deployed on Render with the API. |
 
 Think of Firebase as:
 
@@ -72,6 +72,6 @@ We stay on **Firebase Spark (free)**:
 
 - Auth ✅
 - Firestore ✅
-- FCM ✅
-- Hosting ✅ (later)
-- Storage ❌ for now on new projects (needs Blaze) → PDF phase deferred / alternate plan later
+- FCM ✅ (token registration; OS banners need a native build)
+- Hosting ❌ not used (admin + API on Render)
+- Storage ❌ not used (PDFs on Supabase)
