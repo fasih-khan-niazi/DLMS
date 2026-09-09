@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { ConfirmDialog } from "./ui";
+import { applyTheme, getStoredTheme, type ThemeMode } from "../utils/theme";
 
 const navItems: Array<{
   to: string;
@@ -89,6 +91,9 @@ export function Layout() {
   const { profile, logout } = useAuth();
   const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme());
 
   useEffect(() => {
     setNavOpen(false);
@@ -102,6 +107,22 @@ export function Layout() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [navOpen]);
+
+  async function confirmSignOut() {
+    setSigningOut(true);
+    try {
+      await logout();
+    } finally {
+      setSigningOut(false);
+      setSignOutOpen(false);
+    }
+  }
+
+  function onToggleTheme() {
+    const next: ThemeMode = theme === "dark" ? "light" : "dark";
+    applyTheme(next);
+    setTheme(next);
+  }
 
   return (
     <div className={`shell${navOpen ? " nav-open" : ""}`}>
@@ -154,7 +175,14 @@ export function Layout() {
         <div className="sidebar-footer">
           <p className="user-label">Signed in</p>
           <p className="user-email">{profile?.email}</p>
-          <button type="button" className="btn btn-ghost" onClick={() => void logout()}>
+          <button type="button" className="btn btn-ghost" onClick={onToggleTheme}>
+            {theme === "dark" ? "Light mode" : "Dark mode"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => setSignOutOpen(true)}
+          >
             Sign out
           </button>
         </div>
@@ -162,6 +190,18 @@ export function Layout() {
       <main className="main">
         <Outlet />
       </main>
+
+      <ConfirmDialog
+        open={signOutOpen}
+        title="Sign out?"
+        message="You will need to sign in again to use the admin console."
+        confirmLabel="Sign out"
+        cancelLabel="Stay signed in"
+        variant="danger"
+        busy={signingOut}
+        onConfirm={() => void confirmSignOut()}
+        onCancel={() => setSignOutOpen(false)}
+      />
     </div>
   );
 }

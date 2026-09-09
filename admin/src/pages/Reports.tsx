@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { api } from "../config/api";
+import { EmptyState, PageHeader, useToast } from "../components/ui";
+import { extractApiError } from "../utils/apiError";
 
 type ReportMetrics = {
   loansCreated: number;
@@ -57,6 +59,7 @@ const METRIC_LABELS: { key: keyof ReportMetrics; label: string }[] = [
 ];
 
 export function ReportsPage() {
+  const { showToast } = useToast();
   const [from, setFrom] = useState(() => daysAgoLocalIso(30));
   const [to, setTo] = useState(() => todayLocalIso());
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
@@ -64,70 +67,78 @@ export function ReportsPage() {
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const loadSummary = useCallback(async (fromDate: string, toDate: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data } = await api.get<SummaryResponse>("/api/admin/reports/summary", {
-        params: { from: fromDate, to: toDate },
-      });
-      setSummary(data);
-    } catch {
-      setError("Failed to load report summary");
-      setSummary(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const loadSummary = useCallback(
+    async (fromDate: string, toDate: string) => {
+      if (fromDate > toDate) {
+        const msg = "From date must be on or before To date.";
+        setError(msg);
+        showToast(msg, "error");
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await api.get<SummaryResponse>("/api/admin/reports/summary", {
+          params: { from: fromDate, to: toDate },
+        });
+        setSummary(data);
+        showToast("Report summary loaded", "success");
+      } catch (err) {
+        const msg = extractApiError(err, "Failed to load report summary");
+        setError(msg);
+        setSummary(null);
+        showToast(msg, "error");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [showToast]
+  );
 
   function onLoad(e: FormEvent) {
     e.preventDefault();
     void loadSummary(from, to);
   }
 
-  async function downloadCsv() {
-    setExporting("csv");
-    setError(null);
-    try {
-      const response = await api.get("/api/admin/reports/export.csv", {
-        params: { from, to },
-        responseType: "blob",
-      });
-      const blob = new Blob([response.data], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `dlms-report-${from}-${to}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      setError("Failed to download CSV");
-    } finally {
-      setExporting(null);
+  async function download(kind: "csv" | "pdf") {
+    if (from > to) {
+      const msg = "From date must be on or before To date.";
+      setError(msg);
+      showToast(msg, "error");
+      return;
     }
-  }
-
-  async function downloadPdf() {
-    setExporting("pdf");
+    setExporting(kind);
     setError(null);
     try {
-      const response = await api.get("/api/admin/reports/export.pdf", {
-        params: { from, to },
-        responseType: "blob",
+      const response = await api.get(
+        kind === "csv" ? "/api/admin/reports/export.csv" : "/api/admin/reports/export.pdf",
+        {
+          params: { from, to },
+          responseType: "blob",
+        }
+      );
+      const blob = new Blob([response.data], {
+        type: kind === "csv" ? "text/csv;charset=utf-8" : "application/pdf",
       });
-      const blob = new Blob([response.data], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `dlms-report-${from}-${to}.pdf`;
+      a.download = `dlms-report-${from}-${to}.${kind}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-    } catch {
-      setError("Failed to download PDF");
+      showToast(
+        kind === "csv" ? "CSV downloaded" : "PDF downloaded",
+        "success"
+      );
+    } catch (err) {
+      const msg = extractApiError(
+        err,
+        kind === "csv" ? "Failed to download CSV" : "Failed to download PDF"
+      );
+      setError(msg);
+      showToast(msg, "error");
     } finally {
       setExporting(null);
     }
@@ -143,12 +154,12 @@ export function ReportsPage() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1>Reports</h1>
-        <p className="muted">Date-range metrics with CSV and PDF export</p>
-      </header>
+      <PageHeader
+        title="Reports"
+        subtitle="Date-range circulation metrics. CSV is spreadsheet-friendly; PDF is a printable summary."
+      />
 
-      <form className="toolbar" onSubmit={onLoad}>
+      <form className="toolbar reports-toolbar" onSubmit={onLoad}>
         <label>
           From
           <input
@@ -167,30 +178,43 @@ export function ReportsPage() {
             required
           />
         </label>
-        <button type="submit" className="btn btn-primary" disabled={loading}>
+        <button type="submit" className="btn btn-primary" disabled={loading || !!exporting}>
           {loading ? "Loading..." : "Load summary"}
         </button>
         <button
           type="button"
-          className="btn"
+          className="btn btn-soft"
           disabled={!!exporting || loading}
-          onClick={() => void downloadCsv()}
+          onClick={() => void download("csv")}
         >
           {exporting === "csv" ? "Downloading..." : "Download CSV"}
         </button>
         <button
           type="button"
-          className="btn"
+          className="btn btn-soft"
           disabled={!!exporting || loading}
-          onClick={() => void downloadPdf()}
+          onClick={() => void download("pdf")}
         >
           {exporting === "pdf" ? "Downloading..." : "Download PDF"}
         </button>
       </form>
 
+      <p className="muted small reports-note">
+        CSV includes daily series and totals for the selected range. PDF is a compact printable
+        overview of the same metrics.
+      </p>
+
       {error ? <p className="error-banner">{error}</p> : null}
 
-      {summary ? (
+      {loading ? (
+        <div className="stat-grid">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="stat-card skeleton-card" />
+          ))}
+        </div>
+      ) : null}
+
+      {summary && !loading ? (
         <>
           <p className="muted">
             Showing {summary.from} to {summary.to}
@@ -226,7 +250,9 @@ export function ReportsPage() {
                 ))}
                 {summary.series.length === 0 ? (
                   <tr>
-                    <td colSpan={4}>No daily rows</td>
+                    <td colSpan={4} className="empty-cell">
+                      No daily rows in this range.
+                    </td>
                   </tr>
                 ) : null}
               </tbody>
@@ -236,7 +262,10 @@ export function ReportsPage() {
       ) : null}
 
       {!summary && !loading && !error ? (
-        <p className="muted">Choose a date range and load the summary.</p>
+        <EmptyState
+          title="Load a report range"
+          message="Choose From and To dates, then load the summary. You can export CSV or PDF for the same range."
+        />
       ) : null}
     </div>
   );

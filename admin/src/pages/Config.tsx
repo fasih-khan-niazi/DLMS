@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, API_BASE_URL } from "../config/api";
+import { PageHeader, useToast } from "../components/ui";
+import { extractApiError } from "../utils/apiError";
 
 type SystemConfig = {
   maxBorrowLimit?: number;
@@ -31,7 +33,6 @@ const defaults: SystemConfig = {
   catalogPageSize: 10,
 };
 
-/** Human labels used when the connected API cannot store a setting. */
 const FIELD_LABELS: Record<string, string> = {
   allowInAppCopyBorrow: "Allow in-app copy borrow/return",
   librariansCanBorrow: "Librarians can borrow physical books",
@@ -45,17 +46,16 @@ function labelFor(field: string) {
   return FIELD_LABELS[field] || field;
 }
 
-/** Settings added after the Week 1 API; used to detect an outdated backend. */
 const TOGGLE_FIELDS = ["allowInAppCopyBorrow", "librariansCanBorrow"] as const;
 
 export function ConfigPage() {
+  const { showToast } = useToast();
   const [form, setForm] = useState<SystemConfig>(defaults);
   const [reminderText, setReminderText] = useState("2,1");
   const [daysOffText, setDaysOffText] = useState("Sunday");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [unsupported, setUnsupported] = useState<string[]>([]);
 
   useEffect(() => {
@@ -89,8 +89,6 @@ export function ConfigPage() {
           librariansCanBorrow: data.config?.librariansCanBorrow !== false,
         };
 
-        // An API that does not advertise a field cannot store it. Flag it now
-        // rather than letting the control appear to save and then revert.
         if (Array.isArray(data.supportedFields)) {
           const missing = TOGGLE_FIELDS.filter((f) => !data.supportedFields!.includes(f));
           setUnsupported(missing);
@@ -105,8 +103,12 @@ export function ConfigPage() {
           : String(cfg.reminderDaysBefore ?? "2,1");
         setReminderText(reminders);
         setDaysOffText((cfg.workingDaysOff || ["Sunday"]).join(","));
-      } catch {
-        if (!cancelled) setError("Failed to load config");
+      } catch (err) {
+        if (!cancelled) {
+          const msg = extractApiError(err, "Failed to load config");
+          setError(msg);
+          showToast(msg, "error");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -114,18 +116,47 @@ export function ConfigPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showToast]);
 
   function updateNumber(field: keyof SystemConfig, value: string) {
     const n = Number(value);
     setForm((prev) => ({ ...prev, [field]: Number.isFinite(n) ? n : 0 }));
   }
 
+  function validate(): string | null {
+    if ((form.maxBorrowLimit ?? 0) < 1) return "Max borrow limit must be at least 1.";
+    if ((form.loanPeriodDays ?? 0) < 1) return "Loan period must be at least 1 day.";
+    if ((form.finePerDayRs ?? -1) < 0) return "Fine per day cannot be negative.";
+    if ((form.reservationHoldHours ?? 0) < 1) {
+      return "Reservation hold must be at least 1 hour.";
+    }
+    if ((form.maxPdfSizeMb ?? 0) < 1) return "Max PDF size must be at least 1 MB.";
+    const pageSize = form.catalogPageSize ?? 10;
+    if (pageSize < 5 || pageSize > 50) return "Catalog page size must be between 5 and 50.";
+    if (!(form.timezone || "").trim()) return "Timezone is required.";
+
+    const reminders = reminderText
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (reminders.length === 0) return "Enter at least one reminder day offset.";
+    if (reminders.some((s) => !Number.isFinite(Number(s)) || Number(s) < 0)) {
+      return "Reminder days must be non-negative numbers (example: 2,1).";
+    }
+    return null;
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      showToast(validationError, "error");
+      return;
+    }
+
     setSaving(true);
     setError(null);
-    setMessage(null);
     try {
       const reminderDaysBefore = reminderText
         .split(",")
@@ -164,8 +195,6 @@ export function ConfigPage() {
         librariansCanBorrow: data.config?.librariansCanBorrow !== false,
       };
 
-      // Verify the server actually stored what we sent. Anything it did not
-      // acknowledge is reported instead of silently snapping back.
       const applied = Array.isArray(data.appliedFields) ? data.appliedFields : null;
       const dropped = applied
         ? Object.keys(payload).filter((key) => !applied.includes(key))
@@ -176,16 +205,19 @@ export function ConfigPage() {
 
       if (dropped.length > 0) {
         setUnsupported(dropped);
-        setError(
+        const msg =
           `Saved, but this API rejected ${dropped.length} setting(s): ` +
-            `${dropped.map(labelFor).join(", ")}. The API at ${API_BASE_URL} is older than this portal.`
-        );
+          `${dropped.map(labelFor).join(", ")}.`;
+        setError(msg);
+        showToast("Saved with partial support from this API", "info");
       } else {
         setUnsupported([]);
-        setMessage("Configuration saved successfully.");
+        showToast("Configuration saved", "success");
       }
-    } catch {
-      setError("Failed to save config");
+    } catch (err) {
+      const msg = extractApiError(err, "Failed to save config");
+      setError(msg);
+      showToast(msg, "error");
     } finally {
       setSaving(false);
     }
@@ -194,10 +226,7 @@ export function ConfigPage() {
   if (loading) {
     return (
       <div className="page">
-        <header className="page-header">
-          <h1>Configuration</h1>
-          <p className="muted">Loading system settings...</p>
-        </header>
+        <PageHeader title="Configuration" subtitle="Loading system settings..." />
         <div className="skeleton-stack">
           <div className="skeleton-block" />
           <div className="skeleton-block" />
@@ -209,15 +238,12 @@ export function ConfigPage() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <h1>Configuration</h1>
-        <p className="muted">
-          Grouped system settings for loans, fines, reservations, calendar, and digital library.
-        </p>
-        <p className="muted small">Connected API: {API_BASE_URL}</p>
-      </header>
+      <PageHeader
+        title="Configuration"
+        subtitle="Grouped system settings for loans, fines, reservations, calendar, and digital library."
+        actions={<span className="pill muted-pill mono">{API_BASE_URL}</span>}
+      />
 
-      {message ? <p className="success-banner">{message}</p> : null}
       {error ? <p className="error-banner">{error}</p> : null}
       {unsupported.length > 0 ? (
         <p className="error-banner">
@@ -260,7 +286,12 @@ export function ConfigPage() {
                   setForm((p) => ({ ...p, librariansCanBorrow: e.target.checked }))
                 }
               />
-              Librarians can borrow physical books
+              <span>
+                Librarians can borrow physical books
+                <span className="muted small" style={{ display: "block", fontWeight: 400 }}>
+                  Off cancels librarian reservations and limits Scan to returns only.
+                </span>
+              </span>
             </label>
             <label className="checkbox-row config-span">
               <input
@@ -271,10 +302,15 @@ export function ConfigPage() {
                   setForm((p) => ({ ...p, allowInAppCopyBorrow: e.target.checked }))
                 }
               />
-              Allow in-app copy borrow/return (Scan remains primary; default off)
-              {unsupported.includes("allowInAppCopyBorrow") ? (
-                <span className="muted small"> (not supported by the connected API)</span>
-              ) : null}
+              <span>
+                Allow in-app copy borrow/return
+                <span className="muted small" style={{ display: "block", fontWeight: 400 }}>
+                  Scan remains primary. Default is off.
+                  {unsupported.includes("allowInAppCopyBorrow")
+                    ? " Not supported by the connected API."
+                    : ""}
+                </span>
+              </span>
             </label>
           </div>
         </section>

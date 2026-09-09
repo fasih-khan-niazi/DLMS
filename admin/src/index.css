@@ -23,6 +23,8 @@
   --shadow-auth: 0 22px 55px rgba(0, 0, 0, 0.24);
   --font: "Poppins", "Segoe UI", "Helvetica Neue", sans-serif;
   --font-display: "Poppins", "Segoe UI", sans-serif;
+  --surface: #ffffff;
+  --table-head: #ebe8e1;
 
   font-family: var(--font);
   line-height: 1.45;
@@ -31,6 +33,77 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+}
+
+/* Match mobile darkTokens */
+html[data-theme="dark"] {
+  --navy: #d7e4f0;
+  --navy-dark: #a8bdd0;
+  --cream: #1a2834;
+  --cream-dark: #141f28;
+  --amber: #e8a838;
+  --amber-dark: #f0c05a;
+  --text: #e8edf2;
+  --muted: #9aa8b5;
+  --border: #2f4050;
+  --white: #243444;
+  --danger: #f97066;
+  --success: #3dd68c;
+  --warning: #f5a524;
+  --overlay: rgba(0, 0, 0, 0.35);
+  --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.35);
+  --shadow-auth: 0 22px 55px rgba(0, 0, 0, 0.5);
+  --surface: #243444;
+  --table-head: #1f2f3c;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] .sidebar {
+  background: linear-gradient(180deg, #141f28 0%, #0f1820 100%);
+}
+
+html[data-theme="dark"] .nav-link.active {
+  color: #1a2834;
+}
+
+html[data-theme="dark"] .auth-shell {
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(232, 168, 56, 0.12), transparent 45%),
+    linear-gradient(145deg, #0f1820 0%, #1a2834 48%, #243444 100%);
+}
+
+html[data-theme="dark"] .auth-panel,
+html[data-theme="dark"] .dialog-card {
+  background: var(--cream);
+}
+
+html[data-theme="dark"] .toast-success {
+  background: #1c3328;
+}
+
+html[data-theme="dark"] .toast-error {
+  background: #3a2424;
+}
+
+html[data-theme="dark"] .toast-info {
+  background: #243444;
+}
+
+html[data-theme="dark"] .error-banner {
+  background: #3a2424;
+  border-color: #5c3030;
+}
+
+html[data-theme="dark"] .success-banner {
+  background: #1c3328;
+  border-color: #2f5a40;
+}
+
+html[data-theme="dark"] .attention-card.tone-danger,
+html[data-theme="dark"] .attention-card.tone-warning,
+html[data-theme="dark"] .attention-card.tone-amber {
+  background: var(--surface);
 }
 
 *,
@@ -359,7 +432,7 @@ select {
   padding: 0.55rem 0.9rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background: var(--white);
+  background: var(--surface);
   color: var(--navy);
   font-weight: 600;
   font-size: 0.9rem;
@@ -369,6 +442,38 @@ select {
 .quick-link:hover {
   background: rgba(232, 168, 56, 0.12);
   border-color: rgba(232, 168, 56, 0.45);
+}
+
+.reports-toolbar {
+  align-items: flex-end;
+}
+
+.reports-note {
+  margin: -0.35rem 0 1rem;
+}
+
+.sidebar-footer .btn-ghost + .btn-ghost {
+  margin-top: 0.45rem;
+}
+
+@media (max-width: 720px) {
+  .reports-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reports-toolbar label {
+    width: 100%;
+  }
+
+  .table-wrap {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .page-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }
 
 .status-pill {
@@ -398,7 +503,7 @@ select {
 .empty-state {
   text-align: center;
   padding: 2.5rem 1.25rem;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
@@ -851,7 +956,7 @@ select {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 0.72rem 0.85rem;
-  background: #fff;
+  background: var(--surface);
   font-weight: 400;
   color: var(--text);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -965,7 +1070,8 @@ table select {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 0.55rem 0.7rem;
-  background: #fff;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .toolbar label {
@@ -995,7 +1101,7 @@ table select {
 }
 
 .config-section {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 1.1rem 1.2rem 1.25rem;
@@ -1076,7 +1182,7 @@ table select {
 }
 
 .stat-card {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 1rem 1.1rem;
@@ -1111,7 +1217,7 @@ table select {
 
 .table-wrap {
   overflow-x: auto;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
@@ -1131,7 +1237,7 @@ td {
 }
 
 th {
-  background: var(--cream-dark);
+  background: var(--table-head);
   color: var(--navy);
   font-weight: 600;
 }
