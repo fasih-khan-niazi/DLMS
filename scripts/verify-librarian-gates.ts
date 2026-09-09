@@ -1,15 +1,4 @@
-﻿/**
- * Librarian borrow/reserve gates.
- *
- * When librariansCanBorrow is off, a librarian must get 403 on borrow and
- * reserve. A student must not get that same error for the same endpoints
- * (they may get 409 for other business reasons â€” that is still a pass).
- *
- * Restores the original config flag.
- *
- * Usage (from api/):
- *   npx tsx scripts/verify-librarian-gates.ts [apiBaseUrl]
- */
+/** ye script librarian borrow/reserve gates verify karta hai */
 import axios, { type AxiosInstance } from "axios";
 import { auth, db } from "../api/src/config/firebase";
 
@@ -54,11 +43,11 @@ async function main() {
   const copyId = copies.docs[0].id;
   const isbn = String(copies.docs[0].data().isbn || "");
 
+  // In-app borrow on taake librarian role check tak pahunchein
   const cfgRef = db.collection("config").doc("system");
   const cfgSnap = await cfgRef.get();
   const original = cfgSnap.data()?.librariansCanBorrow;
   const originalInApp = cfgSnap.data()?.allowInAppCopyBorrow;
-  // In-app borrow must be on so we reach the librarian role check, not the scan-only gate.
   await cfgRef.set({ librariansCanBorrow: false, allowInAppCopyBorrow: true }, { merge: true });
 
   const lib = await client(librarian.id);
@@ -96,7 +85,6 @@ async function main() {
           await stu.post("/api/loans/return", { copyId });
           console.log("   returned accidental student loan");
         } catch {
-          /* ignore */
         }
       }
     }

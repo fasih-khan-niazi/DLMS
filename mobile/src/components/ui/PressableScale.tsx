@@ -3,15 +3,14 @@ import { Pressable, type PressableProps, type StyleProp, type ViewStyle } from "
 import * as Haptics from "../../utils/haptics";
 import { useTheme } from "../../theme";
 
+// tap pe scale + optional haptic
 type Props = PressableProps & {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   haptic?: "light" | "selection" | "none";
-  /** Opacity dip only. No glow, no haptic. Use on dense menu rows. */
   quiet?: boolean;
 };
 
-/** Shared tap: light haptic, slight scale, theme-aware glow. Use on cards and chips. */
 export function PressableScale({
   children,
   style,

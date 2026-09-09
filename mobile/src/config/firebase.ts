@@ -17,6 +17,7 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApps()[0]! : initializeApp(firebaseConfig);
 
+// Firebase Auth - RN AsyncStorage pe session save (SDK 54 direct import)
 function createAuth() {
   try {
     return initializeAuth(app, {

@@ -1,5 +1,6 @@
 import type { PaginatedResponse } from "../types/pagination";
 
+// physical catalog list ka cache
 const TTL_MS = 90 * 1000;
 
 type CacheEntry<T> = {

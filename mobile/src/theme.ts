@@ -1,4 +1,4 @@
-/** @deprecated Import from `./theme/index` or `./theme` folder. Kept for existing imports. */
+// purana import path - naya code theme/index use kare
 export {
   colors,
   type,

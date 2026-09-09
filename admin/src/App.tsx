@@ -1,11 +1,14 @@
+// routes + auth gate - protected pages Layout ke andar
 import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { ToastProvider } from "./components/ui";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CatalogPage } from "./pages/Catalog";
 import { ConfigPage } from "./pages/Config";
 import { DashboardPage } from "./pages/Dashboard";
 import { FinesPage } from "./pages/Fines";
+import { LoansPage } from "./pages/Loans";
 import { LoginPage } from "./pages/Login";
 import { ForgotPasswordPage } from "./pages/ForgotPassword";
 import { ReportsPage } from "./pages/Reports";
@@ -17,8 +20,11 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (loading) {
     return (
-      <div className="auth-shell">
-        <p className="auth-loading">Loading...</p>
+      <div className="auth-shell auth-shell-loading">
+        <div className="auth-loading-card">
+          <div className="auth-loading-spinner" aria-hidden />
+          <p>Loading DLMS Admin...</p>
+        </div>
       </div>
     );
   }
@@ -33,29 +39,32 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<DashboardPage />} />
-            <Route path="users" element={<UsersPage />} />
-            <Route path="catalog" element={<CatalogPage />} />
-            <Route path="config" element={<ConfigPage />} />
-            <Route path="reservations" element={<ReservationsPage />} />
-            <Route path="fines" element={<FinesPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<DashboardPage />} />
+              <Route path="users" element={<UsersPage />} />
+              <Route path="catalog" element={<CatalogPage />} />
+              <Route path="loans" element={<LoansPage />} />
+              <Route path="config" element={<ConfigPage />} />
+              <Route path="reservations" element={<ReservationsPage />} />
+              <Route path="fines" element={<FinesPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </ToastProvider>
     </AuthProvider>
   );
 }

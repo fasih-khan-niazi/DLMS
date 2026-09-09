@@ -1,4 +1,4 @@
-/** Navigate from Activity / nested screens to the Catalog tab. */
+// nested screens se Catalog tab pe navigate
 export function goToCatalogTab(navigation: { navigate: (...args: any[]) => void; getParent?: () => any }) {
   const tryNav = (nav: any) => {
     if (!nav?.navigate) return false;

@@ -26,6 +26,7 @@ type Props = {
   embedded?: boolean;
 };
 
+// ye screen student reservations dikhati hai
 export default function ReservationsScreen({ navigation, embedded }: Props) {
   const { colors, fontFamily, space, type } = useTheme();
   const [items, setItems] = useState<any[]>([]);
@@ -78,7 +79,7 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
       return;
     }
 
-    // Server committed the cancel. Report success, then reconcile the views.
+    // cancel server pe ho gaya - pehle success, phir list refresh
     setCancelling(false);
     setCancelId(null);
     setFeedback({
@@ -88,7 +89,7 @@ export default function ReservationsScreen({ navigation, embedded }: Props) {
     });
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
-    // Cancelling can free a held copy, so catalog availability may change.
+    // cancel se copy free ho sakti hai - catalog cache clear
     runSideEffect(invalidateCatalogCache);
     void load();
   };

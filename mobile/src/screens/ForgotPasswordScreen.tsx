@@ -19,6 +19,7 @@ type Feedback = {
   message: string;
 } | null;
 
+// ye screen password reset hai
 export default function ForgotPasswordScreen({ navigation, route }: Props) {
   const { colors, fontFamily, type, space } = useTheme();
   const [email, setEmail] = useState(route.params?.email || "");

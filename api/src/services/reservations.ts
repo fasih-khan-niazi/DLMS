@@ -2,6 +2,7 @@ import { db } from "../config/firebase";
 import { getSystemConfig } from "./loans";
 import { notifyUser } from "./notifications";
 
+// Reservation queue: waiting -> ready hold -> borrow, plus heal/expire
 const HOUR_MS = 60 * 60 * 1000;
 
 export function normalizeIsbn(isbn: string): string {
@@ -24,7 +25,8 @@ type WaitingRow = {
   createdAt?: any;
 };
 
-/** FIFO waiters for an ISBN (in-memory sort — no composite index required beyond equality). */
+
+// ISBN ki waiting list FIFO order mein
 export async function listWaitingReservations(isbn: string): Promise<WaitingRow[]> {
   const normalized = normalizeIsbn(isbn);
   let docs = (
@@ -35,7 +37,7 @@ export async function listWaitingReservations(isbn: string): Promise<WaitingRow[
       .get()
   ).docs;
 
-  // Legacy rows may store hyphenated ISBN while catalog/copies use normalized
+
   if (docs.length === 0) {
     const allWaiting = await db.collection("reservations").where("status", "==", "waiting").get();
     docs = allWaiting.docs.filter(
@@ -78,7 +80,7 @@ export async function getNextWaitingReservation(
   return next || null;
 }
 
-/** 1-based queue position among current waiting reservations for an ISBN. */
+
 export async function computeQueuePosition(
   isbn: string,
   reservationId: string
@@ -96,15 +98,13 @@ export type AssignResult = {
   holdHours: number;
 };
 
-/**
- * Atomically: waiting reservation → ready + copy → reserved for that user.
- * Only assigns when the copy is currently `available`.
- */
+
+// Available copy ko next waiter ko assign (ready hold)
 export async function assignCopyToNextReservation(input: {
   copyId: string;
   isbn: string;
   title?: string;
-  /** Skip this user (e.g. the person who just returned the copy). */
+
   excludeUserId?: string;
 }): Promise<AssignResult | null> {
   const isbn = normalizeIsbn(input.isbn);
@@ -143,7 +143,7 @@ export async function assignCopyToNextReservation(input: {
     if (normalizeIsbn(String(copy.isbn || "")) !== isbn) {
       throw new Error("COPY_ISBN_MISMATCH");
     }
-    // Strict: only free shelf copies can be held for the queue
+
     if (copy.status !== "available") {
       throw new Error("COPY_NOT_AVAILABLE");
     }
@@ -191,7 +191,7 @@ export async function assignCopyToNextReservation(input: {
       dedupeKey: `reservation_ready_${next.id}`,
     });
   } catch (error) {
-    // Hold is already committed — never roll back because push/inbox failed
+
     console.error("[reservations] notify ready failed (hold still active):", error);
   }
 
@@ -204,12 +204,8 @@ export async function assignCopyToNextReservation(input: {
   };
 }
 
-/**
- * Heal drift for one ISBN:
- * - Orphan `reserved` copies (no matching ready reservation) → free
- * - Ready reservations pointing at missing/wrong copies → expire/fix
- * - Available copies + waiting queue → assign FIFO
- */
+
+// Orphan reserved copies aur waiting queue heal karo (ek ISBN)
 export async function reconcileReservationsForIsbn(
   isbnRaw: string,
   opts?: { excludeUserId?: string; title?: string }
@@ -228,7 +224,7 @@ export async function reconcileReservationsForIsbn(
   let copyDocs = (
     await db.collection("bookCopies").where("isbn", "==", isbn).get()
   ).docs;
-  // Legacy copies may still store hyphenated ISBN
+
   if (copyDocs.length === 0) {
     const allCopies = await db.collection("bookCopies").get();
     copyDocs = allCopies.docs.filter(
@@ -264,7 +260,7 @@ export async function reconcileReservationsForIsbn(
     );
   }
 
-  // Doc id must win over any `id` field stored in the document body
+
   const copies: any[] = copyDocs.map((doc) => {
     const data = doc.data() as Record<string, any>;
     return { ...data, id: doc.id };
@@ -279,7 +275,7 @@ export async function reconcileReservationsForIsbn(
     .filter((r) => r.status === "waiting")
     .sort((a, b) => createdAtMs(a.createdAt) - createdAtMs(b.createdAt));
 
-  // 1) Heal reserved copies that have no matching ready reservation
+
   for (const copy of copies) {
     if (copy.status !== "reserved") continue;
     const holder = String(copy.reservedForUserId || "");
@@ -290,7 +286,7 @@ export async function reconcileReservationsForIsbn(
     });
     if (match) continue;
 
-    // Promote waiting reservation: prefer holder match, else FIFO head
+
     const waiter = holder
       ? waiting.find((r) => String(r.userId || "") === holder)
       : waiting[0];
@@ -340,7 +336,7 @@ export async function reconcileReservationsForIsbn(
       } catch (error) {
         console.error("[reconcile] notify after promote failed:", error);
       }
-      // Remove from local waiting list so we don't assign twice
+
       const wi = waiting.findIndex((r) => r.id === waiter.id);
       if (wi >= 0) waiting.splice(wi, 1);
       fixedReady += 1;
@@ -348,7 +344,7 @@ export async function reconcileReservationsForIsbn(
       continue;
     }
 
-    // Truly orphan → free for shelf or next waiter
+
     await db.runTransaction(async (tx) => {
       const copyRef = db.collection("bookCopies").doc(copy.id);
       const catalogRef = db.collection("catalog").doc(isbn);
@@ -375,11 +371,11 @@ export async function reconcileReservationsForIsbn(
     freedOrphans += 1;
   }
 
-  // 2) Assign available copies to waiting queue (FIFO)
+
   const availableCopyIds = copies
     .filter((c) => c.status === "available")
     .map((c) => String(c.id));
-  // Re-read after orphan free (those copies are now available)
+
   for (const copyId of availableCopyIds) {
     try {
       const result = await assignCopyToNextReservation({
@@ -395,7 +391,7 @@ export async function reconcileReservationsForIsbn(
       break;
     }
   }
-  // Copies just freed from orphan holds
+
   for (let i = 0; i < 20; i += 1) {
     const available = await db
       .collection("bookCopies")
@@ -421,7 +417,7 @@ export async function reconcileReservationsForIsbn(
     }
   }
 
-  // 3) Recompute catalog counters from copies (hardens drift)
+
   const freshCopies = await db.collection("bookCopies").where("isbn", "==", isbn).get();
   let availableCount = 0;
   let issuedCount = 0;
@@ -448,7 +444,8 @@ export async function reconcileReservationsForIsbn(
   return { assigned, freedOrphans, fixedReady, waitingLeft };
 }
 
-/** Cancel waiting/ready reservations when a title is deactivated; notify students. */
+
+// Title deactivate hone par waiting/ready cancel + notify
 export async function cancelReservationsForDeactivatedTitle(input: {
   isbn: string;
   title: string;
@@ -527,7 +524,8 @@ export async function cancelReservationsForDeactivatedTitle(input: {
   return cancelled;
 }
 
-/** Cancel waiting/ready physical reservations for all librarians (e.g. when borrow is disabled). */
+
+// Librarians ki physical reservations cancel (borrow disable pe)
 export async function cancelLibrarianReservations() {
   const librariansSnap = await db.collection("users").where("role", "==", "librarian").get();
   if (librariansSnap.empty) return 0;
@@ -607,16 +605,14 @@ export async function cancelLibrarianReservations() {
   return cancelled;
 }
 
-/** If copies are available while people are waiting, hold for the next waiter. */
+
 export async function fulfillWaitingWithAvailableCopies(isbn: string) {
   const result = await reconcileReservationsForIsbn(isbn);
   return result.assigned;
 }
 
-/**
- * Expire ready holds past expiresAt.
- * Copy is then reassigned to the next waiter, or marked available.
- */
+
+// Ready hold expire hone ke baad copy free / next waiter
 export async function expireReadyReservationHolds() {
   const now = new Date();
   const snap = await db.collection("reservations").where("status", "==", "ready").get();
@@ -718,17 +714,15 @@ export async function expireReadyReservationHolds() {
   return { expired, reassigned, freed };
 }
 
-/**
- * Expire overdue ready holds, then heal waiting queues.
- * Used by cron and on API boot so a local restart still clears stale holds.
- */
+
+// Cron: expire holds, phir saari waiting queues heal
 export async function runCirculationMaintenance() {
   const expiry = await expireReadyReservationHolds();
   const queues = await reconcileAllWaitingQueues();
   return { expiry, queues };
 }
 
-/** Sweep titles that still have waiting reservations (heals missed return fulfills). */
+
 export async function reconcileAllWaitingQueues() {
   const snap = await db.collection("reservations").where("status", "==", "waiting").get();
   const isbns = Array.from(

@@ -1,9 +1,4 @@
-﻿/**
- * Operator helper: force-return a specific copy through the real API.
- * Used to clear a copy left issued by an interrupted test run.
- *
- * Usage (from api/): npx tsx scripts/return-copy.ts <copyId>
- */
+/** ye helper ek copy ko API se force-return karta hai */
 import axios from "axios";
 import { auth, db } from "../api/src/config/firebase";
 

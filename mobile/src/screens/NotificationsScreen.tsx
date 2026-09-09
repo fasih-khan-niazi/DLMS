@@ -19,6 +19,7 @@ type Props = {
   navigation: NativeStackNavigationProp<any>;
 };
 
+// ye screen notifications inbox dikhati hai
 export default function NotificationsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, fontFamily, radius, space, type, mode } = useTheme();
@@ -55,7 +56,6 @@ export default function NotificationsScreen({ navigation }: Props) {
       await api.patch(`/api/notifications/${id}/read`);
       setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     } catch {
-      // still allow navigation
     }
   };
 
@@ -65,7 +65,6 @@ export default function NotificationsScreen({ navigation }: Props) {
       await api.post("/api/notifications/read-all");
       setItems((prev) => prev.map((n) => ({ ...n, read: true })));
     } catch {
-      // keep current state
     }
   };
 

@@ -1,6 +1,6 @@
 import { createCanvas } from "@napi-rs/canvas";
 
-/** Render the first page of a PDF buffer to a JPEG thumbnail. */
+// PDF ki pehli page se JPEG cover banata hai
 export async function renderPdfFirstPageToJpeg(pdfBuffer: Buffer): Promise<Buffer> {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const loadingTask = pdfjs.getDocument({

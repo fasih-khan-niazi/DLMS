@@ -7,6 +7,7 @@ import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
 
+// Firebase Admin setup - Firestore, Auth, Storage, FCM yahan se milte hain
 dotenv.config();
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -23,7 +24,7 @@ function loadCredential() {
     }
   }
 
-  // Render has no secrets/ folder. PATH from a copied local .env will crash deploy.
+  // Render pe secrets folder nahi hota - JSON env use karo
   if (process.env.RENDER === "true") {
     throw new Error(
       "On Render, set FIREBASE_SERVICE_ACCOUNT_JSON to the full service account JSON. Remove FIREBASE_SERVICE_ACCOUNT_PATH."

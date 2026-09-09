@@ -1,7 +1,7 @@
 import multer from "multer";
 import path from "path";
 
-/** Absolute ceiling; real limit comes from config.maxPdfSizeMb in the upload route. */
+// PDF upload ceiling - asli limit route mein config.maxPdfSizeMb se aati hai
 const ABSOLUTE_MAX_PDF_BYTES = 100 * 1024 * 1024;
 
 export const uploadPdf = multer({

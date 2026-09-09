@@ -1,4 +1,4 @@
-/** Case-insensitive substring match across title, authors, ISBN, and keywords. */
+// Title, authors, ISBN, keywords mein case-insensitive search
 export function matchesTextQuery(
   fields: {
     title?: string;

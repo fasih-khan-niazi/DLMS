@@ -1,9 +1,4 @@
-/**
- * Desk fine collection: lookup, partial/full pay, return blocked until paid.
- *
- * Restores copies and config. Usage (from repo root):
- *   npx tsx scripts/verify-fines-collect.ts [apiBaseUrl]
- */
+/** ye script desk fine collection (lookup, partial/full pay) verify karta hai */
 import axios, { type AxiosInstance } from "axios";
 import { auth, db } from "../api/src/config/firebase";
 
@@ -117,6 +112,7 @@ async function main() {
   let extraBorrowed: { copyId: string; isbn: string } | null = null;
 
   try {
+    // 1) Role gates
     console.log("\n1) Role gates");
     const stuLookup = await stu.get("/api/fines/lookup", { params: { email: student.email } });
     if (stuLookup.status === 403) pass("students cannot open Collect fines");
@@ -126,6 +122,7 @@ async function main() {
     if (selfLookup.status === 403) pass("librarian cannot collect their own fines");
     else fail(`librarian self lookup ${selfLookup.status} ${JSON.stringify(selfLookup.data)}`);
 
+    // 2) Borrow, backdate, fine accrue
     console.log("\n2) Borrow, backdate, accrue");
     const borrow = await stu.post("/api/loans/borrow", { copyId: book.copyId });
     if (borrow.status >= 200 && borrow.status < 300) {
@@ -192,6 +189,7 @@ async function main() {
     if (otherReturn.status === 403) pass("another student cannot return this copy");
     else fail(`other student return ${otherReturn.status} ${JSON.stringify(otherReturn.data)}`);
 
+    // 3) Partial pay - return abhi block
     console.log("\n3) Partial collection, return still blocked");
     const firstPay = Math.min(50, Math.max(1, outstanding - 1));
     const partial = await lib.post("/api/fines/collect", {
@@ -216,6 +214,7 @@ async function main() {
       fail(`return while unpaid ${blocked.status} ${JSON.stringify(blocked.data)}`);
     }
 
+    // 4) Overpay clamp phir full remaining
     console.log("\n4) Overpay clamps, then full remaining");
     const afterPartial = await lib.get("/api/fines/lookup", { params: { email: student.email } });
     const left = Number(afterPartial.data.outstanding || 0);
@@ -247,7 +246,6 @@ async function main() {
       try {
         await stu.post("/api/loans/return", { qrPayload: qrPayload(book.copyId, book.isbn) });
       } catch {
-        /* ignore */
       }
     }
     if (extraBorrowed) {
@@ -256,7 +254,6 @@ async function main() {
           qrPayload: qrPayload(extraBorrowed.copyId, extraBorrowed.isbn),
         });
       } catch {
-        /* ignore */
       }
     }
     await cfgRef.set(

@@ -1,5 +1,8 @@
+// date-range reports, charts, CSV/PDF export
 import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { api } from "../config/api";
+import { EmptyState, FilterChips, PageHeader, useToast } from "../components/ui";
+import { extractApiError } from "../utils/apiError";
 
 type ReportMetrics = {
   loansCreated: number;
@@ -23,6 +26,7 @@ type DayBucket = {
 type SummaryResponse = {
   from: string;
   to: string;
+  timeZone?: string;
   metrics: ReportMetrics;
   series: DayBucket[];
 };
@@ -56,78 +60,109 @@ const METRIC_LABELS: { key: keyof ReportMetrics; label: string }[] = [
   { key: "activeLoansNow", label: "Active loans (now)" },
 ];
 
+const PRESETS = [
+  { id: "7", label: "Last 7 days", days: 7 },
+  { id: "30", label: "Last 30 days", days: 30 },
+  { id: "90", label: "Last 90 days", days: 90 },
+  { id: "custom", label: "Custom", days: 0 },
+];
+
 export function ReportsPage() {
+  const { showToast } = useToast();
   const [from, setFrom] = useState(() => daysAgoLocalIso(30));
   const [to, setTo] = useState(() => todayLocalIso());
+  const [preset, setPreset] = useState("30");
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const loadSummary = useCallback(async (fromDate: string, toDate: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data } = await api.get<SummaryResponse>("/api/admin/reports/summary", {
-        params: { from: fromDate, to: toDate },
-      });
-      setSummary(data);
-    } catch {
-      setError("Failed to load report summary");
-      setSummary(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const loadSummary = useCallback(
+    async (fromDate: string, toDate: string) => {
+      // date range pe summary metrics
+      if (fromDate > toDate) {
+        const msg = "From date must be on or before To date.";
+        setError(msg);
+        showToast(msg, "error");
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await api.get<SummaryResponse>("/api/admin/reports/summary", {
+          params: { from: fromDate, to: toDate },
+        });
+        setSummary(data);
+        showToast("Report summary loaded", "success");
+      } catch (err) {
+        const msg = extractApiError(err, "Failed to load report summary");
+        setError(msg);
+        setSummary(null);
+        showToast(msg, "error");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [showToast]
+  );
+
+  function applyPreset(id: string) {
+    setPreset(id);
+    if (id === "custom") return;
+    const days = PRESETS.find((p) => p.id === id)?.days || 30;
+    const nextFrom = daysAgoLocalIso(days - 1);
+    const nextTo = todayLocalIso();
+    setFrom(nextFrom);
+    setTo(nextTo);
+    void loadSummary(nextFrom, nextTo);
+  }
 
   function onLoad(e: FormEvent) {
     e.preventDefault();
+    setPreset("custom");
     void loadSummary(from, to);
   }
 
-  async function downloadCsv() {
-    setExporting("csv");
-    setError(null);
-    try {
-      const response = await api.get("/api/admin/reports/export.csv", {
-        params: { from, to },
-        responseType: "blob",
-      });
-      const blob = new Blob([response.data], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `dlms-report-${from}-${to}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch {
-      setError("Failed to download CSV");
-    } finally {
-      setExporting(null);
+  // CSV ya PDF download
+  async function download(kind: "csv" | "pdf") {
+    if (from > to) {
+      const msg = "From date must be on or before To date.";
+      setError(msg);
+      showToast(msg, "error");
+      return;
     }
-  }
-
-  async function downloadPdf() {
-    setExporting("pdf");
+    setExporting(kind);
     setError(null);
     try {
-      const response = await api.get("/api/admin/reports/export.pdf", {
-        params: { from, to },
-        responseType: "blob",
+      const response = await api.get(
+        kind === "csv" ? "/api/admin/reports/export.csv" : "/api/admin/reports/export.pdf",
+        {
+          params: { from, to },
+          responseType: "blob",
+        }
+      );
+      const blob = new Blob([response.data], {
+        type: kind === "csv" ? "text/csv;charset=utf-8" : "application/pdf",
       });
-      const blob = new Blob([response.data], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `dlms-report-${from}-${to}.pdf`;
+      a.download = `dlms-report-${from}-${to}.${kind}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-    } catch {
-      setError("Failed to download PDF");
+      showToast(
+        kind === "csv" ? "CSV downloaded" : "PDF downloaded",
+        "success"
+      );
+    } catch (err) {
+      const msg = extractApiError(
+        err,
+        kind === "csv" ? "Failed to download CSV" : "Failed to download PDF"
+      );
+      setError(msg);
+      showToast(msg, "error");
     } finally {
       setExporting(null);
     }
@@ -142,19 +177,37 @@ export function ReportsPage() {
   }, [summary]);
 
   return (
-    <div className="page">
-      <header className="page-header">
-        <h1>Reports</h1>
-        <p className="muted">Date-range metrics with CSV and PDF export</p>
-      </header>
+    <div className="page reports-print">
+      <PageHeader
+        subtitle="Date-range circulation metrics. CSV is spreadsheet-friendly; PDF is a printable summary."
+        actions={
+          <button
+            type="button"
+            className="btn btn-soft no-print"
+            onClick={() => window.print()}
+          >
+            Print view
+          </button>
+        }
+      />
 
-      <form className="toolbar" onSubmit={onLoad}>
+      <FilterChips
+        chips={PRESETS.map((p) => ({ id: p.id, label: p.label }))}
+        value={preset}
+        onChange={applyPreset}
+        ariaLabel="Report range presets"
+      />
+
+      <form className="toolbar reports-toolbar no-print" onSubmit={onLoad}>
         <label>
           From
           <input
             type="date"
             value={from}
-            onChange={(e) => setFrom(e.target.value)}
+            onChange={(e) => {
+              setFrom(e.target.value);
+              setPreset("custom");
+            }}
             required
           />
         </label>
@@ -163,37 +216,54 @@ export function ReportsPage() {
           <input
             type="date"
             value={to}
-            onChange={(e) => setTo(e.target.value)}
+            onChange={(e) => {
+              setTo(e.target.value);
+              setPreset("custom");
+            }}
             required
           />
         </label>
-        <button type="submit" className="btn btn-primary" disabled={loading}>
+        <button type="submit" className="btn btn-primary" disabled={loading || !!exporting}>
           {loading ? "Loading..." : "Load summary"}
         </button>
         <button
           type="button"
-          className="btn"
+          className="btn btn-soft"
           disabled={!!exporting || loading}
-          onClick={() => void downloadCsv()}
+          onClick={() => void download("csv")}
         >
           {exporting === "csv" ? "Downloading..." : "Download CSV"}
         </button>
         <button
           type="button"
-          className="btn"
+          className="btn btn-soft"
           disabled={!!exporting || loading}
-          onClick={() => void downloadPdf()}
+          onClick={() => void download("pdf")}
         >
           {exporting === "pdf" ? "Downloading..." : "Download PDF"}
         </button>
       </form>
 
+      <p className="muted small reports-note no-print">
+        CSV includes daily series and totals for the selected range. PDF is a compact printable
+        overview of the same metrics.
+      </p>
+
       {error ? <p className="error-banner">{error}</p> : null}
 
-      {summary ? (
+      {loading ? (
+        <div className="stat-grid">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="stat-card skeleton-card" />
+          ))}
+        </div>
+      ) : null}
+
+      {summary && !loading ? (
         <>
           <p className="muted">
             Showing {summary.from} to {summary.to}
+            {summary.timeZone ? ` · ${summary.timeZone}` : ""}
           </p>
           <div className="stat-grid">
             {cards.map((card) => (
@@ -205,7 +275,7 @@ export function ReportsPage() {
           </div>
 
           <h2 className="section-title">Daily activity</h2>
-          <div className="table-wrap">
+          <div className="table-wrap sticky-head">
             <table>
               <thead>
                 <tr>
@@ -226,7 +296,9 @@ export function ReportsPage() {
                 ))}
                 {summary.series.length === 0 ? (
                   <tr>
-                    <td colSpan={4}>No daily rows</td>
+                    <td colSpan={4} className="empty-cell">
+                      No daily rows in this range.
+                    </td>
                   </tr>
                 ) : null}
               </tbody>
@@ -236,7 +308,10 @@ export function ReportsPage() {
       ) : null}
 
       {!summary && !loading && !error ? (
-        <p className="muted">Choose a date range and load the summary.</p>
+        <EmptyState
+          title="Load a report range"
+          message="Pick a preset or choose From and To dates, then load the summary. You can export CSV or PDF for the same range."
+        />
       ) : null}
     </div>
   );

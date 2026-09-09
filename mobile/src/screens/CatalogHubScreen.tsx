@@ -23,6 +23,7 @@ type Props = {
 
 const TAB_ORDER: CatalogTab[] = ["physicalCopies", "digitalCopies"];
 
+// ye screen physical / digital catalog tabs dikhati hai
 export default function CatalogHubScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, fontFamily, radius, space, type } = useTheme();

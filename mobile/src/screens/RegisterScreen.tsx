@@ -17,6 +17,7 @@ type Feedback = {
   message: string;
 } | null;
 
+// ye screen naya account register karti hai
 export default function RegisterScreen({ navigation }: Props) {
   const { space } = useTheme();
   const [displayName, setDisplayName] = useState("");

@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ExpoHaptics from "expo-haptics";
 
+// haptic on/off preference
 const KEY = "dlms.hapticsEnabled";
 
 let enabled = true;
@@ -27,7 +28,6 @@ export async function loadHapticsPreference() {
     if (raw === "0") enabled = false;
     if (raw === "1") enabled = true;
   } catch {
-    // keep default
   }
   listeners.forEach((fn) => fn(enabled));
   return enabled;
@@ -38,7 +38,6 @@ export async function setHapticsEnabled(next: boolean) {
   try {
     await AsyncStorage.setItem(KEY, next ? "1" : "0");
   } catch {
-    // still apply in-memory
   }
   listeners.forEach((fn) => fn(enabled));
 }

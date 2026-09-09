@@ -73,7 +73,7 @@ You should see `{ "service": "dlms-api", "status": "ok", ... }`.
 
 ## Free-tier note
 
-Render free services **sleep after idle**. First request after sleep can take 30–60 seconds. After wake, normal speed. Fine for demos; warn clients about the first load.
+Render free services **sleep after idle**. First request after sleep can take 30-60 seconds. After wake, normal speed. Fine for demos; warn clients about the first load.
 
 Cron jobs inside the API only run while the instance is awake. For Week 1 demos that is usually acceptable.
 

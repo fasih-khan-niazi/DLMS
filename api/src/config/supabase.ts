@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
+// Supabase client - PDF/cover files private bucket mein store hote hain
 let client: SupabaseClient | null = null;
 
 export function isSupabaseConfigured(): boolean {

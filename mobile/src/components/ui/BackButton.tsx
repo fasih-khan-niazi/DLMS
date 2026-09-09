@@ -4,15 +4,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../theme";
 import { PressableScale } from "./PressableScale";
 
+// back chevron button - har screen pe
 type Props = {
   onPress: () => void;
-  /** Use on dark overlays (e.g. scan camera). */
   light?: boolean;
   style?: ViewStyle;
   size?: number;
 };
 
-/** Shared icon-only back control. Use everywhere instead of "← Back" text. */
 export function BackButton({ onPress, light = false, style, size = 24 }: Props) {
   const { colors } = useTheme();
 

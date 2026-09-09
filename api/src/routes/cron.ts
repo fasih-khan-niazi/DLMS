@@ -3,6 +3,7 @@ import { cronAuth } from "../middleware/cronAuth";
 import { runDailyLoanNotifications } from "../services/notifications";
 import { runCirculationMaintenance } from "../services/reservations";
 
+// Manual cron trigger routes (x-cron-secret chahiye)
 const router = Router();
 
 router.use(cronAuth);

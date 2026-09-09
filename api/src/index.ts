@@ -20,6 +20,7 @@ import finesRoutes from "./routes/fines";
 import { requestLogger } from "./middleware/requestLogger";
 import { ensureUploadDirs } from "./config/storage";
 
+// DLMS API ka main entry - yahan se saari routes mount hoti hain
 ensureUploadDirs();
 
 const app = express();
@@ -28,7 +29,7 @@ const port = Number(process.env.PORT ?? 5000);
 function parseAllowedOrigins(): string[] | true {
   const raw = process.env.ALLOWED_ORIGINS?.trim();
   if (!raw || raw === "*") {
-    return true; // reflect any origin (LAN demo / Expo defaults)
+    return true;
   }
   return raw.split(",").map((s) => s.trim()).filter(Boolean);
 }

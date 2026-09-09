@@ -54,6 +54,7 @@ type Props = {
   initialQuery?: string;
 };
 
+// ye screen physical books catalog dikhati hai
 export default function CatalogScreen({
   navigation,
   embedded = false,

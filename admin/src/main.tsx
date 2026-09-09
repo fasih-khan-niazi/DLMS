@@ -1,7 +1,11 @@
+// app entry - pehle saved theme lagao phir React mount
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
+import { applyTheme, getStoredTheme } from "./utils/theme";
+
+applyTheme(getStoredTheme());
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

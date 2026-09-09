@@ -33,6 +33,7 @@ import {
 import { matchesTextQuery } from "../utils/textSearch";
 import { sortCopies } from "../utils/copies";
 
+// Physical catalog: titles, copies, covers, reviews
 const router = Router();
 
 function sortCatalogResults(items: Record<string, unknown>[], sort: string) {
@@ -60,13 +61,18 @@ function matchesAvailabilityFilter(doc: Record<string, unknown>, availability: s
 function resolveCatalogStatusFilter(
   query: Record<string, unknown>,
   isStaff: boolean
-): "active" | "inactive" {
+): "active" | "inactive" | "all" {
   const requested = String(query.catalogStatus || "active").trim().toLowerCase();
-  if (isStaff && requested === "inactive") return "inactive";
+  if (!isStaff) return "active";
+  if (requested === "inactive" || requested === "all") return requested;
   return "active";
 }
 
-function matchesCatalogStatus(doc: Record<string, unknown>, catalogStatus: "active" | "inactive") {
+function matchesCatalogStatus(
+  doc: Record<string, unknown>,
+  catalogStatus: "active" | "inactive" | "all"
+) {
+  if (catalogStatus === "all") return true;
   const active = doc.isActive !== false;
   return catalogStatus === "inactive" ? !active : active;
 }
@@ -137,7 +143,8 @@ function getAvailabilityLabel(doc: {
   return "Unavailable";
 }
 
-/** Derives catalog counters from live copy rows (the source of truth). */
+
+// Copy rows se available/issued/reserved counts derive
 function countCopyStatuses(copies: Array<{ status?: string }>) {
   let availableCount = 0;
   let issuedCount = 0;
@@ -157,7 +164,8 @@ function countCopyStatuses(copies: Array<{ status?: string }>) {
   };
 }
 
-// Lookup ISBN metadata via Google Books (manual fallback handled by client if null)
+
+// Google Books se ISBN metadata lookup
 router.get(
   "/lookup/:isbn",
   authenticate,
@@ -191,7 +199,8 @@ router.get(
   }
 );
 
-// Add or update a catalog title (ISBN + Google Books or manual fields)
+
+// Title add/update (ISBN + Google Books ya manual fields)
 router.post(
   "/books",
   authenticate,
@@ -222,7 +231,7 @@ router.post(
         try {
           metadata = await fetchBookByIsbn(cleanedIsbn);
         } catch (error) {
-          // Google Books can return 503 / timeouts; don't block save if fields are filled
+
           console.warn("Google Books unavailable during save; using provided fields.", error);
           metadata = null;
         }
@@ -291,7 +300,8 @@ router.post(
   }
 );
 
-// Add one or more physical copies for an ISBN
+
+// Physical copies add karo (1-50)
 router.post(
   "/copies",
   authenticate,
@@ -379,7 +389,8 @@ router.post(
   }
 );
 
-// Browse / search catalog
+
+// Catalog browse / search
 router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const q = String(req.query.q || "").trim().toLowerCase();
@@ -428,7 +439,7 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
         return;
       }
 
-      // Load a broad set, then substring-match so "mock" finds "Mockingbird"
+
       const snapshot = await db
         .collection("catalog")
         .orderBy("title")
@@ -493,7 +504,8 @@ router.get("/books", authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Staff: edit title, authors, description, categories, page count
+
+// Staff: title/authors/description edit
 router.patch(
   "/books/:isbn",
   authenticate,
@@ -562,7 +574,8 @@ router.patch(
   }
 );
 
-// Set cover image URL manually (librarian/admin)
+
+// Cover URL manually set
 router.patch(
   "/books/:isbn/cover",
   authenticate,
@@ -610,7 +623,8 @@ router.patch(
   }
 );
 
-// Upload cover image file (librarian/admin)
+
+// Cover image file upload (Supabase)
 router.post(
   "/books/:isbn/cover",
   authenticate,
@@ -676,7 +690,8 @@ router.post(
   }
 );
 
-// Stream uploaded cover image (authenticated — private Supabase bucket)
+
+// Cover stream (authenticated - private bucket)
 router.get("/books/:isbn/cover-image", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const isbn = normalizeIsbn(req.params.isbn as string);
@@ -703,7 +718,7 @@ router.get("/books/:isbn/cover-image", authenticate, async (req: AuthRequest, re
         servedPath = objectPath;
         break;
       } catch {
-        // try next legacy path
+
       }
     }
 
@@ -721,7 +736,8 @@ router.get("/books/:isbn/cover-image", authenticate, async (req: AuthRequest, re
   }
 });
 
-// Soft-activate / soft-deactivate a catalog title (keeps loan/reservation history)
+
+// Soft activate / deactivate title
 router.patch(
   "/books/:isbn/status",
   authenticate,
@@ -810,7 +826,8 @@ router.patch(
   }
 );
 
-// Get a single catalog title with its copies
+
+// Single title + copies (counts copies se derive)
 router.get("/books/:isbn", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const isbn = normalizeIsbn(req.params.isbn as string);
@@ -840,8 +857,7 @@ router.get("/books/:isbn", authenticate, async (req: AuthRequest, res: Response)
       })
     );
 
-    // Copy rows are the source of truth. Derive counts from them so a drifted
-    // counter can never make a returned book keep showing as issued/reserved.
+
     const liveCounts = countCopyStatuses(copies);
 
     let pendingReservationCount = 0;
@@ -854,7 +870,7 @@ router.get("/books/:isbn", authenticate, async (req: AuthRequest, res: Response)
       pendingReservationCount = reservationsSnap.size;
     }
 
-    // Self-heal stored counters in the background when they disagree.
+
     if (
       Number(data.availableCount || 0) !== liveCounts.availableCount ||
       Number(data.issuedCount || 0) !== liveCounts.issuedCount ||
@@ -893,7 +909,7 @@ router.get("/books/:isbn", authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
-// Get a single physical copy by copyId (useful for QR scan later)
+
 router.get("/copies/:copyId", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const copyId = req.params.copyId as string;

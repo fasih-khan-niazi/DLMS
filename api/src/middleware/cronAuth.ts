@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 
+// Internal cron routes ke liye x-cron-secret check
 export function cronAuth(req: Request, res: Response, next: NextFunction): void {
   const expected = process.env.CRON_SECRET;
   if (!expected || expected === "replace_me") {

@@ -13,6 +13,7 @@ import * as Haptics from "../utils/haptics";
 import { Button } from "./ui/Button";
 import { useTheme } from "../theme";
 
+// confirm / success modal - har jagah use
 export type AppModalVariant = "success" | "error" | "info" | "danger";
 
 type Props = {
@@ -22,11 +23,8 @@ type Props = {
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  /** Primary CTA style. Prefer dangerSoft for destructive confirms. */
   confirmVariant?: "primary" | "danger" | "dangerSoft" | "secondary" | "softOutline";
-  /** Secondary/cancel button style when cancelLabel is shown. */
   cancelVariant?: "ghost" | "secondary" | "softOutline";
-  /** center = outcome/confirm dialog; sheet = bottom sheet for actions. */
   presentation?: "center" | "sheet";
   confirmLoading?: boolean;
   onClose: () => void;

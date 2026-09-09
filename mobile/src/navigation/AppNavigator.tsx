@@ -38,13 +38,14 @@ import NotificationsScreen from "../screens/NotificationsScreen";
 import UnifiedSearchScreen from "../screens/UnifiedSearchScreen";
 import CollectFinesScreen from "../screens/CollectFinesScreen";
 
+// ye app navigation root hai - auth stacks aur main tabs
 const AuthStackNav = createNativeStackNavigator();
 const HomeStackNav = createNativeStackNavigator();
 const CatalogStackNav = createNativeStackNavigator();
 const ProfileStackNav = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-/** How often the librarian Scan gate is refreshed in the background. */
+// librarian Scan gate kitni der baad refresh hota hai
 const SCAN_GATE_REFRESH_MS = 30_000;
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
@@ -184,24 +185,20 @@ function MainTabNavigator() {
   const { profile, refresh } = useProfile();
   const { showToast } = useToast();
 
-  /**
-   * Synchronous snapshot of whether Scan is closed to this librarian.
-   * Kept warm in the background so a tab press never waits on the network:
-   * feedback (haptic + toast) and the block decision happen in the same tick.
-   */
+  // Scan tab librarian ke liye band hai ya nahi - background mein warm rakho
   const scanBlockedRef = useRef(false);
 
   const computeScanBlocked = useCallback(
     (librariansCanBorrow: boolean | null, activeLoans: number) => {
       if (profile?.role !== "librarian") return false;
       if (librariansCanBorrow !== false) return false;
-      // Borrowing off but loans outstanding: Scan stays open for returns only.
+      // borrow band hai lekin loans hain to return ke liye Scan open
       return activeLoans === 0;
     },
     [profile?.role]
   );
 
-  // Seed instantly from whatever config is already in memory, then revalidate.
+  // pehle memory se seed, phir server se revalidate
   useEffect(() => {
     if (profile?.role !== "librarian") {
       scanBlockedRef.current = false;
@@ -226,7 +223,7 @@ function MainTabNavigator() {
     };
   }, [profile?.role, profile?.activeBorrowCount, computeScanBlocked]);
 
-  /** Re-checks the gate against the server; resolves true when Scan may open. */
+  // server se gate dubara check - true matlab Scan open
   const revalidateScanGate = async (): Promise<boolean> => {
     invalidateAppConfigCache();
     const config = await getAppConfig(true);
@@ -241,7 +238,6 @@ function MainTabNavigator() {
       activeLoans = Number(me.data?.activeBorrowCount) || 0;
       void refresh().catch(() => {});
     } catch {
-      // fall back to the cached count
     }
 
     const blocked = computeScanBlocked(config.librariansCanBorrow, activeLoans);
@@ -322,18 +318,15 @@ function MainTabNavigator() {
         }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
-            // Not a gated user, or the gate is currently open: let the tab open
-            // natively so there is no perceptible delay.
             if (profile?.role !== "librarian" || !scanBlockedRef.current) return;
 
             e.preventDefault();
-            // Same tick as the press, so haptic and toast land together.
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(
               () => {}
             );
             showToast("Borrowing is disabled for librarians.");
 
-            // Confirm against the server; open Scan if the gate has since lifted.
+            // server confirm - gate open ho to Scan kholo
             void revalidateScanGate().then((allowed) => {
               if (allowed) navigation.navigate("Scan");
             });

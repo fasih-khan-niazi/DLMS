@@ -73,6 +73,7 @@ function greetingInKarachi(now = new Date()): string {
   return "Welcome back";
 }
 
+// ye screen home dashboard dikhati hai
 export default function HomeScreen({ navigation }: Props) {
   const { colors, fontFamily, radius, space, type, mode } = useTheme();
   const { profile, refresh: refreshProfile, isStaff } = useProfile();

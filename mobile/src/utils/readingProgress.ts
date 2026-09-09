@@ -1,4 +1,4 @@
-/** Minimum time on a page before it counts toward reading progress. */
+// page pe itna time rukna chahiye tab progress count hogi
 export const MIN_PAGE_DWELL_MS = 4000;
 
 export type ReadingProgressSnapshot = {
@@ -7,11 +7,7 @@ export type ReadingProgressSnapshot = {
   totalPages: number;
 };
 
-/**
- * Tracks meaningful reading. Rapid scroll-to-end does not instantly hit 100%.
- * A page counts only after the reader stays on it for MIN_PAGE_DWELL_MS.
- * Prior saved progress is preserved and can only increase.
- */
+// PDF reading progress - jaldi scroll se 100% nahi hoti
 export class ReadingProgressTracker {
   private currentPage = 1;
   private totalPages = 1;

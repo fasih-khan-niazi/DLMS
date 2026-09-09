@@ -33,6 +33,7 @@ const ProfileContext = createContext<ProfileContextValue>({
   refresh: async () => {},
 });
 
+// user profile ka global state
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);

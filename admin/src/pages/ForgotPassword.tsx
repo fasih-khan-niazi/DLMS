@@ -1,10 +1,13 @@
+// password reset email Firebase se bhejta hai
 import { useState, type FormEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { firebaseAuth } from "../config/firebase";
+import { useToast } from "../components/ui";
 
 export function ForgotPasswordPage() {
   const location = useLocation();
+  const { showToast } = useToast();
   const preset = (location.state as { email?: string } | null)?.email || "";
   const [email, setEmail] = useState(preset);
   const [submitting, setSubmitting] = useState(false);
@@ -24,6 +27,7 @@ export function ForgotPasswordPage() {
     try {
       await sendPasswordResetEmail(firebaseAuth, trimmed);
       setSent(true);
+      showToast("Reset link sent if that account exists", "success");
     } catch (err: unknown) {
       const code =
         err && typeof err === "object" && "code" in err
@@ -38,6 +42,7 @@ export function ForgotPasswordPage() {
       } else {
         setError("Could not send reset email. Check Firebase Auth email settings.");
       }
+      showToast("Could not send reset email", "error");
     } finally {
       setSubmitting(false);
     }
@@ -46,6 +51,7 @@ export function ForgotPasswordPage() {
   return (
     <div className="auth-shell">
       <div className="auth-hero">
+        <div className="auth-hero-glow" aria-hidden />
         <p className="auth-eyebrow">Account recovery</p>
         <h1 className="auth-brand">DLMS</h1>
         <p className="auth-lede">
@@ -55,7 +61,9 @@ export function ForgotPasswordPage() {
       </div>
 
       <form className="auth-panel" onSubmit={(e) => void onSubmit(e)}>
-        <h2>Forgot password</h2>
+        <div className="auth-panel-head">
+          <h2>Forgot password</h2>
+        </div>
         {sent ? (
           <>
             <p className="success-banner">
@@ -69,8 +77,8 @@ export function ForgotPasswordPage() {
         ) : (
           <>
             <p className="muted">
-              Uses Firebase Auth email link (not a custom OTP). Configure the email
-              template under Firebase Console Authentication.
+              Uses the Firebase Auth email link. Configure the template under Firebase
+              Console Authentication.
             </p>
             {error ? <p className="error-banner">{error}</p> : null}
             <label>
@@ -80,6 +88,7 @@ export function ForgotPasswordPage() {
                 autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@example.com"
                 required
               />
             </label>

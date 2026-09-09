@@ -21,7 +21,7 @@ No em dashes in UI copy.
 
 | Phase | Name | Scope items | Risk |
 |-------|------|-------------|------|
-| 0 | Baseline | — | Low |
+| 0 | Baseline | - | Low |
 | 1 | Design foundation | 1, 2, 3, 5 (light first) | Low |
 | 2 | API pagination | 9 (backend) | Medium |
 | 3 | Navigation and IA | 7, 13, 6 (shell) | Medium |
@@ -260,7 +260,7 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 
 ## Phase 9b: In-app reader and smart progress (14 extended)
 
-**Status:** Parked (2026-08-24) — vertical + page modes, pinch zoom, landscape settings, quality, pan. Revisit only if new issues appear.
+**Status:** Parked (2026-08-24) - vertical + page modes, pinch zoom, landscape settings, quality, pan. Revisit only if new issues appear.
 
 **Goal:** Read PDFs inside the app; progress reflects actual reading, not scroll position.
 
@@ -360,7 +360,7 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 5. Staff tools + tests for A borrow → B reserve → A return → B ready → B claim; cancel → shelf free
 6. Manual heal script/admin button for currently stuck ISBNs
 
-**B / C / D and Phases 12–15:** proceed first. Phase R waits.
+**B / C / D and Phases 12-15:** proceed first. Phase R waits.
 
 **Git (if not already pushed):** `fix(api): harden reservation fulfill and reconcile after return` (keep; do not revert blindly)
 
@@ -370,7 +370,7 @@ Profile **photo** is explicitly **post-Phase 15** (future sub-phase).
 
 Order: **B (done) → Phase B2 (this polish) → C → D**, then Phases **12+**, then **Phase R**.
 
-### B — Auth polish + modals + profile refresh
+### B - Auth polish + modals + profile refresh
 
 **Status:** Implemented (2026-08-25).
 
@@ -386,7 +386,7 @@ Order: **B (done) → Phase B2 (this polish) → C → D**, then Phases **12+**,
 
 **Git:** `feat(mobile): auth polish, AppModals, reservation cancel, profile refresh`
 
-### Phase B2 — UX harden + auth lock + reviews (before C)
+### Phase B2 - UX harden + auth lock + reviews (before C)
 
 **Status:** Implemented (2026-08-26).
 
@@ -397,9 +397,9 @@ Order: **B (done) → Phase B2 (this polish) → C → D**, then Phases **12+**,
 #### Delivered
 - [x] `dangerSoft` on cancel reservation / sign-out / remove shelf / lock sheet
 - [x] Shared `BackButton` (chevron) across detail / add / upload / search / bookshelf
-- [x] AppModal + scan/filter/settings sheets: no outside dismiss; haptic on outside tap (Expo Go may not feel it — works on dev build)
-- [x] `AppToast` — compact centered, light red (`dangerSoft` palette), circled X, 3s countdown bar
-- [x] `softOutline` cancel buttons on modals (Stay signed in, Keep reservation, etc.) — light amber + border, dark-mode aware
+- [x] AppModal + scan/filter/settings sheets: no outside dismiss; haptic on outside tap (Expo Go may not feel it - works on dev build)
+- [x] `AppToast` - compact centered, light red (`dangerSoft` palette), circled X, 3s countdown bar
+- [x] `softOutline` cancel buttons on modals (Stay signed in, Keep reservation, etc.) - light amber + border, dark-mode aware
 - [x] Tab bar active tab glow (filled icon + pill highlight)
 - [x] Reviews summary: `★ avg/5` under Student reviews
 - [x] API `GET /api/auth/login-lock` + `POST /api/auth/login-attempt` (`loginLocks` collection)
@@ -410,14 +410,14 @@ Order: **B (done) → Phase B2 (this polish) → C → D**, then Phases **12+**,
 - [x] Book detail skeleton; reviews `★ avg/5` + NPS word band; clearer recommend line
 - [x] Dark mode still hydrates from AsyncStorage before UI (ThemeProvider `ready`)
 
-#### Firebase email template (you — Console)
+#### Firebase email template (you - Console)
 
 Authentication → Templates → Password reset:
 
 - **Subject:** Reset your DLMS password
 - **Body (verified):**
   - Greeting + `%EMAIL%` placeholder (Firebase replaces with the account email)
-  - Reset link via `%LINK%` (required — do not hard-code URLs)
+  - Reset link via `%LINK%` (required - do not hard-code URLs)
   - Ignore-if-not-you line; sign-off **The DLMS Team**
 - **From name:** DLMS (if available)
 - **Note:** Copy is professional; no Firebase/project-id wording in body. `%EMAIL%` and `%LINK%` are the correct Firebase template variables.
@@ -426,16 +426,16 @@ Authentication → Templates → Password reset:
 
 | Area | Status |
 |------|--------|
-| Destructive confirms | `dangerSoft` — sign out, cancel reservation, remove shelf, lock sheet |
-| Modal cancel buttons | `softOutline` default — amber tint + border, dark mode |
+| Destructive confirms | `dangerSoft` - sign out, cancel reservation, remove shelf, lock sheet |
+| Modal cancel buttons | `softOutline` default - amber tint + border, dark mode |
 | Filter Reset buttons | `ghost` (intentional low-emphasis inside sheets) |
 | Profile Sign out row button | `secondary` (opens modal; confirm is `dangerSoft`) |
 | Primary CTAs | `primary` / `amber` for staff actions |
 | Toasts | Light red dangerSoft palette (not navy) |
 
-**Minor note:** Catalog/Digital filter **Reset** stays `ghost` (no border) by design — low priority action inside a sheet.
+**Minor note:** Catalog/Digital filter **Reset** stays `ghost` (no border) by design - low priority action inside a sheet.
 
-#### VnV — reservationHoldHours
+#### VnV - reservationHoldHours
 
 1. Admin → Config → set hold hours to a low test value (e.g. 1).
 2. Create waiting reservation; return a copy so it becomes **ready** (after Phase R fix, or assign path).
@@ -446,7 +446,7 @@ Authentication → Templates → Password reset:
 
 ---
 
-### C — Available Copies UI
+### C - Available Copies UI
 
 **Status:** Done (2026-08-26).
 
@@ -462,7 +462,7 @@ Authentication → Templates → Password reset:
 
 ---
 
-### D — Admin configs + librarian borrow harden
+### D - Admin configs + librarian borrow harden
 
 **Status:** Done (2026-08-26).
 

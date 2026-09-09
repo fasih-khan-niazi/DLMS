@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { auth, db } from "../config/firebase";
 
+// Firebase token verify karta hai aur req.uid / req.role set karta hai
 export interface AuthRequest extends Request {
   uid?: string;
   role?: string;
@@ -34,7 +35,7 @@ export async function authenticate(
     }
 
     req.uid = decoded.uid;
-    // Firestore role is source of truth (custom claims can lag after role changes)
+    // Role Firestore se lo (claims late update ho sakte hain)
     req.role = typeof data.role === "string" ? data.role : "student";
     next();
   } catch {

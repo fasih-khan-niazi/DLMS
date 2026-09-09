@@ -2,8 +2,9 @@ import cron from "node-cron";
 import { runCirculationMaintenance } from "../services/reservations";
 import { runDailyLoanNotifications } from "../services/notifications";
 
+// Cron jobs - daily reminders aur hold expiry Asia/Karachi timezone mein
 export function startCronJobs() {
-  // Daily: due reminders, overdue alerts, estimated fine notices (midnight Karachi)
+  // Roz raat 12 baje: due reminders, overdue alerts, fine notices
   cron.schedule(
     "0 0 * * *",
     async () => {
@@ -18,8 +19,7 @@ export function startCronJobs() {
     { timezone: "Asia/Karachi" }
   );
 
-  // Every 15 minutes: expire overdue ready holds, then assign waiting queues.
-  // Frequent enough that a 72h hold cannot sit days past expiresAt.
+  // Har 15 minute: expire ready holds, phir waiting queue assign karo
   cron.schedule(
     "*/15 * * * *",
     async () => {
@@ -36,7 +36,7 @@ export function startCronJobs() {
 
   console.log("Cron jobs scheduled (Asia/Karachi timezone)");
 
-  // Local watch/restarts never wait 6 hours. Expire + heal immediately after boot.
+  // Server start par turant expire + heal chalao (local restart ke liye)
   setTimeout(() => {
     console.log("[CRON] Startup circulation maintenance...");
     runCirculationMaintenance()

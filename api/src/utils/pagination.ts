@@ -10,7 +10,7 @@ const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
 const MAX_LEGACY_LIMIT = 100;
 
-/** Max documents loaded from Firestore before in-memory filter/sort/page. */
+// Firestore se load karne ki max limit (phir memory mein filter/page)
 export const LIST_FETCH_CAP = 500;
 
 export function parseListQuery(
@@ -33,6 +33,7 @@ export function parseListQuery(
   return { page, pageSize };
 }
 
+// Array ko page / pageSize ke hisaab se kaato
 export function paginateArray<T>(
   items: T[],
   page: number,

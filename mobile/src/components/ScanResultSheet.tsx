@@ -28,6 +28,7 @@ type Props = {
   onGoHome?: () => void;
 };
 
+// scan ke baad result bottom sheet
 export function ScanResultSheet({ result, onDismiss, onRetry, onGoHome }: Props) {
   const { colors, fontFamily, space, type, radius } = useTheme();
 

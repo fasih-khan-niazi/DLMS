@@ -7,6 +7,7 @@ import { ToastProvider } from "./src/components/AppToast";
 import { getAppConfig, hydrateAppConfig } from "./src/utils/appConfig";
 import { loadHapticsPreference } from "./src/utils/haptics";
 
+// ye root App hai - theme aur navigation yahan wrap hote hain
 function StatusBarSync() {
   const { mode } = useTheme();
   return <StatusBar style={mode === "dark" ? "light" : "dark"} />;

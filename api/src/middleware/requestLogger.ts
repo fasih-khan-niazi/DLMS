@@ -32,7 +32,7 @@ function timestamp(): string {
   return new Date().toLocaleTimeString("en-GB", { hour12: false });
 }
 
-/** Structured HTTP request log — one line per request. */
+// Har HTTP request ka ek-line structured log
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
   const start = Date.now();
   const method = req.method.padEnd(5);

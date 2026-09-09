@@ -1,4 +1,4 @@
-/** Catalog hub segment ids and labels (keep in sync across navigation params). */
+// Catalog hub ke physical / digital tabs
 export type CatalogTab = "physicalCopies" | "digitalCopies";
 
 export const CATALOG_TABS = {

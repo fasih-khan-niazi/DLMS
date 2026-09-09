@@ -3,6 +3,7 @@ import * as Sharing from "expo-sharing";
 import { firebaseAuth } from "../config/firebase";
 import { API_BASE_URL } from "../config/api";
 
+// digital book PDF download aur share
 function pdfCachePath(digitalBookId: string, title: string): string {
   const safeName = title.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40) || "book";
   return `${FileSystem.cacheDirectory}${safeName}_${digitalBookId}.pdf`;
@@ -38,7 +39,6 @@ export async function downloadDigitalPdf(
     try {
       await FileSystem.deleteAsync(cached, { idempotent: true });
     } catch {
-      // ignore
     }
   }
 

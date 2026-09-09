@@ -1,10 +1,4 @@
-/**
- * Read-only inbox audit: the same user should not have two rows for the
- * same reservation/loan event (the old .add() path created twins).
- *
- * Usage (from repo root):
- *   npx tsx scripts/verify-notifications.ts
- */
+/** ye script notification inbox duplicate rows audit karta hai */
 import { db } from "../api/src/config/firebase";
 
 let failures = 0;
@@ -31,6 +25,7 @@ async function main() {
   console.log("Notification inbox dedupe audit");
   console.log("===============================");
 
+  // Same event ke do inbox rows (twins) dhoondo
   const snap = await db.collection("notifications").get();
   const groups = new Map<string, string[]>();
   for (const doc of snap.docs) {

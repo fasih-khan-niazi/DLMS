@@ -1,9 +1,12 @@
+// admin login screen - email/password
 import { useState, type FormEvent } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../components/ui";
 
 export function LoginPage() {
   const { user, profile, loading, error, login, clearError } = useAuth();
+  const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -19,7 +22,7 @@ export function LoginPage() {
     try {
       await login(email.trim(), password);
     } catch {
-      // error via context
+      showToast("Could not sign in. Check your email and password.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -28,16 +31,21 @@ export function LoginPage() {
   return (
     <div className="auth-shell">
       <div className="auth-hero">
+        <div className="auth-hero-glow" aria-hidden />
         <p className="auth-eyebrow">Library operations</p>
         <h1 className="auth-brand">DLMS</h1>
         <p className="auth-lede">
-          Admin console for users, config, fines, reservations, and reports.
+          Admin console for users, configuration, fines, reservations, and reports.
         </p>
       </div>
 
       <form className="auth-panel" onSubmit={(e) => void onSubmit(e)}>
-        <h2>Sign in</h2>
-        <p className="muted">Admin accounts only. Librarians use the mobile app.</p>
+        <div className="auth-panel-head">
+          <h2>Sign in</h2>
+          <p className="muted">
+            Admin accounts only. Librarians use the mobile app.
+          </p>
+        </div>
         {error ? <p className="error-banner">{error}</p> : null}
 
         <label>
@@ -47,6 +55,7 @@ export function LoginPage() {
             autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            placeholder="admin@example.com"
             required
           />
         </label>

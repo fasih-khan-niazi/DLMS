@@ -15,7 +15,7 @@ Historical notes from the Week 1 freeze (`v1.0.0-week1` on `main`).
 
 ## What Week 1 shipped
 
-Phases 1–8 on the original two-week roadmap:
+Phases 1-8 on the original two-week roadmap:
 
 1. Monorepo, Express API, Expo mobile, Firebase baseline
 2. Catalog + ISBN lookup (Google Books) + copies + QR payload
@@ -49,7 +49,7 @@ API health: `https://dlms-csij.onrender.com/health`
 
 ---
 
-## Post–Phase 8 polish blocks (done)
+## Post-Phase 8 polish blocks (done)
 
 | Block | Focus |
 |-------|--------|

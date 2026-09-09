@@ -7,7 +7,7 @@ function copyTime(value: unknown): number {
   return 0;
 }
 
-/** Stable Copy 1, Copy 2, … order for labels (createdAt, then copyId). */
+// Copies ko stable order mein sort (Copy 1, Copy 2, ...)
 export function sortCopies<T extends { copyId?: string; createdAt?: unknown }>(copies: T[]): T[] {
   return [...copies].sort((a, b) => {
     const at = copyTime(a.createdAt);

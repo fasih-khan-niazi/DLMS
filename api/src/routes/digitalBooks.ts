@@ -11,7 +11,6 @@ import { buildSearchKeywords } from "../services/googleBooks";
 import { clampCatalogPageSize, getSystemConfig } from "../services/loans";
 import {
   downloadDigitalBookPdf,
-  removeDigitalBookPdf,
   uploadDigitalBookPdf,
 } from "../services/digitalBookStorage";
 import { uploadBookCover, downloadBookCover } from "../services/bookCoverStorage";
@@ -33,6 +32,7 @@ import {
 } from "../utils/pagination";
 import { matchesTextQuery } from "../utils/textSearch";
 
+// Digital books: PDF upload, stream, cover, reviews, bookshelf
 const router = Router();
 
 function sortDigitalBooks(items: Record<string, unknown>[], sort: string) {
@@ -61,13 +61,15 @@ function buildDigitalCoverImageUrl(req: AuthRequest, digitalBookId: string) {
 
 function withCoverThumbnail(req: AuthRequest, row: Record<string, unknown>) {
   const digitalBookId = String(row.digitalBookId || "");
-  // Always expose cover URL — endpoint lazy-generates from PDF page 1 if missing.
+
+  // Cover URL hamesha expose - missing ho to PDF page 1 se lazy generate
   return {
     ...row,
     thumbnailUrl: buildDigitalCoverImageUrl(req, digitalBookId),
   };
 }
 
+// Cover missing ho to PDF se JPEG bana ke store
 async function ensureDigitalCover(
   digitalBookId: string,
   data: Record<string, unknown>
@@ -78,7 +80,7 @@ async function ensureDigitalCover(
       const file = await downloadBookCover(existingPath);
       return { ...file, path: existingPath };
     } catch {
-      // fall through and regenerate
+
     }
   }
 
@@ -93,7 +95,7 @@ async function ensureDigitalCover(
     }
     return { ...file, path: coverPath };
   } catch {
-    // generate from PDF
+
   }
 
   const backend = String(data.storageBackend || "local");
@@ -125,7 +127,8 @@ async function ensureDigitalCover(
   return { buffer: coverBuffer, contentType: "image/jpeg", path: coverPath };
 }
 
-// List published digital books (search optional)
+
+// Digital books list / search
 router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const q = String(req.query.q || "")
@@ -133,6 +136,11 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
       .toLowerCase();
     const sort = String(req.query.sort || "title_asc");
     const shelfFilter = String(req.query.shelfFilter || "all");
+    const isStaff = req.role === "librarian" || req.role === "admin";
+    const includeUnpublished =
+      isStaff &&
+      (String(req.query.includeUnpublished || "") === "1" ||
+        String(req.query.includeUnpublished || "").toLowerCase() === "true");
     const config = await getSystemConfig();
     const defaultPageSize = clampCatalogPageSize(config.catalogPageSize);
     const { page, pageSize } = parseListQuery(
@@ -151,18 +159,22 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
         res.json(paginateArray([], page, pageSize));
         return;
       }
-      // Broad fetch + substring match ("mock" → "Mockingbird")
-      snap = await db
-        .collection("digitalBooks")
-        .where("isPublished", "==", true)
-        .limit(LIST_FETCH_CAP)
-        .get();
+
+      snap = includeUnpublished
+        ? await db.collection("digitalBooks").limit(LIST_FETCH_CAP).get()
+        : await db
+            .collection("digitalBooks")
+            .where("isPublished", "==", true)
+            .limit(LIST_FETCH_CAP)
+            .get();
     } else {
-      snap = await db
-        .collection("digitalBooks")
-        .where("isPublished", "==", true)
-        .limit(LIST_FETCH_CAP)
-        .get();
+      snap = includeUnpublished
+        ? await db.collection("digitalBooks").limit(LIST_FETCH_CAP).get()
+        : await db
+            .collection("digitalBooks")
+            .where("isPublished", "==", true)
+            .limit(LIST_FETCH_CAP)
+            .get();
     }
 
     let results: Record<string, unknown>[] = snap.docs.map((doc) => {
@@ -170,9 +182,21 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
       return withCoverThumbnail(req, {
         ...data,
         digitalBookId: data.digitalBookId || doc.id,
+        isPublished: data.isPublished !== false,
         fileUrl: publicFileUrl(req, data.digitalBookId || doc.id),
       });
     });
+
+    const publishStatus = String(req.query.publishStatus || "all")
+      .trim()
+      .toLowerCase();
+    if (!includeUnpublished) {
+      results = results.filter((row) => row.isPublished !== false);
+    } else if (publishStatus === "published") {
+      results = results.filter((row) => row.isPublished !== false);
+    } else if (publishStatus === "unpublished") {
+      results = results.filter((row) => row.isPublished === false);
+    }
 
     if (shelfFilter !== "all" && req.uid) {
       const shelfSnap = await db
@@ -190,7 +214,7 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
         const progress = Number(shelf?.progress ?? 0);
         switch (shelfFilter) {
           case "saved":
-            // On bookshelf but not started reading yet
+
             return !!shelf && progress <= 0;
           case "reading":
             return !!shelf && progress > 0 && progress < 100;
@@ -226,7 +250,8 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// Bookshelf list MUST be before /:digitalBookId
+
+// Meri digital bookshelf
 router.get("/bookshelf/mine", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const snap = await db
@@ -251,7 +276,7 @@ router.get("/bookshelf/mine", authenticate, async (req: AuthRequest, res: Respon
   }
 });
 
-// Get one digital book
+
 router.get("/:digitalBookId", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const digitalBookId = req.params.digitalBookId as string;
@@ -332,7 +357,8 @@ router.patch(
   }
 );
 
-// Stream/download PDF (authenticated) - proxies Supabase (or legacy local files)
+
+// Cover image stream (lazy generate)
 router.get("/:digitalBookId/cover-image", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const digitalBookId = req.params.digitalBookId as string;
@@ -358,7 +384,7 @@ router.get("/:digitalBookId/cover-image", authenticate, async (req: AuthRequest,
   }
 });
 
-// Reviews MUST be before generic /:digitalBookId mutations that could conflict
+
 router.get("/:digitalBookId/reviews", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const digitalBookId = req.params.digitalBookId as string;
@@ -429,7 +455,7 @@ router.put("/:digitalBookId/reviews", authenticate, async (req: AuthRequest, res
       confirm: true,
     });
 
-    // Keep bookshelf rating in sync when present
+
     const shelfRef = db.collection("users").doc(req.uid!).collection("bookshelf").doc(digitalBookId);
     const shelfSnap = await shelfRef.get();
     if (shelfSnap.exists) {
@@ -443,6 +469,7 @@ router.put("/:digitalBookId/reviews", authenticate, async (req: AuthRequest, res
   }
 });
 
+// PDF stream (authenticated)
 router.get("/:digitalBookId/file", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const digitalBookId = req.params.digitalBookId as string;
@@ -487,7 +514,8 @@ router.get("/:digitalBookId/file", authenticate, async (req: AuthRequest, res: R
   }
 });
 
-// Upload PDF (librarian/admin) - Supabase Storage
+
+// Nayi digital book PDF upload
 router.post(
   "/",
   authenticate,
@@ -569,7 +597,7 @@ router.post(
         mimeType: "application/pdf",
         isPublished: true,
         storageBackend: "supabase",
-        // Path reserved; image is generated in background so upload returns quickly.
+
         coverStoragePath,
         searchKeywords,
         uploadedBy: req.uid,
@@ -579,7 +607,7 @@ router.post(
 
       await db.collection("digitalBooks").doc(digitalBookId).set(doc);
 
-      // Non-blocking: first-page cover while client already sees the new title.
+
       const pdfBuffer = req.file.buffer;
       void (async () => {
         try {
@@ -609,7 +637,8 @@ router.post(
   }
 );
 
-// Unpublish (soft delete)
+
+// Digital book delete (staff)
 router.delete(
   "/:digitalBookId",
   authenticate,
@@ -624,22 +653,8 @@ router.delete(
         return;
       }
 
-      const data = snap.data()!;
       await ref.update({ isPublished: false, updatedAt: new Date() });
-
-      // Best-effort remove from Supabase (keep metadata for audit)
-      if (data.storageBackend === "supabase") {
-        const objectPath = data.storagePath || data.storedFileName;
-        if (objectPath) {
-          try {
-            await removeDigitalBookPdf(objectPath);
-          } catch (removeError) {
-            console.error("Supabase remove after unpublish failed:", removeError);
-          }
-        }
-      }
-
-      res.json({ success: true, digitalBookId });
+      res.json({ success: true, digitalBookId, isPublished: false });
     } catch (error) {
       console.error("Unpublish digital book error:", error);
       res.status(500).json({ error: "Failed to unpublish digital book" });
@@ -647,8 +662,36 @@ router.delete(
   }
 );
 
-// ---- Bookshelf mutations ----
 
+router.patch(
+  "/:digitalBookId/status",
+  authenticate,
+  requireRole("librarian", "admin"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const digitalBookId = req.params.digitalBookId as string;
+      if (typeof req.body?.isPublished !== "boolean") {
+        res.status(400).json({ error: "isPublished boolean is required" });
+        return;
+      }
+      const ref = db.collection("digitalBooks").doc(digitalBookId);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        res.status(404).json({ error: "Digital book not found" });
+        return;
+      }
+      await ref.update({ isPublished: req.body.isPublished, updatedAt: new Date() });
+      res.json({ success: true, digitalBookId, isPublished: req.body.isPublished });
+    } catch (error) {
+      console.error("Digital book status error:", error);
+      res.status(500).json({ error: "Failed to update digital book status" });
+    }
+  }
+);
+
+
+
+// Bookshelf mein add
 router.post(
   "/:digitalBookId/bookshelf",
   authenticate,

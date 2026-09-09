@@ -10,6 +10,7 @@ import {
 } from "../utils/recentSearches";
 import { looksLikeIsbn } from "../utils/isbn";
 
+// search bar - recent queries ke sath
 type Props = {
   value: string;
   onChangeText: (text: string) => void;
@@ -17,7 +18,6 @@ type Props = {
   placeholder?: string;
   hint?: string;
   debounceMs?: number;
-  /** When false, only search on submit (good for Home navigate). Default true. */
   searchOnDebounce?: boolean;
   showRecent?: boolean;
   showHint?: boolean;

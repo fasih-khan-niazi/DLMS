@@ -7,7 +7,7 @@ export { shadows } from "./shadows";
 export { fontFamily, type as typeScale } from "./typography";
 export { ThemeProvider, useTheme } from "./ThemeProvider";
 
-/** Backward-compatible flat exports for existing screens (light defaults) */
+// purane screens ke liye flat light-theme exports
 import { lightTheme } from "./lightTheme";
 
 export const colors = lightTheme.colors;

@@ -1,5 +1,6 @@
 import { digitalBooksBucket, getSupabase } from "../config/supabase";
 
+// Catalog / digital book covers Supabase private bucket mein
 const SIGNED_URL_TTL_SEC = 60 * 60 * 24 * 365 * 10; // 10 years
 
 export function coverObjectPathForIsbn(isbn: string): string {

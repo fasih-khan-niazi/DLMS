@@ -1,5 +1,6 @@
 import { digitalBooksBucket, getSupabase } from "../config/supabase";
 
+// Digital book PDF upload / download / delete (Supabase)
 export async function uploadDigitalBookPdf(input: {
   objectPath: string;
   buffer: Buffer;

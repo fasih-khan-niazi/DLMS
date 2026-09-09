@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// staff ki last few scan history
 const KEY = "dlms.scanHistory";
 const MAX = 5;
 

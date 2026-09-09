@@ -1,12 +1,4 @@
-﻿/**
- * Ready-hold cancel: borrow -> reserve -> return (promote) -> cancel ready.
- *
- * Asserts the copy goes back on the shelf (or to the next waiter) and that
- * Activity no longer lists the hold as ready. Restores every document it touches.
- *
- * Usage (from api/):
- *   npx tsx scripts/verify-ready-cancel.ts [apiBaseUrl]
- */
+/** ye script ready-hold cancel flow verify karta hai */
 import axios, { type AxiosInstance } from "axios";
 import { auth, db } from "../api/src/config/firebase";
 
@@ -99,6 +91,7 @@ async function main() {
   const borrowedCopyIds = new Set<string>();
 
   try {
+    // 1) Student A free copies borrow
     console.log(`\n1) Student A borrows ${target.copyIds.length} free copy(ies)`);
     for (const copyId of target.copyIds) {
       await a.post("/api/loans/borrow", { copyId });
@@ -107,6 +100,7 @@ async function main() {
     if ((await copyStatus(primaryCopy)).status === "issued") pass("copy issued to A");
     else fail("copy was not issued");
 
+    // 2) Student B reserve
     console.log(`\n2) Student B reserves`);
     const reserveRes = await b.post("/api/reservations", { isbn: target.isbn });
     const reservationId = String(reserveRes.data.reservationId || reserveRes.data.id || "");
@@ -114,7 +108,8 @@ async function main() {
     if (reservationId) pass(`waiting reservation ${reservationId}`);
     else fail("no reservation id returned");
 
-    console.log(`\n3) Student A returns one copy â€” hold should become ready`);
+    // 3) Return pe hold ready hona chahiye
+    console.log(`\n3) Student A returns one copy - hold should become ready`);
     await a.post("/api/loans/return", { copyId: primaryCopy });
     borrowedCopyIds.delete(primaryCopy);
 
@@ -136,6 +131,7 @@ async function main() {
     if (held.status === "reserved" && held.heldFor === uidB) pass("copy reserved for B");
     else fail(`copy is ${held.status} heldFor=${held.heldFor}`);
 
+    // 4) Ready hold cancel
     console.log(`\n4) Student B cancels the ready hold`);
     const cancelRes = await b.delete(`/api/reservations/${bReady.id}`);
     if (cancelRes.data?.success) pass("cancel endpoint returned success");
@@ -169,7 +165,6 @@ async function main() {
         await a.post("/api/loans/return", { copyId });
         console.log(`   returned leftover loan on ${copyId}`);
       } catch {
-        /* ignore */
       }
     }
     for (const id of createdReservationIds) {

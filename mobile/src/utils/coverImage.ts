@@ -3,6 +3,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { API_BASE_URL } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
 
+// book cover images download aur disk pe cache
 const REVISION_PREFIX = "dlms.cover.rev.";
 
 export function isApiCoverUrl(uri: string): boolean {
@@ -17,12 +18,11 @@ export function extractCoverCacheKey(uri: string): string | null {
   return null;
 }
 
-/** @deprecated use extractCoverCacheKey */
 export function extractCoverIsbn(uri: string): string | null {
   return extractCoverCacheKey(uri);
 }
 
-/** Force cover-image requests through the mobile API base URL (LAN IP vs localhost). */
+// cover URL ko mobile API base pe force karo
 export function normalizeCoverUrl(uri: string): string {
   if (!isApiCoverUrl(uri)) return uri;
   const key = extractCoverCacheKey(uri);
@@ -41,7 +41,7 @@ function stableCoverPath(cacheKey: string): string {
   return `${FileSystem.cacheDirectory}cover_${safe}.img`;
 }
 
-/** Instant cache hit for list views. Any on-disk file counts. */
+// list views ke liye instant cache hit
 export async function peekCoverCache(uri: string): Promise<string | null> {
   if (!uri.trim()) return null;
   if (!isApiCoverUrl(uri)) return uri;
@@ -61,12 +61,10 @@ export async function invalidateCoverCache(idOrIsbn: string): Promise<void> {
     try {
       await FileSystem.deleteAsync(dest, { idempotent: true });
     } catch {
-      // ignore
     }
     try {
       await AsyncStorage.removeItem(`${REVISION_PREFIX}${cacheKey}`);
     } catch {
-      // ignore
     }
   }
 }

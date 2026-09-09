@@ -2,7 +2,13 @@ import { Router, Response } from "express";
 import { auth, db } from "../config/firebase";
 import { authenticate, AuthRequest } from "../middleware/authenticate";
 import { requireRole } from "../middleware/requireRole";
-import { clampCatalogPageSize, getSystemConfig } from "../services/loans";
+import {
+  clampCatalogPageSize,
+  fineRemaining,
+  getSystemConfig,
+  isValidIanaTimeZone,
+  normalizeWorkingDaysOff,
+} from "../services/loans";
 import {
   normalizeIsbn,
   reconcileAllWaitingQueues,
@@ -10,7 +16,11 @@ import {
   cancelLibrarianReservations,
 } from "../services/reservations";
 import { clearLoginLock } from "../services/loginLock";
+import { persistAccruedFines } from "../services/fines";
+import { notifyUser } from "../services/notifications";
+import { paginateArray, parseListQuery, LIST_FETCH_CAP } from "../utils/pagination";
 
+// Admin/librarian: dashboard, users, config, holidays, fines oversight
 const router = Router();
 
 router.use(authenticate);
@@ -32,13 +42,14 @@ const CONFIG_ALLOWED_FIELDS = [
 
 type ConfigField = (typeof CONFIG_ALLOWED_FIELDS)[number];
 
-/** Fields stored as real booleans so a checkbox can never round-trip as a string. */
+
 const CONFIG_BOOLEAN_FIELDS = new Set<ConfigField>([
   "blockCheckoutIfUnpaidFine",
   "librariansCanBorrow",
   "allowInAppCopyBorrow",
 ]);
 
+// Checkbox values ko real boolean banao (string round-trip na ho)
 function coerceConfigValue(field: ConfigField, value: unknown): unknown {
   if (CONFIG_BOOLEAN_FIELDS.has(field)) {
     if (typeof value === "string") {
@@ -60,6 +71,7 @@ function serializeDoc(id: string, data: Record<string, any>) {
   }
   return out;
 }
+
 
 // Dashboard counts (librarian + admin)
 router.get(
@@ -116,14 +128,25 @@ router.get(
   }
 );
 
-// List users (admin-only)
+
+// Users list (sirf admin)
 router.get("/users", requireRole("admin"), async (req: AuthRequest, res: Response) => {
   try {
     const q = String(req.query.q || "")
       .trim()
       .toLowerCase();
+    const roleFilter = String(req.query.role || "")
+      .trim()
+      .toLowerCase();
+    const statusFilter = String(req.query.status || "")
+      .trim()
+      .toLowerCase();
+    const finesFilter = String(req.query.fines || "")
+      .trim()
+      .toLowerCase();
+    const { page, pageSize } = parseListQuery(req.query as Record<string, unknown>, 20);
 
-    const snap = await db.collection("users").limit(100).get();
+    const snap = await db.collection("users").limit(LIST_FETCH_CAP).get();
     let users = snap.docs.map((doc) => serializeDoc(doc.id, doc.data()));
 
     if (q) {
@@ -134,20 +157,47 @@ router.get("/users", requireRole("admin"), async (req: AuthRequest, res: Respons
       });
     }
 
-    res.json({ users });
+    if (roleFilter === "student" || roleFilter === "librarian" || roleFilter === "admin") {
+      users = users.filter((user) => String(user.role || "student") === roleFilter);
+    }
+
+    if (statusFilter === "active") {
+      users = users.filter((user) => user.isActive !== false);
+    } else if (statusFilter === "suspended") {
+      users = users.filter((user) => user.isActive === false);
+    }
+
+    if (finesFilter === "unpaid" || finesFilter === "1" || finesFilter === "true") {
+      users = users.filter((user) => !!user.hasUnpaidFines);
+    }
+
+    users.sort((a, b) =>
+      String(a.displayName || a.email || "").localeCompare(String(b.displayName || b.email || ""))
+    );
+
+    const truncated = snap.size >= LIST_FETCH_CAP;
+    const paged = paginateArray(users, page, pageSize);
+    res.json({
+      users: paged.results,
+      page: paged.page,
+      pageSize: paged.pageSize,
+      total: paged.total,
+      totalPages: paged.totalPages,
+      truncated,
+    });
   } catch (error) {
     console.error("Admin users list error:", error);
     res.status(500).json({ error: "Failed to list users" });
   }
 });
 
-// Read system config (admin-only)
+
+// System config read (admin)
 router.get("/config", requireRole("admin"), async (_req: AuthRequest, res: Response) => {
   try {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate");
     const config = await getSystemConfig();
-    // supportedFields lets the portal detect an older API that would silently
-    // drop newer settings instead of quietly reverting the control.
+
     res.json({ config, supportedFields: [...CONFIG_ALLOWED_FIELDS] });
   } catch (error) {
     console.error("Admin config read error:", error);
@@ -155,7 +205,8 @@ router.get("/config", requireRole("admin"), async (_req: AuthRequest, res: Respo
   }
 });
 
-// Merge-update system config (admin-only)
+
+// System config merge-update (admin)
 router.put("/config", requireRole("admin"), async (req: AuthRequest, res: Response) => {
   try {
     res.set("Cache-Control", "no-store, no-cache, must-revalidate");
@@ -180,6 +231,33 @@ router.put("/config", requireRole("admin"), async (req: AuthRequest, res: Respon
 
     if (Object.prototype.hasOwnProperty.call(updates, "catalogPageSize")) {
       updates.catalogPageSize = clampCatalogPageSize(updates.catalogPageSize);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, "timezone")) {
+      const tz = String(updates.timezone || "").trim();
+      if (!isValidIanaTimeZone(tz)) {
+        res.status(400).json({
+          error: "Invalid timezone. Use a valid IANA name such as Asia/Karachi.",
+        });
+        return;
+      }
+      updates.timezone = tz;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, "workingDaysOff")) {
+      const normalized = normalizeWorkingDaysOff(updates.workingDaysOff);
+      if (
+        Array.isArray(updates.workingDaysOff) &&
+        updates.workingDaysOff.length > 0 &&
+        normalized.length === 0
+      ) {
+        res.status(400).json({
+          error:
+            "workingDaysOff must use English weekday names (Sunday, Monday, Tuesday, …).",
+        });
+        return;
+      }
+      updates.workingDaysOff = normalized;
     }
 
     const prevConfig = await getSystemConfig();
@@ -228,7 +306,8 @@ router.put("/config", requireRole("admin"), async (req: AuthRequest, res: Respon
   }
 });
 
-// Active reservations (librarian + admin)
+
+// Active reservations overview
 router.get(
   "/reservations",
   requireRole("librarian", "admin"),
@@ -249,28 +328,83 @@ router.get(
   }
 );
 
-// Unpaid fines overview (librarian + admin)
+
+// Unpaid fines overview
 router.get(
   "/fines",
   requireRole("librarian", "admin"),
-  async (_req: AuthRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
+      const { page, pageSize } = parseListQuery(
+        req.query as Record<string, unknown>,
+        20
+      );
+      const view = String(req.query.view || "loans").trim().toLowerCase();
+
       const [usersSnap, loansSnap] = await Promise.all([
-        db.collection("users").where("hasUnpaidFines", "==", true).limit(100).get(),
         db
-          .collection("loans")
-          .where("finePaid", "==", false)
-          .limit(100)
+          .collection("users")
+          .where("hasUnpaidFines", "==", true)
+          .limit(LIST_FETCH_CAP)
           .get(),
+        db.collection("loans").where("finePaid", "==", false).limit(LIST_FETCH_CAP).get(),
       ]);
 
-      const users = usersSnap.docs.map((doc) => serializeDoc(doc.id, doc.data()));
+      const accrueIds = new Set<string>(
+        usersSnap.docs.map((doc) => doc.id).concat(
+          loansSnap.docs.map((doc) => String(doc.data().userId || "")).filter(Boolean)
+        )
+      );
+      await Promise.all(
+        [...accrueIds].map(async (uid) => {
+          try {
+            await persistAccruedFines(uid);
+          } catch (error) {
+            console.error("Admin fines accrual error:", uid, error);
+          }
+        })
+      );
 
-      const loans = loansSnap.docs
-        .map((doc) => serializeDoc(doc.id, doc.data()))
-        .filter((loan) => Number(loan.fineAmount || 0) > 0);
+      const [usersFresh, loansFresh] = await Promise.all([
+        db
+          .collection("users")
+          .where("hasUnpaidFines", "==", true)
+          .limit(LIST_FETCH_CAP)
+          .get(),
+        db.collection("loans").where("finePaid", "==", false).limit(LIST_FETCH_CAP).get(),
+      ]);
 
-      res.json({ users, loans });
+      const users = usersFresh.docs.map((doc) => serializeDoc(doc.id, doc.data()));
+      const loans = loansFresh.docs
+        .map((doc) => {
+          const row = serializeDoc(doc.id, doc.data());
+          const remaining = fineRemaining({
+            fineAmount: Number(row.fineAmount || 0),
+            finePaidAmount: Number(row.finePaidAmount || 0),
+            finePaid: row.finePaid === true,
+          });
+          return { ...row, remaining };
+        })
+        .filter((loan) => Number(loan.remaining || 0) > 0);
+
+      const truncated =
+        usersFresh.size >= LIST_FETCH_CAP || loansFresh.size >= LIST_FETCH_CAP;
+      const usersPaged = paginateArray(users, page, pageSize);
+      const loansPaged = paginateArray(loans, page, pageSize);
+      const active = view === "users" ? usersPaged : loansPaged;
+
+      res.json({
+        users: usersPaged.results,
+        loans: loansPaged.results,
+        page: active.page,
+        pageSize: active.pageSize,
+        total: active.total,
+        totalPages: active.totalPages,
+        usersTotal: usersPaged.total,
+        loansTotal: loansPaged.total,
+        truncated,
+        view: view === "users" ? "users" : "loans",
+      });
     } catch (error) {
       console.error("Admin fines list error:", error);
       res.status(500).json({ error: "Failed to list fines" });
@@ -278,7 +412,8 @@ router.get(
   }
 );
 
-// Mark fine paid (librarian + admin) - mirrors loans route
+
+// Fine paid mark (partial-safe, loans route jaisa)
 router.post(
   "/loans/:loanId/mark-fine-paid",
   requireRole("librarian", "admin"),
@@ -299,7 +434,14 @@ router.post(
         return;
       }
 
+      const unpaidOnLoan = fineRemaining(loan);
+      if (!unpaidOnLoan) {
+        res.status(400).json({ error: "No unpaid fine on this loan" });
+        return;
+      }
+
       const userRef = db.collection("users").doc(loan.userId);
+      let cleared = unpaidOnLoan;
 
       await db.runTransaction(async (tx) => {
         const userSnap = await tx.get(userRef);
@@ -308,13 +450,12 @@ router.post(
         }
 
         const user = userSnap.data()!;
-        const remaining = Math.max(
-          (user.totalOutstandingFines || 0) - (loan.fineAmount || 0),
-          0
-        );
+        const remaining = Math.max((user.totalOutstandingFines || 0) - unpaidOnLoan, 0);
+        cleared = unpaidOnLoan;
 
         tx.update(loanRef, {
           finePaid: true,
+          finePaidAmount: Number(loan.fineAmount || 0),
           finePaidAt: new Date(),
           finePaidBy: req.uid,
         });
@@ -330,11 +471,29 @@ router.post(
         action: "fine_paid",
         actorId: req.uid,
         targetId: loanId,
-        metadata: { amount: loan.fineAmount, userId: loan.userId, via: "admin" },
+        metadata: {
+          amount: cleared,
+          fineAmount: loan.fineAmount,
+          userId: loan.userId,
+          via: "admin",
+        },
         timestamp: new Date(),
       });
 
-      res.json({ success: true, loanId });
+      try {
+        await notifyUser({
+          userId: String(loan.userId),
+          type: "fine_paid",
+          title: "Fine cleared",
+          body: `Rs ${cleared} was marked paid at the desk.`,
+          metadata: { amount: String(cleared), loanId },
+          dedupeKey: `fine_paid:${loanId}:${cleared}`,
+        });
+      } catch (error) {
+        console.error("Admin mark fine paid notify error:", error);
+      }
+
+      res.json({ success: true, loanId, amountCleared: cleared });
     } catch (error: any) {
       if (error.message === "USER_NOT_FOUND") {
         res.status(404).json({ error: "User not found" });
@@ -346,7 +505,8 @@ router.post(
   }
 );
 
-// Promote or demote a user's role (admin-only)
+
+// User role promote/demote (admin)
 router.post("/users/:uid/role", requireRole("admin"), async (req: AuthRequest, res: Response) => {
   try {
     const uid = req.params.uid as string;
@@ -379,19 +539,19 @@ router.post("/users/:uid/role", requireRole("admin"), async (req: AuthRequest, r
       return;
     }
 
-    // Block promotion if user has unpaid fines
+
     if (role !== "student" && userData.hasUnpaidFines) {
       res.status(400).json({ error: "Cannot promote user with unpaid fines" });
       return;
     }
 
-    // Block promotion if user is suspended
+
     if (!userData.isActive) {
       res.status(400).json({ error: "Cannot change role of a suspended account" });
       return;
     }
 
-    // If promoting from student, cancel waiting reservations
+
     if (userData.role === "student" && role !== "student") {
       const waitingReservations = await db
         .collection("reservations")
@@ -404,7 +564,7 @@ router.post("/users/:uid/role", requireRole("admin"), async (req: AuthRequest, r
         batch.update(doc.ref, { status: "cancelled", updatedAt: new Date() });
       });
 
-      // Check for ready reservations (block promotion)
+
       const readyReservations = await db
         .collection("reservations")
         .where("userId", "==", uid)
@@ -421,11 +581,11 @@ router.post("/users/:uid/role", requireRole("admin"), async (req: AuthRequest, r
       await batch.commit();
     }
 
-    // Update custom claims and Firestore
+
     await auth.setCustomUserClaims(uid, { role });
     await db.collection("users").doc(uid).update({ role, updatedAt: new Date() });
 
-    // Audit log
+
     await db.collection("auditLog").add({
       action: "role_changed",
       actorId: req.uid,
@@ -441,7 +601,8 @@ router.post("/users/:uid/role", requireRole("admin"), async (req: AuthRequest, r
   }
 });
 
-// Suspend or activate a user (admin-only)
+
+// User suspend / activate (admin)
 router.post("/users/:uid/status", requireRole("admin"), async (req: AuthRequest, res: Response) => {
   try {
     const uid = req.params.uid as string;
@@ -484,7 +645,8 @@ router.post("/users/:uid/status", requireRole("admin"), async (req: AuthRequest,
   }
 });
 
-/** Heal reservation/copy drift for one ISBN or all waiting queues (admin). */
+
+// Reservation/copy drift heal (ek ISBN ya saari queues)
 router.post(
   "/reservations/reconcile",
   requireRole("librarian", "admin"),
@@ -506,7 +668,8 @@ router.post(
   }
 );
 
-/** Clear login lock for an email (admin). */
+
+// Login lock clear (admin)
 router.post("/login-locks/unlock", requireRole("admin"), async (req: AuthRequest, res: Response) => {
   try {
     const email = String(req.body?.email || "").trim();
@@ -531,5 +694,228 @@ router.post("/login-locks/unlock", requireRole("admin"), async (req: AuthRequest
     res.status(500).json({ error: "Failed to unlock login" });
   }
 });
+
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+
+// Library holidays list (due-date skip)
+router.get("/holidays", requireRole("admin"), async (_req: AuthRequest, res: Response) => {
+  try {
+    const snap = await db.collection("config").doc("holidays").collection("dates").get();
+    const holidays = snap.docs
+      .map((doc) => {
+        const data = doc.data() || {};
+        return {
+          date: String(data.date || doc.id),
+          name: String(data.name || doc.id),
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+    res.json({ holidays });
+  } catch (error) {
+    console.error("Admin holidays list error:", error);
+    res.status(500).json({ error: "Failed to list holidays" });
+  }
+});
+
+
+router.post("/holidays", requireRole("admin"), async (req: AuthRequest, res: Response) => {
+  try {
+    const date = String(req.body?.date || "").trim();
+    const name = String(req.body?.name || "").trim() || date;
+    if (!DATE_KEY_RE.test(date)) {
+      res.status(400).json({ error: "date must be YYYY-MM-DD" });
+      return;
+    }
+
+    await db.collection("config").doc("holidays").collection("dates").doc(date).set({
+      date,
+      name,
+      updatedAt: new Date(),
+      updatedBy: req.uid,
+    });
+
+    await db.collection("auditLog").add({
+      action: "holiday_upserted",
+      actorId: req.uid,
+      targetId: date,
+      metadata: { name },
+      timestamp: new Date(),
+    });
+
+    res.json({ success: true, holiday: { date, name } });
+  } catch (error) {
+    console.error("Admin holiday upsert error:", error);
+    res.status(500).json({ error: "Failed to save holiday" });
+  }
+});
+
+
+router.delete(
+  "/holidays/:date",
+  requireRole("admin"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const date = String(req.params.date || "").trim();
+      if (!DATE_KEY_RE.test(date)) {
+        res.status(400).json({ error: "date must be YYYY-MM-DD" });
+        return;
+      }
+
+      await db.collection("config").doc("holidays").collection("dates").doc(date).delete();
+
+      await db.collection("auditLog").add({
+        action: "holiday_deleted",
+        actorId: req.uid,
+        targetId: date,
+        metadata: {},
+        timestamp: new Date(),
+      });
+
+      res.json({ success: true, date });
+    } catch (error) {
+      console.error("Admin holiday delete error:", error);
+      res.status(500).json({ error: "Failed to delete holiday" });
+    }
+  }
+);
+
+
+// Active / overdue loans oversight
+router.get(
+  "/loans",
+  requireRole("librarian", "admin"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const statusFilter = String(req.query.status || "all")
+        .trim()
+        .toLowerCase();
+      const q = String(req.query.q || "")
+        .trim()
+        .toLowerCase();
+      const { page, pageSize } = parseListQuery(
+        req.query as Record<string, unknown>,
+        20
+      );
+      const now = Date.now();
+
+      const [activeSnap, overdueSnap] = await Promise.all([
+        db.collection("loans").where("status", "==", "active").limit(LIST_FETCH_CAP).get(),
+        db.collection("loans").where("status", "==", "overdue").limit(LIST_FETCH_CAP).get(),
+      ]);
+
+      const byId = new Map<string, Record<string, unknown>>();
+      for (const doc of [...activeSnap.docs, ...overdueSnap.docs]) {
+        byId.set(doc.id, serializeDoc(doc.id, doc.data()));
+      }
+
+      type LoanRow = Record<string, unknown> & {
+        isOverdue: boolean;
+        remainingFine: number;
+        userEmail?: string;
+        userDisplayName?: string;
+      };
+
+      let loans: LoanRow[] = [...byId.values()].map((loan) => {
+        const dueMs = loan.dueDate ? new Date(String(loan.dueDate)).getTime() : NaN;
+        const isOverdue =
+          String(loan.status) === "overdue" ||
+          (String(loan.status) === "active" && Number.isFinite(dueMs) && dueMs < now);
+        return {
+          ...loan,
+          isOverdue,
+          remainingFine: fineRemaining({
+            fineAmount: loan.fineAmount,
+            finePaidAmount: loan.finePaidAmount,
+            finePaid: loan.finePaid,
+          }),
+        };
+      });
+
+      if (statusFilter === "overdue") {
+        loans = loans.filter((loan) => loan.isOverdue);
+      } else if (statusFilter === "active") {
+        loans = loans.filter((loan) => !loan.isOverdue);
+      }
+
+      const overdueCount = [...byId.values()].filter((loan) => {
+        const dueMs = loan.dueDate ? new Date(String(loan.dueDate)).getTime() : NaN;
+        return (
+          String(loan.status) === "overdue" ||
+          (String(loan.status) === "active" && Number.isFinite(dueMs) && dueMs < now)
+        );
+      }).length;
+      const activeCount = byId.size - overdueCount;
+
+      const userIds = [...new Set(loans.map((loan) => String(loan.userId || "")).filter(Boolean))];
+      const userSnaps = await Promise.all(
+        userIds.map((uid) => db.collection("users").doc(uid).get())
+      );
+      const usersById = new Map(
+        userSnaps
+          .filter((snap) => snap.exists)
+          .map((snap) => {
+            const data = snap.data() || {};
+            return [
+              snap.id,
+              {
+                email: String(data.email || ""),
+                displayName: String(data.displayName || ""),
+              },
+            ] as const;
+          })
+      );
+
+      loans = loans.map((loan) => {
+        const user = usersById.get(String(loan.userId || ""));
+        return {
+          ...loan,
+          userEmail: user?.email || "",
+          userDisplayName: user?.displayName || "",
+        };
+      });
+
+      if (q) {
+        loans = loans.filter((loan) => {
+          const hay = [
+            loan.title,
+            loan.isbn,
+            loan.copyId,
+            loan.userId,
+            loan.userEmail,
+            loan.userDisplayName,
+            loan.id,
+          ]
+            .map((v) => String(v || "").toLowerCase())
+            .join(" ");
+          return hay.includes(q);
+        });
+      }
+
+      loans.sort((a, b) => {
+        if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+        return String(a.dueDate || "").localeCompare(String(b.dueDate || ""));
+      });
+
+      const truncated =
+        activeSnap.size >= LIST_FETCH_CAP || overdueSnap.size >= LIST_FETCH_CAP;
+      const paged = paginateArray(loans, page, pageSize);
+
+      res.json({
+        loans: paged.results,
+        page: paged.page,
+        pageSize: paged.pageSize,
+        total: paged.total,
+        totalPages: paged.totalPages,
+        truncated,
+        overdueCount,
+        activeCount,
+      });
+    } catch (error) {
+      console.error("Admin loans list error:", error);
+      res.status(500).json({ error: "Failed to list loans" });
+    }
+  }
+);
 
 export default router;

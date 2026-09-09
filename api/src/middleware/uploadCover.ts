@@ -1,6 +1,7 @@
 import multer from "multer";
 import path from "path";
 
+// Book cover image upload (JPEG/PNG/WebP, max 5MB)
 const MAX_COVER_BYTES = 5 * 1024 * 1024;
 
 const allowedExt = new Set([".jpg", ".jpeg", ".png", ".webp"]);

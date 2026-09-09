@@ -1,13 +1,4 @@
-/**
- * Runs the QA scripts in order and reports a combined scorecard.
- *
- * Read-only / math checks first, then HTTP config, then mutating circulation
- * flows so a failure early does not leave the library mid-borrow.
- *
- * Usage (from repo root):
- *   npm run verify:suite
- *   npx tsx scripts/verify-suite.ts [apiBaseUrl]
- */
+/** ye script saari QA verify scripts order mein chala ke scorecard deta hai */
 import { spawnSync } from "child_process";
 import path from "path";
 
@@ -19,11 +10,13 @@ const STEPS: Array<{ name: string; file: string; args?: boolean }> = [
   { name: "digital covers", file: "verify-digital-covers.ts", args: true },
   { name: "notification dedupe", file: "verify-notifications.ts" },
   { name: "admin config HTTP", file: "verify-config-http.ts", args: true },
+  { name: "admin fix-pack", file: "verify-admin-fixpack.ts", args: true },
   { name: "librarian gates", file: "verify-librarian-gates.ts", args: true },
   { name: "ready-hold cancel", file: "verify-ready-cancel.ts", args: true },
   { name: "circulation flow", file: "verify-circulation-flow.ts", args: true },
   { name: "return copy match", file: "verify-return-copy.ts", args: true },
   { name: "fine collection", file: "verify-fines-collect.ts", args: true },
+  { name: "park smoke", file: "verify-park-smoke.ts", args: true },
 ];
 
 function runStep(step: (typeof STEPS)[number]): { ok: boolean; code: number } {
@@ -43,6 +36,7 @@ function runStep(step: (typeof STEPS)[number]): { ok: boolean; code: number } {
 }
 
 function main() {
+  // Har step order mein; pehle read-only phir mutating
   console.log(`DLMS QA suite against ${API_BASE}`);
   console.log("================================");
 

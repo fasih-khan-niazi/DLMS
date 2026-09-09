@@ -15,6 +15,7 @@ type Props = {
   route?: { params?: { initialTab?: ActivityTab } };
 };
 
+// ye screen loans / reservations tabs dikhati hai
 export default function ActivityScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, fontFamily, radius, space, type } = useTheme();

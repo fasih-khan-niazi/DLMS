@@ -1,12 +1,4 @@
-﻿/**
- * Digital cover URLs on catalog list, detail, and bookshelf.
- *
- * Home "continue reading" was blank because /bookshelf/mine omitted thumbnailUrl.
- * This asserts the URL is attached and the cover endpoint answers.
- *
- * Usage (from api/):
- *   npx tsx scripts/verify-digital-covers.ts [apiBaseUrl]
- */
+/** ye script digital cover URLs (list, detail, bookshelf) verify karta hai */
 import axios, { type AxiosInstance } from "axios";
 import { auth, db } from "../api/src/config/firebase";
 
@@ -51,6 +43,7 @@ async function main() {
   const http = await client(student.id);
   console.log(`Student ${student.id}`);
 
+  // 1) Digital list pe cover URL
   console.log(`\n1) GET /api/digital-books`);
   const list = await http.get("/api/digital-books", { params: { page: 1, pageSize: 10 } });
   if (list.status !== 200) {
@@ -59,7 +52,7 @@ async function main() {
     const results: Array<{ digitalBookId?: string; thumbnailUrl?: string }> = list.data.results || [];
     const missing = results.filter((row) => !hasCoverUrl(row));
     if (results.length === 0) {
-      console.log("   (no digital titles â€” skip list cover check)");
+      console.log("   (no digital titles - skip list cover check)");
     } else if (missing.length === 0) {
       pass(`${results.length} list row(s) include thumbnailUrl`);
     } else {
@@ -67,6 +60,7 @@ async function main() {
     }
   }
 
+  // 2) Bookshelf / continue-reading cover
   console.log(`\n2) GET /api/digital-books/bookshelf/mine`);
   const shelf = await http.get("/api/digital-books/bookshelf/mine");
   if (shelf.status !== 200) {
@@ -76,7 +70,7 @@ async function main() {
       shelf.data.items || [];
     const missing = items.filter((row) => !hasCoverUrl(row));
     if (items.length === 0) {
-      console.log("   (empty bookshelf â€” Home continue-reading will be empty, which is fine)");
+      console.log("   (empty bookshelf - Home continue-reading will be empty, which is fine)");
       pass("bookshelf endpoint is reachable");
     } else if (missing.length === 0) {
       pass(`${items.length} bookshelf item(s) include thumbnailUrl`);
@@ -88,6 +82,7 @@ async function main() {
   const digitalSnap = await db.collection("digitalBooks").limit(1).get();
   if (!digitalSnap.empty) {
     const digitalBookId = digitalSnap.docs[0].id;
+    // 3) Cover-image endpoint
     console.log(`\n3) GET /api/digital-books/${digitalBookId}/cover-image`);
     const cover = await http.get(`/api/digital-books/${digitalBookId}/cover-image`, {
       responseType: "arraybuffer",
@@ -101,7 +96,7 @@ async function main() {
       fail(`cover-image returned ${cover.status}`);
     }
   } else {
-    console.log("\n3) No digitalBooks documents â€” skip cover-image fetch");
+    console.log("\n3) No digitalBooks documents - skip cover-image fetch");
   }
 
   console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : `${failures} CHECK(S) FAILED`}`);

@@ -20,6 +20,7 @@ type Props = {
   embedded?: boolean;
 };
 
+// ye screen student loans dikhati hai
 export default function MyLoansScreen({ navigation, embedded }: Props) {
   const { colors, fontFamily, space, type } = useTheme();
   const [loans, setLoans] = useState<any[]>([]);

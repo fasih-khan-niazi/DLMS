@@ -11,6 +11,7 @@ const OnboardingContext = createContext<OnboardingContextValue>({
   openOnboarding: () => {},
 });
 
+// pehli baar onboarding carousel
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const { profile } = useProfile();
   const [visible, setVisible] = useState(false);

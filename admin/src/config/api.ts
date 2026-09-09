@@ -1,7 +1,7 @@
 import axios from "axios";
 import { firebaseAuth } from "./firebase";
 
-/** Default = Render Week 1 API. Override with VITE_API_URL in admin/.env */
+// API base URL - local ke liye VITE_API_URL set karo
 export const API_BASE_URL = (
   import.meta.env.VITE_API_URL || "https://dlms-csij.onrender.com"
 ).replace(/\/$/, "");
@@ -11,6 +11,7 @@ export const api = axios.create({
   timeout: 60000,
 });
 
+// har request pe Firebase token lagata hai
 api.interceptors.request.use(async (config) => {
   const user = firebaseAuth.currentUser;
   if (user) {

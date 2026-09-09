@@ -52,6 +52,7 @@ type ModalState =
   | { kind: "error"; title: string; message: string }
   | null;
 
+// ye screen staff fines collect karti hai
 export default function CollectFinesScreen({ navigation }: Props) {
   const { colors, fontFamily, space, type } = useTheme();
   const [email, setEmail] = useState("");

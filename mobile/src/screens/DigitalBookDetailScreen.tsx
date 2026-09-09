@@ -27,6 +27,7 @@ type Props = {
   route: RouteProp<{ params: { digitalBookId: string } }, "params">;
 };
 
+// ye screen digital book detail aur open/read dikhati hai
 export default function DigitalBookDetailScreen({ navigation, route }: Props) {
   const { digitalBookId } = route.params;
   const { isStaff } = useProfile();

@@ -38,11 +38,7 @@ import { getAppConfig, peekLibrariansCanBorrow } from "../utils/appConfig";
 
 type Mode = "borrow" | "return";
 
-/**
- * The scan overlay always sits on a live camera feed, so its colours are fixed
- * rather than themed. Theme tokens invert in dark mode (`colors.white` becomes
- * a dark navy), which would make these controls disappear over the camera.
- */
+// camera overlay colours fixed - theme dark mode pe invert nahi hona chahiye
 const ON_CAMERA_TEXT = "#FFFFFF";
 const ON_CAMERA_TEXT_DIM = "rgba(255,255,255,0.85)";
 const ON_CAMERA_BACKDROP = "#141F28";
@@ -87,11 +83,11 @@ async function resolveCopyLabel(copyId: string, isbn: string): Promise<string> {
     const idx = (data.copies || []).findIndex((c: { copyId: string }) => c.copyId === copyId);
     if (idx >= 0) return `Copy ${idx + 1}`;
   } catch {
-    // ignore
   }
   return "Copy";
 }
 
+// yahan QR scan hota hai - borrow / return
 export default function ScanScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
@@ -188,8 +184,7 @@ export default function ScanScreen({ navigation }: Props) {
       return;
     }
 
-    // Past this point the server has committed the loan change. Nothing below is
-    // allowed to surface as a scan failure.
+    // server pe loan change ho chuka - neeche failure mat dikhao
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
     const title = response.data?.title || "Book";
@@ -207,7 +202,6 @@ export default function ScanScreen({ navigation }: Props) {
     try {
       await refresh();
     } catch {
-      // counts still refresh on next focus
     }
 
     setResult({
@@ -226,7 +220,6 @@ export default function ScanScreen({ navigation }: Props) {
         await pushScanHistory({ title, copyLabel, mode });
         await loadHistory();
       } catch {
-        // scan history is cosmetic; never block or fail the scan result
       }
     }
   };

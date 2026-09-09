@@ -9,7 +9,6 @@ type Props = {
   width?: number;
   height?: number;
   style?: ViewStyle;
-  /** Bumps when the cover changes so cached images reload. */
   cacheKey?: string | number;
 };
 
@@ -63,7 +62,7 @@ export function BookCover({ uri, width = 72, height = 108, style, cacheKey }: Pr
   }, [uri, cacheKey]);
 
   const showImage = !!displayUri && !failed;
-  // Prefer branded placeholder over a spinner so catalog stays calm while covers fetch.
+  // cover load hote waqt spinner nahi - placeholder dikhao
   const showSpinner = false;
 
   return (

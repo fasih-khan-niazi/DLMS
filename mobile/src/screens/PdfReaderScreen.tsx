@@ -51,6 +51,7 @@ async function applyOrientation(lock: ReaderPrefs["orientation"]) {
   }
 }
 
+// ye screen PDF reader hai - zoom aur page/scroll mode
 export default function PdfReaderScreen({ navigation, route }: Props) {
   const {
     digitalBookId,
@@ -116,7 +117,6 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
         totalPages: snap.totalPages,
       });
     } catch {
-      // best effort
     }
   }, [digitalBookId, onBookshelf]);
 
@@ -136,7 +136,7 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
       try {
         const savedPrefs = await getReaderPrefs();
         if (cancelled) return;
-        // Enforce XOR: landscape only with scroll
+        // landscape sirf scroll mode ke sath
         if (savedPrefs.orientation === "landscape" && savedPrefs.readMode === "page") {
           savedPrefs.readMode = "scroll";
         }
@@ -199,13 +199,12 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
         setError(data.message || "Reader error");
       }
     } catch {
-      // ignore
     }
   };
 
   const applySettings = async () => {
     let next = { ...draftPrefs };
-    // Mutual exclusion
+    // landscape aur page mode ek sath nahi
     if (next.orientation === "landscape") next.readMode = "scroll";
     if (next.readMode === "page") next.orientation = "portrait";
 
