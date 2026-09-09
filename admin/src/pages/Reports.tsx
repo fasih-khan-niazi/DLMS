@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { api } from "../config/api";
-import { EmptyState, PageHeader, useToast } from "../components/ui";
+import { EmptyState, FilterChips, PageHeader, useToast } from "../components/ui";
 import { extractApiError } from "../utils/apiError";
 
 type ReportMetrics = {
@@ -58,10 +58,18 @@ const METRIC_LABELS: { key: keyof ReportMetrics; label: string }[] = [
   { key: "activeLoansNow", label: "Active loans (now)" },
 ];
 
+const PRESETS = [
+  { id: "7", label: "Last 7 days", days: 7 },
+  { id: "30", label: "Last 30 days", days: 30 },
+  { id: "90", label: "Last 90 days", days: 90 },
+  { id: "custom", label: "Custom", days: 0 },
+];
+
 export function ReportsPage() {
   const { showToast } = useToast();
   const [from, setFrom] = useState(() => daysAgoLocalIso(30));
   const [to, setTo] = useState(() => todayLocalIso());
+  const [preset, setPreset] = useState("30");
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
@@ -95,8 +103,20 @@ export function ReportsPage() {
     [showToast]
   );
 
+  function applyPreset(id: string) {
+    setPreset(id);
+    if (id === "custom") return;
+    const days = PRESETS.find((p) => p.id === id)?.days || 30;
+    const nextFrom = daysAgoLocalIso(days - 1);
+    const nextTo = todayLocalIso();
+    setFrom(nextFrom);
+    setTo(nextTo);
+    void loadSummary(nextFrom, nextTo);
+  }
+
   function onLoad(e: FormEvent) {
     e.preventDefault();
+    setPreset("custom");
     void loadSummary(from, to);
   }
 
@@ -153,19 +173,37 @@ export function ReportsPage() {
   }, [summary]);
 
   return (
-    <div className="page">
+    <div className="page reports-print">
       <PageHeader
-        title="Reports"
         subtitle="Date-range circulation metrics. CSV is spreadsheet-friendly; PDF is a printable summary."
+        actions={
+          <button
+            type="button"
+            className="btn btn-soft no-print"
+            onClick={() => window.print()}
+          >
+            Print view
+          </button>
+        }
       />
 
-      <form className="toolbar reports-toolbar" onSubmit={onLoad}>
+      <FilterChips
+        chips={PRESETS.map((p) => ({ id: p.id, label: p.label }))}
+        value={preset}
+        onChange={applyPreset}
+        ariaLabel="Report range presets"
+      />
+
+      <form className="toolbar reports-toolbar no-print" onSubmit={onLoad}>
         <label>
           From
           <input
             type="date"
             value={from}
-            onChange={(e) => setFrom(e.target.value)}
+            onChange={(e) => {
+              setFrom(e.target.value);
+              setPreset("custom");
+            }}
             required
           />
         </label>
@@ -174,7 +212,10 @@ export function ReportsPage() {
           <input
             type="date"
             value={to}
-            onChange={(e) => setTo(e.target.value)}
+            onChange={(e) => {
+              setTo(e.target.value);
+              setPreset("custom");
+            }}
             required
           />
         </label>
@@ -199,7 +240,7 @@ export function ReportsPage() {
         </button>
       </form>
 
-      <p className="muted small reports-note">
+      <p className="muted small reports-note no-print">
         CSV includes daily series and totals for the selected range. PDF is a compact printable
         overview of the same metrics.
       </p>
@@ -229,7 +270,7 @@ export function ReportsPage() {
           </div>
 
           <h2 className="section-title">Daily activity</h2>
-          <div className="table-wrap">
+          <div className="table-wrap sticky-head">
             <table>
               <thead>
                 <tr>
@@ -264,7 +305,7 @@ export function ReportsPage() {
       {!summary && !loading && !error ? (
         <EmptyState
           title="Load a report range"
-          message="Choose From and To dates, then load the summary. You can export CSV or PDF for the same range."
+          message="Pick a preset or choose From and To dates, then load the summary. You can export CSV or PDF for the same range."
         />
       ) : null}
     </div>

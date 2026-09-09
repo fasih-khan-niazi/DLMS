@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ConfirmDialog } from "./ui";
@@ -18,6 +18,18 @@ const navItems: Array<{
   { to: "/fines", label: "Fines", icon: FinesIcon },
   { to: "/reports", label: "Reports", icon: ReportsIcon },
 ];
+
+const PAGE_TITLES: Record<string, string> = {
+  "/": "Dashboard",
+  "/users": "Users",
+  "/catalog": "Catalog",
+  "/config": "Configuration",
+  "/reservations": "Reservations",
+  "/fines": "Fines",
+  "/reports": "Reports",
+};
+
+const DENSITY_KEY = "dlms.admin.density";
 
 function DashboardIcon() {
   return (
@@ -87,6 +99,14 @@ function ReportsIcon() {
   );
 }
 
+function getStoredDensity(): "comfortable" | "compact" {
+  try {
+    return localStorage.getItem(DENSITY_KEY) === "compact" ? "compact" : "comfortable";
+  } catch {
+    return "comfortable";
+  }
+}
+
 export function Layout() {
   const { profile, logout } = useAuth();
   const location = useLocation();
@@ -94,10 +114,24 @@ export function Layout() {
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme());
+  const [density, setDensity] = useState<"comfortable" | "compact">(() => getStoredDensity());
+
+  const pageTitle = useMemo(() => {
+    return PAGE_TITLES[location.pathname] || "Admin";
+  }, [location.pathname]);
 
   useEffect(() => {
     setNavOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-density", density);
+    try {
+      localStorage.setItem(DENSITY_KEY, density);
+    } catch {
+      // ignore
+    }
+  }, [density]);
 
   useEffect(() => {
     if (!navOpen) return;
@@ -107,6 +141,32 @@ export function Layout() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [navOpen]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable);
+      if (typing) return;
+
+      if (e.key === "/" ) {
+        e.preventDefault();
+        const search = document.querySelector<HTMLInputElement>(
+          'input[type="search"], input[data-search="1"]'
+        );
+        search?.focus();
+      }
+      if (e.key === "Escape") {
+        setSignOutOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   async function confirmSignOut() {
     setSigningOut(true);
@@ -181,15 +241,33 @@ export function Layout() {
           <button
             type="button"
             className="btn btn-ghost"
+            onClick={() =>
+              setDensity((d) => (d === "compact" ? "comfortable" : "compact"))
+            }
+          >
+            {density === "compact" ? "Comfortable density" : "Compact density"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
             onClick={() => setSignOutOpen(true)}
           >
             Sign out
           </button>
         </div>
       </aside>
-      <main className="main">
-        <Outlet />
-      </main>
+      <div className="shell-content">
+        <header className="topbar">
+          <div>
+            <p className="topbar-crumb muted small">Admin / {pageTitle}</p>
+            <h1 className="topbar-title">{pageTitle}</h1>
+          </div>
+          <p className="topbar-hint muted small">Press / to focus search</p>
+        </header>
+        <main className="main">
+          <Outlet />
+        </main>
+      </div>
 
       <ConfirmDialog
         open={signOutOpen}

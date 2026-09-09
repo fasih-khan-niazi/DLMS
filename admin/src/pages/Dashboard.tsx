@@ -14,7 +14,31 @@ type DashboardStats = {
   unpaidFinesTotal: number;
 };
 
+type DayBucket = {
+  date: string;
+  loans: number;
+  returns: number;
+  reservations: number;
+};
+
 const CACHE_KEY = "dlms.admin.dashboard";
+
+function daysAgoLocalIso(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function todayLocalIso(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export function DashboardPage() {
   const { showToast } = useToast();
@@ -26,6 +50,7 @@ export function DashboardPage() {
       return null;
     }
   });
+  const [series, setSeries] = useState<DayBucket[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!stats);
   const [refreshing, setRefreshing] = useState(false);
@@ -36,9 +61,17 @@ export function DashboardPage() {
       if (opts?.silent && stats) setRefreshing(true);
       else if (!opts?.silent) setLoading(true);
       try {
-        const { data } = await api.get<DashboardStats>("/api/admin/dashboard");
-        setStats(data);
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        const [dash, report] = await Promise.all([
+          api.get<DashboardStats>("/api/admin/dashboard"),
+          api
+            .get<{ series: DayBucket[] }>("/api/admin/reports/summary", {
+              params: { from: daysAgoLocalIso(6), to: todayLocalIso() },
+            })
+            .catch(() => ({ data: { series: [] as DayBucket[] } })),
+        ]);
+        setStats(dash.data);
+        setSeries(report.data.series || []);
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(dash.data));
         setError(null);
         setLastRefreshed(new Date());
         if (opts?.toast) showToast("Dashboard updated", "success");
@@ -98,7 +131,6 @@ export function DashboardPage() {
   return (
     <div className="page">
       <PageHeader
-        title="Dashboard"
         subtitle="What needs attention across circulation and accounts"
         actions={
           <div className="page-header-actions">
@@ -166,6 +198,28 @@ export function DashboardPage() {
               )}
             </div>
           </section>
+
+          {series.length > 0 ? (
+            <section className="dash-section">
+              <h2 className="section-title">Last 7 days</h2>
+              <div className="activity-strip" aria-label="Daily loans last week">
+                {series.map((day) => {
+                  const max = Math.max(...series.map((d) => d.loans), 1);
+                  const height = Math.max(8, Math.round((day.loans / max) * 56));
+                  return (
+                    <div key={day.date} className="activity-day" title={`${day.date}: ${day.loans} loans`}>
+                      <div className="activity-bar" style={{ height }} />
+                      <span className="activity-label muted small">
+                        {day.date.slice(5)}
+                      </span>
+                      <span className="activity-count muted small">{day.loans}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="muted small">Bars show loans created each day. Open Reports for full ranges.</p>
+            </section>
+          ) : null}
 
           <section className="dash-section">
             <h2 className="section-title">Quick links</h2>

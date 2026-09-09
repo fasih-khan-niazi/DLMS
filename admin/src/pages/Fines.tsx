@@ -1,6 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../config/api";
-import { ConfirmDialog, PageHeader, useToast } from "../components/ui";
+import {
+  ConfirmDialog,
+  CopyId,
+  FilterChips,
+  PageHeader,
+  Pagination,
+  useToast,
+} from "../components/ui";
 import { extractApiError } from "../utils/apiError";
 
 type FineUser = {
@@ -27,6 +34,8 @@ type PendingPay = {
   amount: number;
 };
 
+const PAGE_SIZE = 15;
+
 export function FinesPage() {
   const { showToast } = useToast();
   const [users, setUsers] = useState<FineUser[]>([]);
@@ -35,6 +44,8 @@ export function FinesPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingPay | null>(null);
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState("loans");
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -45,6 +56,7 @@ export function FinesPage() {
       );
       setUsers(data.users);
       setLoans(data.loans);
+      setPage(1);
     } catch (err) {
       const msg = extractApiError(err, "Failed to load fines");
       setError(msg);
@@ -75,10 +87,22 @@ export function FinesPage() {
     }
   }
 
+  const pagedUsers = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return users.slice(start, start + PAGE_SIZE);
+  }, [users, page]);
+
+  const pagedLoans = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return loans.slice(start, start + PAGE_SIZE);
+  }, [loans, page]);
+
+  const total = view === "users" ? users.length : loans.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
   return (
     <div className="page">
       <PageHeader
-        title="Fines"
         subtitle="Outstanding balances and loan-level fines. Mark paid clears the full fine on one loan. Partial cash collection is done in the mobile Collect fines desk flow."
         actions={
           <button
@@ -92,6 +116,19 @@ export function FinesPage() {
         }
       />
 
+      <FilterChips
+        chips={[
+          { id: "loans", label: `Loans (${loans.length})` },
+          { id: "users", label: `Users (${users.length})` },
+        ]}
+        value={view}
+        onChange={(id) => {
+          setView(id);
+          setPage(1);
+        }}
+        ariaLabel="Fines views"
+      />
+
       {error ? <p className="error-banner">{error}</p> : null}
 
       {loading ? (
@@ -99,10 +136,9 @@ export function FinesPage() {
           <div className="skeleton-block tall" />
           <div className="skeleton-block tall" />
         </div>
-      ) : (
+      ) : view === "users" ? (
         <>
-          <h2 className="section-title">Users with unpaid fines</h2>
-          <div className="table-wrap">
+          <div className="table-wrap sticky-head">
             <table>
               <thead>
                 <tr>
@@ -112,14 +148,14 @@ export function FinesPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.length === 0 ? (
+                {pagedUsers.length === 0 ? (
                   <tr>
                     <td colSpan={3} className="empty-cell">
                       No users with unpaid fines.
                     </td>
                   </tr>
                 ) : (
-                  users.map((u) => (
+                  pagedUsers.map((u) => (
                     <tr key={u.id}>
                       <td>{u.displayName || "-"}</td>
                       <td>{u.email || "-"}</td>
@@ -134,9 +170,17 @@ export function FinesPage() {
               </tbody>
             </table>
           </div>
-
-          <h2 className="section-title">Loans with unpaid fines</h2>
-          <div className="table-wrap">
+          <Pagination
+            page={Math.min(page, totalPages)}
+            totalPages={users.length === 0 ? 0 : totalPages}
+            total={users.length}
+            disabled={loading}
+            onPageChange={setPage}
+          />
+        </>
+      ) : (
+        <>
+          <div className="table-wrap sticky-head">
             <table>
               <thead>
                 <tr>
@@ -148,21 +192,25 @@ export function FinesPage() {
                 </tr>
               </thead>
               <tbody>
-                {loans.length === 0 ? (
+                {pagedLoans.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="empty-cell">
                       No unpaid loan fines.
                     </td>
                   </tr>
                 ) : (
-                  loans.map((loan) => (
+                  pagedLoans.map((loan) => (
                     <tr key={loan.id}>
                       <td>
                         <div>{loan.title || "-"}</div>
                         <div className="muted small">{loan.isbn || loan.copyId}</div>
                       </td>
-                      <td className="mono">{loan.userId}</td>
-                      <td className="mono">{loan.id}</td>
+                      <td>
+                        <CopyId value={String(loan.userId || "")} label="User ID" />
+                      </td>
+                      <td>
+                        <CopyId value={loan.id} label="Loan ID" />
+                      </td>
                       <td>
                         <span className="status-pill danger">Rs {loan.fineAmount ?? 0}</span>
                       </td>
@@ -187,6 +235,13 @@ export function FinesPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={Math.min(page, totalPages)}
+            totalPages={loans.length === 0 ? 0 : totalPages}
+            total={loans.length}
+            disabled={loading}
+            onPageChange={setPage}
+          />
         </>
       )}
 

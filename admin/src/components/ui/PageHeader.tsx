@@ -1,16 +1,17 @@
 import type { ReactNode } from "react";
 
 type Props = {
-  title: string;
+  /** Optional. Shell top bar already shows the page name. */
+  title?: string;
   subtitle?: string;
   actions?: ReactNode;
 };
 
 export function PageHeader({ title, subtitle, actions }: Props) {
   return (
-    <header className="page-header">
+    <header className={`page-header${title ? "" : " page-header-intro"}`}>
       <div>
-        <h1>{title}</h1>
+        {title ? <h1>{title}</h1> : null}
         {subtitle ? <p className="muted">{subtitle}</p> : null}
       </div>
       {actions ? <div className="page-header-actions">{actions}</div> : null}

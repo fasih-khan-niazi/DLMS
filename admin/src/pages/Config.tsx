@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, API_BASE_URL } from "../config/api";
-import { PageHeader, useToast } from "../components/ui";
+import { api } from "../config/api";
+import { PageHeader, ToggleSwitch, useToast } from "../components/ui";
 import { extractApiError } from "../utils/apiError";
 
 type SystemConfig = {
@@ -17,6 +17,17 @@ type SystemConfig = {
   timezone?: string;
   catalogPageSize?: number;
 };
+
+type ConfigTab = "loans" | "fines" | "reservations" | "calendar" | "catalog" | "digital";
+
+const TABS: { id: ConfigTab; label: string }[] = [
+  { id: "loans", label: "Loans" },
+  { id: "fines", label: "Fines" },
+  { id: "reservations", label: "Reservations" },
+  { id: "calendar", label: "Calendar" },
+  { id: "catalog", label: "Catalog" },
+  { id: "digital", label: "Digital" },
+];
 
 const defaults: SystemConfig = {
   maxBorrowLimit: 5,
@@ -50,6 +61,7 @@ const TOGGLE_FIELDS = ["allowInAppCopyBorrow", "librariansCanBorrow"] as const;
 
 export function ConfigPage() {
   const { showToast } = useToast();
+  const [tab, setTab] = useState<ConfigTab>("loans");
   const [form, setForm] = useState<SystemConfig>(defaults);
   const [reminderText, setReminderText] = useState("2,1");
   const [daysOffText, setDaysOffText] = useState("Sunday");
@@ -206,10 +218,10 @@ export function ConfigPage() {
       if (dropped.length > 0) {
         setUnsupported(dropped);
         const msg =
-          `Saved, but this API rejected ${dropped.length} setting(s): ` +
-          `${dropped.map(labelFor).join(", ")}.`;
+          `Saved, but ${dropped.length} setting(s) were not applied: ` +
+          `${dropped.map(labelFor).join(", ")}. Redeploy the API if this persists.`;
         setError(msg);
-        showToast("Saved with partial support from this API", "info");
+        showToast("Saved with partial support", "info");
       } else {
         setUnsupported([]);
         showToast("Configuration saved", "success");
@@ -226,7 +238,7 @@ export function ConfigPage() {
   if (loading) {
     return (
       <div className="page">
-        <PageHeader title="Configuration" subtitle="Loading system settings..." />
+        <PageHeader subtitle="Loading system settings..." />
         <div className="skeleton-stack">
           <div className="skeleton-block" />
           <div className="skeleton-block" />
@@ -239,211 +251,220 @@ export function ConfigPage() {
   return (
     <div className="page">
       <PageHeader
-        title="Configuration"
-        subtitle="Grouped system settings for loans, fines, reservations, calendar, and digital library."
-        actions={<span className="pill muted-pill mono">{API_BASE_URL}</span>}
+        subtitle="Library rules for loans, fines, reservations, calendar, catalog, and digital uploads."
       />
 
       {error ? <p className="error-banner">{error}</p> : null}
       {unsupported.length > 0 ? (
         <p className="error-banner">
-          This API does not support {unsupported.map(labelFor).join(", ")}. Point the portal at an
-          API that has these settings (set VITE_API_URL in admin/.env, then restart the dev server),
-          or redeploy the API. Until then those controls cannot be saved.
+          Some settings are unavailable on this API build: {unsupported.map(labelFor).join(", ")}.
+          Redeploy the latest API so those controls can be saved.
         </p>
       ) : null}
 
-      <form className="config-form config-form-sections" onSubmit={(e) => void onSubmit(e)}>
-        <section className="config-section">
-          <div className="config-section-head">
-            <h2>Loans</h2>
-            <p className="muted small">Borrow limits and loan duration</p>
-          </div>
-          <div className="config-grid">
-            <label>
-              Max borrow limit
-              <input
-                type="number"
-                min={1}
-                value={form.maxBorrowLimit ?? 5}
-                onChange={(e) => updateNumber("maxBorrowLimit", e.target.value)}
-              />
-            </label>
-            <label>
-              Loan period (days)
-              <input
-                type="number"
-                min={1}
-                value={form.loanPeriodDays ?? 14}
-                onChange={(e) => updateNumber("loanPeriodDays", e.target.value)}
-              />
-            </label>
-            <label className="checkbox-row config-span">
-              <input
-                type="checkbox"
-                checked={!!form.librariansCanBorrow}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, librariansCanBorrow: e.target.checked }))
-                }
-              />
-              <span>
-                Librarians can borrow physical books
-                <span className="muted small" style={{ display: "block", fontWeight: 400 }}>
-                  Off cancels librarian reservations and limits Scan to returns only.
-                </span>
-              </span>
-            </label>
-            <label className="checkbox-row config-span">
-              <input
-                type="checkbox"
-                checked={!!form.allowInAppCopyBorrow}
-                disabled={unsupported.includes("allowInAppCopyBorrow")}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, allowInAppCopyBorrow: e.target.checked }))
-                }
-              />
-              <span>
-                Allow in-app copy borrow/return
-                <span className="muted small" style={{ display: "block", fontWeight: 400 }}>
-                  Scan remains primary. Default is off.
-                  {unsupported.includes("allowInAppCopyBorrow")
-                    ? " Not supported by the connected API."
-                    : ""}
-                </span>
-              </span>
-            </label>
-          </div>
-        </section>
+      <div className="config-tabs" role="tablist" aria-label="Configuration sections">
+        {TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            className={tab === item.id ? "config-tab active" : "config-tab"}
+            onClick={() => setTab(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
 
-        <section className="config-section">
-          <div className="config-section-head">
-            <h2>Fines</h2>
-            <p className="muted small">
-              Late charges. Returning a copy with an unpaid fine is always blocked until the desk
-              records payment. This toggle only controls new borrows and reservations.
-            </p>
-          </div>
-          <div className="config-grid">
-            <label>
-              Fine per day (Rs)
-              <input
-                type="number"
-                min={0}
-                value={form.finePerDayRs ?? 50}
-                onChange={(e) => updateNumber("finePerDayRs", e.target.value)}
-              />
-            </label>
-            <label className="checkbox-row config-span">
-              <input
-                type="checkbox"
-                checked={!!form.blockCheckoutIfUnpaidFine}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, blockCheckoutIfUnpaidFine: e.target.checked }))
-                }
-              />
-              <span>
-                Block new borrows and reservations while unpaid fines exist
-                <span className="muted small" style={{ display: "block", fontWeight: 400 }}>
-                  Off means they can still borrow or reserve with a balance. They still cannot
-                  return a late copy until that fine is paid.
-                </span>
-              </span>
-            </label>
-          </div>
-        </section>
+      <form className="config-form config-form-tabbed" onSubmit={(e) => void onSubmit(e)}>
+        {tab === "loans" ? (
+          <section className="config-section" role="tabpanel">
+            <div className="config-section-head">
+              <h2>Loans</h2>
+              <p className="muted small">Borrow limits, loan length, and who may borrow</p>
+            </div>
+            <div className="config-grid">
+              <label>
+                Max borrow limit
+                <input
+                  type="number"
+                  min={1}
+                  value={form.maxBorrowLimit ?? 5}
+                  onChange={(e) => updateNumber("maxBorrowLimit", e.target.value)}
+                />
+              </label>
+              <label>
+                Loan period (days)
+                <input
+                  type="number"
+                  min={1}
+                  value={form.loanPeriodDays ?? 14}
+                  onChange={(e) => updateNumber("loanPeriodDays", e.target.value)}
+                />
+              </label>
+              <div className="config-span">
+                <ToggleSwitch
+                  checked={!!form.librariansCanBorrow}
+                  onChange={(checked) =>
+                    setForm((p) => ({ ...p, librariansCanBorrow: checked }))
+                  }
+                  label="Librarians can borrow physical books"
+                  description="Off cancels librarian reservations and limits Scan to returns only."
+                />
+              </div>
+              <div className="config-span">
+                <ToggleSwitch
+                  checked={!!form.allowInAppCopyBorrow}
+                  disabled={unsupported.includes("allowInAppCopyBorrow")}
+                  onChange={(checked) =>
+                    setForm((p) => ({ ...p, allowInAppCopyBorrow: checked }))
+                  }
+                  label="Allow in-app copy borrow and return"
+                  description={
+                    unsupported.includes("allowInAppCopyBorrow")
+                      ? "Unavailable on this API build. Scan remains the primary path."
+                      : "Scan remains primary. Default is off."
+                  }
+                />
+              </div>
+            </div>
+          </section>
+        ) : null}
 
-        <section className="config-section">
-          <div className="config-section-head">
-            <h2>Reservations</h2>
-            <p className="muted small">Hold window after a copy becomes ready</p>
-          </div>
-          <div className="config-grid">
-            <label>
-              Reservation hold (hours)
-              <input
-                type="number"
-                min={1}
-                value={form.reservationHoldHours ?? 72}
-                onChange={(e) => updateNumber("reservationHoldHours", e.target.value)}
-              />
-            </label>
-          </div>
-        </section>
+        {tab === "fines" ? (
+          <section className="config-section" role="tabpanel">
+            <div className="config-section-head">
+              <h2>Fines</h2>
+              <p className="muted small">
+                Late charges. Returning a copy with an unpaid fine is always blocked until payment
+                is recorded. The toggle below only controls new borrows and reservations.
+              </p>
+            </div>
+            <div className="config-grid">
+              <label>
+                Fine per day (Rs)
+                <input
+                  type="number"
+                  min={0}
+                  value={form.finePerDayRs ?? 50}
+                  onChange={(e) => updateNumber("finePerDayRs", e.target.value)}
+                />
+              </label>
+              <div className="config-span">
+                <ToggleSwitch
+                  checked={!!form.blockCheckoutIfUnpaidFine}
+                  onChange={(checked) =>
+                    setForm((p) => ({ ...p, blockCheckoutIfUnpaidFine: checked }))
+                  }
+                  label="Block new borrows and reservations while unpaid fines exist"
+                  description="Off means readers can still borrow or reserve with a balance. They still cannot return a late copy until that fine is paid."
+                />
+              </div>
+            </div>
+          </section>
+        ) : null}
 
-        <section className="config-section">
-          <div className="config-section-head">
-            <h2>Calendar and reminders</h2>
-            <p className="muted small">Timezone, closed days, and due reminders</p>
-          </div>
-          <div className="config-grid">
-            <label>
-              Timezone
-              <input
-                type="text"
-                value={form.timezone || "Asia/Karachi"}
-                onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
-              />
-            </label>
-            <label>
-              Reminder days before due
-              <input
-                type="text"
-                value={reminderText}
-                onChange={(e) => setReminderText(e.target.value)}
-                placeholder="2,1"
-              />
-              <span className="field-hint">Comma-separated day offsets (example: 2,1)</span>
-            </label>
-            <label className="config-span">
-              Working days off
-              <input
-                type="text"
-                value={daysOffText}
-                onChange={(e) => setDaysOffText(e.target.value)}
-                placeholder="Sunday"
-              />
-              <span className="field-hint">Comma-separated weekday names</span>
-            </label>
-          </div>
-        </section>
+        {tab === "reservations" ? (
+          <section className="config-section" role="tabpanel">
+            <div className="config-section-head">
+              <h2>Reservations</h2>
+              <p className="muted small">Hold window after a copy becomes ready for pickup</p>
+            </div>
+            <div className="config-grid">
+              <label>
+                Reservation hold (hours)
+                <input
+                  type="number"
+                  min={1}
+                  value={form.reservationHoldHours ?? 72}
+                  onChange={(e) => updateNumber("reservationHoldHours", e.target.value)}
+                />
+              </label>
+            </div>
+          </section>
+        ) : null}
 
-        <section className="config-section">
-          <div className="config-section-head">
-            <h2>Catalog</h2>
-            <p className="muted small">How many titles appear per page in mobile and admin lists</p>
-          </div>
-          <div className="config-grid">
-            <label>
-              Books per page
-              <input
-                type="number"
-                min={5}
-                max={50}
-                value={form.catalogPageSize ?? 10}
-                onChange={(e) => updateNumber("catalogPageSize", e.target.value)}
-              />
-              <span className="field-hint">Between 5 and 50. Default is 10.</span>
-            </label>
-          </div>
-        </section>
+        {tab === "calendar" ? (
+          <section className="config-section" role="tabpanel">
+            <div className="config-section-head">
+              <h2>Calendar and reminders</h2>
+              <p className="muted small">Timezone, closed days, and due reminders</p>
+            </div>
+            <div className="config-grid">
+              <label>
+                Timezone
+                <input
+                  type="text"
+                  value={form.timezone || "Asia/Karachi"}
+                  onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
+                />
+              </label>
+              <label>
+                Reminder days before due
+                <input
+                  type="text"
+                  value={reminderText}
+                  onChange={(e) => setReminderText(e.target.value)}
+                  placeholder="2,1"
+                />
+                <span className="field-hint">Comma-separated day offsets (example: 2,1)</span>
+              </label>
+              <label className="config-span">
+                Working days off
+                <input
+                  type="text"
+                  value={daysOffText}
+                  onChange={(e) => setDaysOffText(e.target.value)}
+                  placeholder="Sunday"
+                />
+                <span className="field-hint">Comma-separated weekday names</span>
+              </label>
+            </div>
+          </section>
+        ) : null}
 
-        <section className="config-section">
-          <div className="config-section-head">
-            <h2>Digital library</h2>
-            <p className="muted small">Upload limits for PDF resources</p>
-          </div>
-          <div className="config-grid">
-            <label>
-              Max PDF size (MB)
-              <input
-                type="number"
-                min={1}
-                value={form.maxPdfSizeMb ?? 25}
-                onChange={(e) => updateNumber("maxPdfSizeMb", e.target.value)}
-              />
-            </label>
-          </div>
-        </section>
+        {tab === "catalog" ? (
+          <section className="config-section" role="tabpanel">
+            <div className="config-section-head">
+              <h2>Catalog</h2>
+              <p className="muted small">How many titles appear per page in lists</p>
+            </div>
+            <div className="config-grid">
+              <label>
+                Books per page
+                <input
+                  type="number"
+                  min={5}
+                  max={50}
+                  value={form.catalogPageSize ?? 10}
+                  onChange={(e) => updateNumber("catalogPageSize", e.target.value)}
+                />
+                <span className="field-hint">Between 5 and 50. Default is 10.</span>
+              </label>
+            </div>
+          </section>
+        ) : null}
+
+        {tab === "digital" ? (
+          <section className="config-section" role="tabpanel">
+            <div className="config-section-head">
+              <h2>Digital library</h2>
+              <p className="muted small">Upload limits for PDF resources</p>
+            </div>
+            <div className="config-grid">
+              <label>
+                Max PDF size (MB)
+                <input
+                  type="number"
+                  min={1}
+                  value={form.maxPdfSizeMb ?? 25}
+                  onChange={(e) => updateNumber("maxPdfSizeMb", e.target.value)}
+                />
+              </label>
+            </div>
+          </section>
+        ) : null}
 
         <div className="config-actions">
           <button type="submit" className="btn btn-primary" disabled={saving}>
