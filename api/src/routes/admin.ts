@@ -683,4 +683,225 @@ router.post("/login-locks/unlock", requireRole("admin"), async (req: AuthRequest
   }
 });
 
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** List library holidays (due-date skip dates). */
+router.get("/holidays", requireRole("admin"), async (_req: AuthRequest, res: Response) => {
+  try {
+    const snap = await db.collection("config").doc("holidays").collection("dates").get();
+    const holidays = snap.docs
+      .map((doc) => {
+        const data = doc.data() || {};
+        return {
+          date: String(data.date || doc.id),
+          name: String(data.name || doc.id),
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+    res.json({ holidays });
+  } catch (error) {
+    console.error("Admin holidays list error:", error);
+    res.status(500).json({ error: "Failed to list holidays" });
+  }
+});
+
+/** Add or update a holiday date. */
+router.post("/holidays", requireRole("admin"), async (req: AuthRequest, res: Response) => {
+  try {
+    const date = String(req.body?.date || "").trim();
+    const name = String(req.body?.name || "").trim() || date;
+    if (!DATE_KEY_RE.test(date)) {
+      res.status(400).json({ error: "date must be YYYY-MM-DD" });
+      return;
+    }
+
+    await db.collection("config").doc("holidays").collection("dates").doc(date).set({
+      date,
+      name,
+      updatedAt: new Date(),
+      updatedBy: req.uid,
+    });
+
+    await db.collection("auditLog").add({
+      action: "holiday_upserted",
+      actorId: req.uid,
+      targetId: date,
+      metadata: { name },
+      timestamp: new Date(),
+    });
+
+    res.json({ success: true, holiday: { date, name } });
+  } catch (error) {
+    console.error("Admin holiday upsert error:", error);
+    res.status(500).json({ error: "Failed to save holiday" });
+  }
+});
+
+/** Remove a holiday date. */
+router.delete(
+  "/holidays/:date",
+  requireRole("admin"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const date = String(req.params.date || "").trim();
+      if (!DATE_KEY_RE.test(date)) {
+        res.status(400).json({ error: "date must be YYYY-MM-DD" });
+        return;
+      }
+
+      await db.collection("config").doc("holidays").collection("dates").doc(date).delete();
+
+      await db.collection("auditLog").add({
+        action: "holiday_deleted",
+        actorId: req.uid,
+        targetId: date,
+        metadata: {},
+        timestamp: new Date(),
+      });
+
+      res.json({ success: true, date });
+    } catch (error) {
+      console.error("Admin holiday delete error:", error);
+      res.status(500).json({ error: "Failed to delete holiday" });
+    }
+  }
+);
+
+/** Active / overdue loans oversight. */
+router.get(
+  "/loans",
+  requireRole("librarian", "admin"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const statusFilter = String(req.query.status || "all")
+        .trim()
+        .toLowerCase();
+      const q = String(req.query.q || "")
+        .trim()
+        .toLowerCase();
+      const { page, pageSize } = parseListQuery(
+        req.query as Record<string, unknown>,
+        20
+      );
+      const now = Date.now();
+
+      const [activeSnap, overdueSnap] = await Promise.all([
+        db.collection("loans").where("status", "==", "active").limit(LIST_FETCH_CAP).get(),
+        db.collection("loans").where("status", "==", "overdue").limit(LIST_FETCH_CAP).get(),
+      ]);
+
+      const byId = new Map<string, Record<string, unknown>>();
+      for (const doc of [...activeSnap.docs, ...overdueSnap.docs]) {
+        byId.set(doc.id, serializeDoc(doc.id, doc.data()));
+      }
+
+      type LoanRow = Record<string, unknown> & {
+        isOverdue: boolean;
+        remainingFine: number;
+        userEmail?: string;
+        userDisplayName?: string;
+      };
+
+      let loans: LoanRow[] = [...byId.values()].map((loan) => {
+        const dueMs = loan.dueDate ? new Date(String(loan.dueDate)).getTime() : NaN;
+        const isOverdue =
+          String(loan.status) === "overdue" ||
+          (String(loan.status) === "active" && Number.isFinite(dueMs) && dueMs < now);
+        return {
+          ...loan,
+          isOverdue,
+          remainingFine: fineRemaining({
+            fineAmount: loan.fineAmount,
+            finePaidAmount: loan.finePaidAmount,
+            finePaid: loan.finePaid,
+          }),
+        };
+      });
+
+      if (statusFilter === "overdue") {
+        loans = loans.filter((loan) => loan.isOverdue);
+      } else if (statusFilter === "active") {
+        loans = loans.filter((loan) => !loan.isOverdue);
+      }
+
+      const overdueCount = [...byId.values()].filter((loan) => {
+        const dueMs = loan.dueDate ? new Date(String(loan.dueDate)).getTime() : NaN;
+        return (
+          String(loan.status) === "overdue" ||
+          (String(loan.status) === "active" && Number.isFinite(dueMs) && dueMs < now)
+        );
+      }).length;
+      const activeCount = byId.size - overdueCount;
+
+      const userIds = [...new Set(loans.map((loan) => String(loan.userId || "")).filter(Boolean))];
+      const userSnaps = await Promise.all(
+        userIds.map((uid) => db.collection("users").doc(uid).get())
+      );
+      const usersById = new Map(
+        userSnaps
+          .filter((snap) => snap.exists)
+          .map((snap) => {
+            const data = snap.data() || {};
+            return [
+              snap.id,
+              {
+                email: String(data.email || ""),
+                displayName: String(data.displayName || ""),
+              },
+            ] as const;
+          })
+      );
+
+      loans = loans.map((loan) => {
+        const user = usersById.get(String(loan.userId || ""));
+        return {
+          ...loan,
+          userEmail: user?.email || "",
+          userDisplayName: user?.displayName || "",
+        };
+      });
+
+      if (q) {
+        loans = loans.filter((loan) => {
+          const hay = [
+            loan.title,
+            loan.isbn,
+            loan.copyId,
+            loan.userId,
+            loan.userEmail,
+            loan.userDisplayName,
+            loan.id,
+          ]
+            .map((v) => String(v || "").toLowerCase())
+            .join(" ");
+          return hay.includes(q);
+        });
+      }
+
+      loans.sort((a, b) => {
+        if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+        return String(a.dueDate || "").localeCompare(String(b.dueDate || ""));
+      });
+
+      const truncated =
+        activeSnap.size >= LIST_FETCH_CAP || overdueSnap.size >= LIST_FETCH_CAP;
+      const paged = paginateArray(loans, page, pageSize);
+
+      res.json({
+        loans: paged.results,
+        page: paged.page,
+        pageSize: paged.pageSize,
+        total: paged.total,
+        totalPages: paged.totalPages,
+        truncated,
+        overdueCount,
+        activeCount,
+      });
+    } catch (error) {
+      console.error("Admin loans list error:", error);
+      res.status(500).json({ error: "Failed to list loans" });
+    }
+  }
+);
+
 export default router;
