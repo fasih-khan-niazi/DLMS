@@ -32,7 +32,7 @@
     ],
     "android": {
       "package": "com.fyp.dlms",
-      "versionCode": 2,
+      "versionCode": 3,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "CAMERA",

@@ -1,5 +1,9 @@
 import { initializeApp, getApps } from "firebase/app";
-import { initializeAuth, getAuth } from "firebase/auth";
+import {
+  initializeAuth,
+  getAuth,
+  getReactNativePersistence,
+} from "firebase/auth";
 import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
 
 const firebaseConfig = {
@@ -13,15 +17,11 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApps()[0]! : initializeApp(firebaseConfig);
 
-// Firebase Auth - RN AsyncStorage pe session save
+// Firebase Auth - RN AsyncStorage pe session save (SDK 54 direct import)
 function createAuth() {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const rnAuth = require("@firebase/auth/dist/rn/index.js") as {
-      getReactNativePersistence: (storage: typeof ReactNativeAsyncStorage) => unknown;
-    };
     return initializeAuth(app, {
-      persistence: rnAuth.getReactNativePersistence(ReactNativeAsyncStorage) as any,
+      persistence: getReactNativePersistence(ReactNativeAsyncStorage),
     });
   } catch {
     return getAuth(app);
