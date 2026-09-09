@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../config/api";
+import { ConfirmDialog, PageHeader, useToast } from "../components/ui";
+import { extractApiError } from "../utils/apiError";
 
 type CatalogBook = {
   isbn?: string;
@@ -11,30 +13,43 @@ type CatalogBook = {
   availability?: string;
 };
 
+type PendingToggle = {
+  isbn: string;
+  title: string;
+  nextActive: boolean;
+};
+
 export function CatalogPage() {
+  const { showToast } = useToast();
   const [q, setQ] = useState("");
   const [books, setBooks] = useState<CatalogBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingToggle | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async (search: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data } = await api.get<{ results: CatalogBook[] }>("/api/catalog/books", {
-        params: {
-          includeInactive: "1",
-          ...(search ? { q: search } : { limit: 100 }),
-        },
-      });
-      setBooks(data.results || []);
-    } catch {
-      setError("Failed to load catalog");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (search: string) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await api.get<{ results: CatalogBook[] }>("/api/catalog/books", {
+          params: {
+            includeInactive: "1",
+            ...(search ? { q: search } : { limit: 100 }),
+          },
+        });
+        setBooks(data.results || []);
+      } catch (err) {
+        const msg = extractApiError(err, "Failed to load catalog");
+        setError(msg);
+        showToast(msg, "error");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [showToast]
+  );
 
   useEffect(() => {
     void load("");
@@ -45,44 +60,37 @@ export function CatalogPage() {
     void load(q.trim());
   }
 
-  async function toggleActive(isbn: string, nextActive: boolean) {
-    const action = nextActive ? "reactivate" : "deactivate";
-    if (
-      !window.confirm(
-        nextActive
-          ? "Reactivate this title in the student catalog?"
-          : "Deactivate this title? Students will not see it. Loan and reservation history stays."
-      )
-    ) {
-      return;
-    }
-    setMessage(null);
-    setError(null);
+  async function confirmToggle() {
+    if (!pending) return;
+    setBusy(true);
     try {
-      await api.patch(`/api/catalog/books/${encodeURIComponent(isbn)}/status`, {
-        isActive: nextActive,
+      await api.patch(`/api/catalog/books/${encodeURIComponent(pending.isbn)}/status`, {
+        isActive: pending.nextActive,
       });
-      setMessage(nextActive ? "Book reactivated" : "Book deactivated");
+      showToast(
+        pending.nextActive ? "Title reactivated in the catalog" : "Title deactivated",
+        "success"
+      );
+      setPending(null);
       await load(q.trim());
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "response" in err
-          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
-          : undefined;
-      setError(msg || `Failed to ${action} book`);
+    } catch (err) {
+      const msg = extractApiError(
+        err,
+        pending.nextActive ? "Failed to reactivate book" : "Failed to deactivate book"
+      );
+      setError(msg);
+      showToast(msg, "error");
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <div className="page">
-      <header className="page-header">
-        <div>
-          <h1>Catalog</h1>
-          <p className="muted">
-            Soft-deactivate duplicates or retired titles. History is kept.
-          </p>
-        </div>
-      </header>
+      <PageHeader
+        title="Catalog"
+        subtitle="Soft-deactivate duplicates or retired titles. Loan and reservation history stays."
+      />
 
       <form className="toolbar" onSubmit={onSearch}>
         <input
@@ -96,7 +104,6 @@ export function CatalogPage() {
         </button>
       </form>
 
-      {message ? <p className="success-banner">{message}</p> : null}
       {error ? <p className="error-banner">{error}</p> : null}
 
       {loading ? (
@@ -127,6 +134,10 @@ export function CatalogPage() {
                 books.map((book) => {
                   const isbn = String(book.isbn || "");
                   const active = book.isActive !== false;
+                  const issued = Math.max(
+                    0,
+                    (book.totalCopies ?? 0) - (book.availableCount ?? 0)
+                  );
                   return (
                     <tr key={isbn}>
                       <td>
@@ -137,7 +148,12 @@ export function CatalogPage() {
                       </td>
                       <td className="mono">{isbn}</td>
                       <td>
-                        {book.availableCount ?? 0} / {book.totalCopies ?? 0} available
+                        <div>
+                          {book.availableCount ?? 0} / {book.totalCopies ?? 0} available
+                        </div>
+                        {issued > 0 ? (
+                          <div className="muted small">{issued} on loan</div>
+                        ) : null}
                       </td>
                       <td>
                         <span className={active ? "status-pill ok" : "status-pill danger"}>
@@ -147,10 +163,18 @@ export function CatalogPage() {
                       <td>
                         <button
                           type="button"
-                          className="btn btn-small"
-                          onClick={() => void toggleActive(isbn, !active)}
+                          className={
+                            active ? "btn btn-small btn-danger-soft" : "btn btn-small btn-soft"
+                          }
+                          onClick={() =>
+                            setPending({
+                              isbn,
+                              title: book.title || isbn,
+                              nextActive: !active,
+                            })
+                          }
                         >
-                          {active ? "Deactivate" : "Activate"}
+                          {active ? "Deactivate" : "Reactivate"}
                         </button>
                       </td>
                     </tr>
@@ -161,6 +185,21 @@ export function CatalogPage() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pending}
+        title={pending?.nextActive ? "Reactivate this title?" : "Deactivate this title?"}
+        message={
+          pending?.nextActive
+            ? `"${pending.title}" will appear in the student catalog again.`
+            : `"${pending?.title}" will be hidden from students. History stays. Titles with copies on loan cannot be deactivated.`
+        }
+        confirmLabel={pending?.nextActive ? "Reactivate" : "Deactivate"}
+        variant={pending?.nextActive ? "info" : "danger"}
+        busy={busy}
+        onConfirm={() => void confirmToggle()}
+        onCancel={() => setPending(null)}
+      />
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../config/api";
+import { ConfirmDialog, PageHeader, useToast } from "../components/ui";
+import { extractApiError } from "../utils/apiError";
 
 type AdminUser = {
   id: string;
@@ -12,9 +14,30 @@ type AdminUser = {
   totalOutstandingFines?: number;
 };
 
+type PendingAction =
+  | {
+      kind: "role";
+      uid: string;
+      name: string;
+      role: string;
+      previous: string;
+    }
+  | {
+      kind: "status";
+      uid: string;
+      name: string;
+      activate: boolean;
+    }
+  | {
+      kind: "unlock";
+      email: string;
+      name: string;
+    };
+
 const CACHE_KEY = "dlms.admin.users";
 
 export function UsersPage() {
+  const { showToast } = useToast();
   const [q, setQ] = useState("");
   const [users, setUsers] = useState<AdminUser[]>(() => {
     try {
@@ -27,7 +50,9 @@ export function UsersPage() {
   const [loading, setLoading] = useState(users.length === 0);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingAction | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [roleDraft, setRoleDraft] = useState<Record<string, string>>({});
 
   const load = useCallback(async (search: string, opts?: { background?: boolean }) => {
     if (opts?.background) setRefreshing(true);
@@ -38,19 +63,27 @@ export function UsersPage() {
         params: search ? { q: search } : undefined,
       });
       setUsers(data.users);
+      const drafts: Record<string, string> = {};
+      data.users.forEach((u) => {
+        drafts[u.id] = u.role || "student";
+      });
+      setRoleDraft(drafts);
       if (!search) {
         sessionStorage.setItem(CACHE_KEY, JSON.stringify(data.users));
       }
-    } catch {
-      setError("Failed to load users");
+    } catch (err) {
+      const msg = extractApiError(err, "Failed to load users");
+      setError(msg);
+      showToast(msg, "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     void load("", { background: users.length > 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   function onSearch(e: FormEvent) {
@@ -58,57 +91,92 @@ export function UsersPage() {
     void load(q.trim());
   }
 
-  async function changeRole(uid: string, role: string, previous: string) {
+  function requestRoleChange(user: AdminUser, role: string) {
+    const previous = user.role || "student";
+    setRoleDraft((d) => ({ ...d, [user.id]: role }));
     if (role === previous) return;
-    if (!window.confirm(`Change this user's role to ${role}?`)) {
-      await load(q.trim(), { background: true });
-      return;
-    }
-    setMessage(null);
-    setError(null);
+    setPending({
+      kind: "role",
+      uid: user.id,
+      name: user.displayName || user.email || user.id,
+      role,
+      previous,
+    });
+  }
+
+  async function runPending() {
+    if (!pending) return;
+    setBusy(true);
     try {
-      await api.post(`/api/admin/users/${uid}/role`, { role });
-      setMessage(`Role updated to ${role}`);
+      if (pending.kind === "role") {
+        await api.post(`/api/admin/users/${pending.uid}/role`, { role: pending.role });
+        showToast(`Role updated to ${pending.role}`, "success");
+      } else if (pending.kind === "status") {
+        await api.post(`/api/admin/users/${pending.uid}/status`, {
+          isActive: pending.activate,
+        });
+        showToast(pending.activate ? "User activated" : "User suspended", "success");
+      } else {
+        await api.post("/api/admin/login-locks/unlock", { email: pending.email });
+        showToast(`Login lock cleared for ${pending.email}`, "success");
+      }
+      setPending(null);
       await load(q.trim(), { background: true });
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "response" in err
-          ? (err as { response?: { data?: { error?: string } } }).response?.data
-              ?.error
-          : undefined;
-      setError(msg || "Failed to change role");
+    } catch (err) {
+      const msg = extractApiError(err, "Action failed");
+      setError(msg);
+      showToast(msg, "error");
+      if (pending.kind === "role") {
+        setRoleDraft((d) => ({ ...d, [pending.uid]: pending.previous }));
+      }
       await load(q.trim(), { background: true });
+    } finally {
+      setBusy(false);
     }
   }
 
-  async function toggleStatus(uid: string, isActive: boolean) {
-    const action = isActive ? "activate" : "suspend";
-    if (!window.confirm(`Are you sure you want to ${action} this user?`)) return;
-    setMessage(null);
-    setError(null);
-    try {
-      await api.post(`/api/admin/users/${uid}/status`, { isActive });
-      setMessage(isActive ? "User activated" : "User suspended");
-      await load(q.trim(), { background: true });
-    } catch (err: unknown) {
-      const msg =
-        err && typeof err === "object" && "response" in err
-          ? (err as { response?: { data?: { error?: string } } }).response?.data
-              ?.error
-          : undefined;
-      setError(msg || "Failed to update status");
+  function cancelPending() {
+    if (pending?.kind === "role") {
+      setRoleDraft((d) => ({ ...d, [pending.uid]: pending.previous }));
     }
+    setPending(null);
   }
+
+  const dialogCopy = (() => {
+    if (!pending) return { title: "", message: "", confirm: "Confirm", variant: "info" as const };
+    if (pending.kind === "role") {
+      return {
+        title: `Change role to ${pending.role}?`,
+        message: `${pending.name} will become a ${pending.role}. Admin accounts stay seed-only and cannot be assigned here.`,
+        confirm: "Change role",
+        variant: "info" as const,
+      };
+    }
+    if (pending.kind === "status") {
+      return {
+        title: pending.activate ? "Activate this account?" : "Suspend this account?",
+        message: pending.activate
+          ? `${pending.name} will be able to sign in again.`
+          : `${pending.name} will be blocked from the app and API until reactivated.`,
+        confirm: pending.activate ? "Activate" : "Suspend",
+        variant: pending.activate ? ("info" as const) : ("danger" as const),
+      };
+    }
+    return {
+      title: "Clear login lock?",
+      message: `Remove any temporary lock on ${pending.email} so they can try signing in again.`,
+      confirm: "Unlock",
+      variant: "info" as const,
+    };
+  })();
 
   return (
     <div className="page">
-      <header className="page-header">
-        <div>
-          <h1>Users</h1>
-          <p className="muted">Promote students to librarian, or suspend accounts. Admin is seed-only.</p>
-        </div>
-        {refreshing ? <span className="pill">Refreshing...</span> : null}
-      </header>
+      <PageHeader
+        title="Users"
+        subtitle="Promote students to librarian, suspend accounts, or clear login locks. Admin is seed-only."
+        actions={refreshing ? <span className="pill">Refreshing...</span> : null}
+      />
 
       <form className="toolbar" onSubmit={onSearch}>
         <input
@@ -122,7 +190,6 @@ export function UsersPage() {
         </button>
       </form>
 
-      {message ? <p className="success-banner">{message}</p> : null}
       {error ? <p className="error-banner">{error}</p> : null}
 
       {loading ? (
@@ -160,10 +227,8 @@ export function UsersPage() {
                         <span className="status-pill ok">admin</span>
                       ) : (
                         <select
-                          value={user.role || "student"}
-                          onChange={(e) =>
-                            void changeRole(user.id, e.target.value, user.role || "student")
-                          }
+                          value={roleDraft[user.id] || user.role || "student"}
+                          onChange={(e) => requestRoleChange(user, e.target.value)}
                         >
                           <option value="student">student</option>
                           <option value="librarian">librarian</option>
@@ -180,25 +245,55 @@ export function UsersPage() {
                       </span>
                     </td>
                     <td>
-                      {user.hasUnpaidFines
-                        ? `Rs ${user.totalOutstandingFines ?? 0}`
-                        : "None"}
+                      {user.hasUnpaidFines ? (
+                        <span className="status-pill danger">
+                          Rs {user.totalOutstandingFines ?? 0}
+                        </span>
+                      ) : (
+                        <span className="muted">None</span>
+                      )}
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        className="btn btn-small"
-                        disabled={user.role === "admin"}
-                        onClick={() =>
-                          void toggleStatus(user.id, user.isActive === false)
-                        }
-                      >
-                        {user.role === "admin"
-                          ? "Protected"
-                          : user.isActive === false
-                            ? "Activate"
-                            : "Suspend"}
-                      </button>
+                      <div className="row-actions">
+                        <button
+                          type="button"
+                          className={
+                            user.isActive === false
+                              ? "btn btn-small btn-soft"
+                              : "btn btn-small btn-danger-soft"
+                          }
+                          disabled={user.role === "admin"}
+                          onClick={() =>
+                            setPending({
+                              kind: "status",
+                              uid: user.id,
+                              name: user.displayName || user.email || user.id,
+                              activate: user.isActive === false,
+                            })
+                          }
+                        >
+                          {user.role === "admin"
+                            ? "Protected"
+                            : user.isActive === false
+                              ? "Activate"
+                              : "Suspend"}
+                        </button>
+                        {user.email && user.role !== "admin" ? (
+                          <button
+                            type="button"
+                            className="btn btn-small"
+                            onClick={() =>
+                              setPending({
+                                kind: "unlock",
+                                email: user.email!,
+                                name: user.displayName || user.email!,
+                              })
+                            }
+                          >
+                            Unlock login
+                          </button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -207,6 +302,17 @@ export function UsersPage() {
           </table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pending}
+        title={dialogCopy.title}
+        message={dialogCopy.message}
+        confirmLabel={dialogCopy.confirm}
+        variant={dialogCopy.variant}
+        busy={busy}
+        onConfirm={() => void runPending()}
+        onCancel={cancelPending}
+      />
     </div>
   );
 }

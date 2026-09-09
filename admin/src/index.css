@@ -272,6 +272,105 @@ select {
   white-space: nowrap;
 }
 
+.pill-amber {
+  background: rgba(232, 168, 56, 0.22);
+  color: var(--navy-dark);
+}
+
+.muted-pill {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.dash-section {
+  margin-bottom: 1.5rem;
+}
+
+.dash-section .section-title {
+  margin-top: 0.25rem;
+}
+
+.attention-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.stat-card-link,
+.attention-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.stat-card-link:hover,
+.attention-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
+  border-color: rgba(46, 74, 98, 0.28);
+}
+
+.attention-card.tone-danger {
+  border-color: rgba(180, 35, 24, 0.28);
+  background: linear-gradient(180deg, #fff 0%, #fef6f5 100%);
+}
+
+.attention-card.tone-danger .stat-value {
+  color: var(--danger);
+}
+
+.attention-card.tone-warning {
+  border-color: rgba(180, 83, 9, 0.28);
+  background: linear-gradient(180deg, #fff 0%, #fff8f0 100%);
+}
+
+.attention-card.tone-warning .stat-value {
+  color: var(--warning);
+}
+
+.attention-card.tone-amber {
+  border-color: rgba(232, 168, 56, 0.45);
+  background: linear-gradient(180deg, #fff 0%, #fff9ec 100%);
+}
+
+.attention-card.tone-amber .stat-value {
+  color: var(--amber-dark);
+}
+
+.stat-hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.quick-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 0.9rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--white);
+  color: var(--navy);
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.quick-link:hover {
+  background: rgba(232, 168, 56, 0.12);
+  border-color: rgba(232, 168, 56, 0.45);
+}
+
 .status-pill {
   display: inline-flex;
   border-radius: var(--radius-pill);
