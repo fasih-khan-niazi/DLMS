@@ -206,26 +206,31 @@ async function auditCirculation(): Promise<Finding[]> {
   }
   console.log(`  broken ready holds: ${brokenReady}`);
 
-  // 5. Issued copies must point at an active loan.
-  const loansSnap = await db.collection("loans").where("status", "==", "active").get();
-  const activeLoanIds = new Set(loansSnap.docs.map((d) => d.id));
+  // 5. Issued copies must point at an open loan (active or overdue).
+  const [activeLoansSnap, overdueLoansSnap] = await Promise.all([
+    db.collection("loans").where("status", "==", "active").get(),
+    db.collection("loans").where("status", "==", "overdue").get(),
+  ]);
+  const openLoanIds = new Set(
+    [...activeLoansSnap.docs, ...overdueLoansSnap.docs].map((d) => d.id)
+  );
   let brokenIssued = 0;
   for (const [, copies] of copiesByIsbn) {
     for (const copy of copies) {
       if (copy.status !== "issued") continue;
       const loanId = String((copy as any).currentLoanId || "");
-      if (!loanId || !activeLoanIds.has(loanId)) {
+      if (!loanId || !openLoanIds.has(loanId)) {
         brokenIssued += 1;
         findings.push({
           severity: "FAIL",
           message:
             `copy ${copy.id} is issued but currentLoanId ${loanId || "(none)"} ` +
-            `is not an active loan (copy can never be returned or shelved)`,
+            `is not an open loan (copy can never be returned or shelved)`,
         });
       }
     }
   }
-  console.log(`  issued copies without an active loan: ${brokenIssued}`);
+  console.log(`  issued copies without an open loan: ${brokenIssued}`);
 
   return findings;
 }

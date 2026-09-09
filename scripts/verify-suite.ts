@@ -19,6 +19,7 @@ const STEPS: Array<{ name: string; file: string; args?: boolean }> = [
   { name: "digital covers", file: "verify-digital-covers.ts", args: true },
   { name: "notification dedupe", file: "verify-notifications.ts" },
   { name: "admin config HTTP", file: "verify-config-http.ts", args: true },
+  { name: "admin fix-pack", file: "verify-admin-fixpack.ts", args: true },
   { name: "librarian gates", file: "verify-librarian-gates.ts", args: true },
   { name: "ready-hold cancel", file: "verify-ready-cancel.ts", args: true },
   { name: "circulation flow", file: "verify-circulation-flow.ts", args: true },
