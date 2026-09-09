@@ -60,13 +60,18 @@ function matchesAvailabilityFilter(doc: Record<string, unknown>, availability: s
 function resolveCatalogStatusFilter(
   query: Record<string, unknown>,
   isStaff: boolean
-): "active" | "inactive" {
+): "active" | "inactive" | "all" {
   const requested = String(query.catalogStatus || "active").trim().toLowerCase();
-  if (isStaff && requested === "inactive") return "inactive";
+  if (!isStaff) return "active";
+  if (requested === "inactive" || requested === "all") return requested;
   return "active";
 }
 
-function matchesCatalogStatus(doc: Record<string, unknown>, catalogStatus: "active" | "inactive") {
+function matchesCatalogStatus(
+  doc: Record<string, unknown>,
+  catalogStatus: "active" | "inactive" | "all"
+) {
+  if (catalogStatus === "all") return true;
   const active = doc.isActive !== false;
   return catalogStatus === "inactive" ? !active : active;
 }

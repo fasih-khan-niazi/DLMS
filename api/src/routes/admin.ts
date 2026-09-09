@@ -10,6 +10,7 @@ import {
   cancelLibrarianReservations,
 } from "../services/reservations";
 import { clearLoginLock } from "../services/loginLock";
+import { paginateArray, parseListQuery } from "../utils/pagination";
 
 const router = Router();
 
@@ -122,8 +123,9 @@ router.get("/users", requireRole("admin"), async (req: AuthRequest, res: Respons
     const q = String(req.query.q || "")
       .trim()
       .toLowerCase();
+    const { page, pageSize } = parseListQuery(req.query as Record<string, unknown>, 20);
 
-    const snap = await db.collection("users").limit(100).get();
+    const snap = await db.collection("users").limit(500).get();
     let users = snap.docs.map((doc) => serializeDoc(doc.id, doc.data()));
 
     if (q) {
@@ -134,7 +136,18 @@ router.get("/users", requireRole("admin"), async (req: AuthRequest, res: Respons
       });
     }
 
-    res.json({ users });
+    users.sort((a, b) =>
+      String(a.displayName || a.email || "").localeCompare(String(b.displayName || b.email || ""))
+    );
+
+    const paged = paginateArray(users, page, pageSize);
+    res.json({
+      users: paged.results,
+      page: paged.page,
+      pageSize: paged.pageSize,
+      total: paged.total,
+      totalPages: paged.totalPages,
+    });
   } catch (error) {
     console.error("Admin users list error:", error);
     res.status(500).json({ error: "Failed to list users" });

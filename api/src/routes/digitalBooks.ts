@@ -11,7 +11,6 @@ import { buildSearchKeywords } from "../services/googleBooks";
 import { clampCatalogPageSize, getSystemConfig } from "../services/loans";
 import {
   downloadDigitalBookPdf,
-  removeDigitalBookPdf,
   uploadDigitalBookPdf,
 } from "../services/digitalBookStorage";
 import { uploadBookCover, downloadBookCover } from "../services/bookCoverStorage";
@@ -125,7 +124,7 @@ async function ensureDigitalCover(
   return { buffer: coverBuffer, contentType: "image/jpeg", path: coverPath };
 }
 
-// List published digital books (search optional)
+// List digital books (search optional). Staff may include unpublished.
 router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const q = String(req.query.q || "")
@@ -133,6 +132,11 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
       .toLowerCase();
     const sort = String(req.query.sort || "title_asc");
     const shelfFilter = String(req.query.shelfFilter || "all");
+    const isStaff = req.role === "librarian" || req.role === "admin";
+    const includeUnpublished =
+      isStaff &&
+      (String(req.query.includeUnpublished || "") === "1" ||
+        String(req.query.includeUnpublished || "").toLowerCase() === "true");
     const config = await getSystemConfig();
     const defaultPageSize = clampCatalogPageSize(config.catalogPageSize);
     const { page, pageSize } = parseListQuery(
@@ -152,17 +156,21 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
         return;
       }
       // Broad fetch + substring match ("mock" → "Mockingbird")
-      snap = await db
-        .collection("digitalBooks")
-        .where("isPublished", "==", true)
-        .limit(LIST_FETCH_CAP)
-        .get();
+      snap = includeUnpublished
+        ? await db.collection("digitalBooks").limit(LIST_FETCH_CAP).get()
+        : await db
+            .collection("digitalBooks")
+            .where("isPublished", "==", true)
+            .limit(LIST_FETCH_CAP)
+            .get();
     } else {
-      snap = await db
-        .collection("digitalBooks")
-        .where("isPublished", "==", true)
-        .limit(LIST_FETCH_CAP)
-        .get();
+      snap = includeUnpublished
+        ? await db.collection("digitalBooks").limit(LIST_FETCH_CAP).get()
+        : await db
+            .collection("digitalBooks")
+            .where("isPublished", "==", true)
+            .limit(LIST_FETCH_CAP)
+            .get();
     }
 
     let results: Record<string, unknown>[] = snap.docs.map((doc) => {
@@ -170,9 +178,21 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
       return withCoverThumbnail(req, {
         ...data,
         digitalBookId: data.digitalBookId || doc.id,
+        isPublished: data.isPublished !== false,
         fileUrl: publicFileUrl(req, data.digitalBookId || doc.id),
       });
     });
+
+    const publishStatus = String(req.query.publishStatus || "all")
+      .trim()
+      .toLowerCase();
+    if (!includeUnpublished) {
+      results = results.filter((row) => row.isPublished !== false);
+    } else if (publishStatus === "published") {
+      results = results.filter((row) => row.isPublished !== false);
+    } else if (publishStatus === "unpublished") {
+      results = results.filter((row) => row.isPublished === false);
+    }
 
     if (shelfFilter !== "all" && req.uid) {
       const shelfSnap = await db
@@ -609,7 +629,7 @@ router.post(
   }
 );
 
-// Unpublish (soft delete)
+// Soft unpublish (keeps PDF so staff can republish)
 router.delete(
   "/:digitalBookId",
   authenticate,
@@ -624,25 +644,38 @@ router.delete(
         return;
       }
 
-      const data = snap.data()!;
       await ref.update({ isPublished: false, updatedAt: new Date() });
-
-      // Best-effort remove from Supabase (keep metadata for audit)
-      if (data.storageBackend === "supabase") {
-        const objectPath = data.storagePath || data.storedFileName;
-        if (objectPath) {
-          try {
-            await removeDigitalBookPdf(objectPath);
-          } catch (removeError) {
-            console.error("Supabase remove after unpublish failed:", removeError);
-          }
-        }
-      }
-
-      res.json({ success: true, digitalBookId });
+      res.json({ success: true, digitalBookId, isPublished: false });
     } catch (error) {
       console.error("Unpublish digital book error:", error);
       res.status(500).json({ error: "Failed to unpublish digital book" });
+    }
+  }
+);
+
+// Publish / unpublish without deleting the file
+router.patch(
+  "/:digitalBookId/status",
+  authenticate,
+  requireRole("librarian", "admin"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const digitalBookId = req.params.digitalBookId as string;
+      if (typeof req.body?.isPublished !== "boolean") {
+        res.status(400).json({ error: "isPublished boolean is required" });
+        return;
+      }
+      const ref = db.collection("digitalBooks").doc(digitalBookId);
+      const snap = await ref.get();
+      if (!snap.exists) {
+        res.status(404).json({ error: "Digital book not found" });
+        return;
+      }
+      await ref.update({ isPublished: req.body.isPublished, updatedAt: new Date() });
+      res.json({ success: true, digitalBookId, isPublished: req.body.isPublished });
+    } catch (error) {
+      console.error("Digital book status error:", error);
+      res.status(500).json({ error: "Failed to update digital book status" });
     }
   }
 );
