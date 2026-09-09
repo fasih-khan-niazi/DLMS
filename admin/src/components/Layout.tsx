@@ -13,6 +13,7 @@ const navItems: Array<{
   { to: "/", label: "Dashboard", end: true, icon: DashboardIcon },
   { to: "/users", label: "Users", icon: UsersIcon },
   { to: "/catalog", label: "Catalog", icon: CatalogIcon },
+  { to: "/loans", label: "Loans", icon: LoansIcon },
   { to: "/config", label: "Config", icon: ConfigIcon },
   { to: "/reservations", label: "Reservations", icon: ReservationsIcon },
   { to: "/fines", label: "Fines", icon: FinesIcon },
@@ -23,6 +24,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/": "Dashboard",
   "/users": "Users",
   "/catalog": "Catalog",
+  "/loans": "Loans",
   "/config": "Configuration",
   "/reservations": "Reservations",
   "/fines": "Fines",
@@ -58,6 +60,15 @@ function CatalogIcon() {
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5V5.5z" />
       <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    </svg>
+  );
+}
+
+function LoansIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M8 4h9a2 2 0 0 1 2 2v13l-3-1.5L13 19l-3-1.5L7 19V6a2 2 0 0 1 2-2z" />
+      <path d="M10 8h6M10 12h6" />
     </svg>
   );
 }

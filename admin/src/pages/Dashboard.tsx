@@ -99,8 +99,8 @@ export function DashboardPage() {
           label: "Overdue loans",
           value: stats.overdueLoans,
           tone: "danger" as const,
-          to: "/reports",
-          hint: "Late returns. Open Reports for trends; clear fines on Fines.",
+          to: "/loans",
+          hint: "Open loan list filtered to overdue",
         },
         {
           label: "Unpaid fines (Rs)",
@@ -122,9 +122,9 @@ export function DashboardPage() {
   const overview = stats
     ? [
         { label: "Users", value: stats.users, to: "/users" },
-        { label: "Active loans", value: stats.activeLoans },
+        { label: "Active loans", value: stats.activeLoans, to: "/loans" },
         { label: "Waiting reservations", value: stats.waitingReservations, to: "/reservations" },
-        { label: "Digital books", value: stats.publishedDigitalBooks },
+        { label: "Digital books", value: stats.publishedDigitalBooks, to: "/catalog" },
       ]
     : [];
 

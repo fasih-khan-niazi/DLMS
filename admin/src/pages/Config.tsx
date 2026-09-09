@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api } from "../config/api";
-import { PageHeader, ToggleSwitch, useToast } from "../components/ui";
+import { ConfirmDialog, PageHeader, ToggleSwitch, useToast } from "../components/ui";
 import { extractApiError } from "../utils/apiError";
 
 type SystemConfig = {
@@ -98,6 +98,24 @@ export function ConfigPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unsupported, setUnsupported] = useState<string[]>([]);
+  const [holidays, setHolidays] = useState<Array<{ date: string; name: string }>>([]);
+  const [holidayDate, setHolidayDate] = useState("");
+  const [holidayName, setHolidayName] = useState("");
+  const [holidayBusy, setHolidayBusy] = useState(false);
+  const [deleteHoliday, setDeleteHoliday] = useState<{ date: string; name: string } | null>(
+    null
+  );
+
+  async function loadHolidays() {
+    try {
+      const { data } = await api.get<{ holidays: Array<{ date: string; name: string }> }>(
+        "/api/admin/holidays"
+      );
+      setHolidays(data.holidays || []);
+    } catch (err) {
+      showToast(extractApiError(err, "Failed to load holidays"), "error");
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -152,6 +170,7 @@ export function ConfigPage() {
         } else {
           setCustomTimezone("");
         }
+        void loadHolidays();
       } catch (err) {
         if (!cancelled) {
           const msg = extractApiError(err, "Failed to load config");
@@ -165,7 +184,46 @@ export function ConfigPage() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showToast]);
+
+  async function addHoliday(e: FormEvent) {
+    e.preventDefault();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(holidayDate)) {
+      showToast("Holiday date must be YYYY-MM-DD", "error");
+      return;
+    }
+    setHolidayBusy(true);
+    try {
+      await api.post("/api/admin/holidays", {
+        date: holidayDate,
+        name: holidayName.trim() || holidayDate,
+      });
+      showToast("Holiday saved", "success");
+      setHolidayDate("");
+      setHolidayName("");
+      await loadHolidays();
+    } catch (err) {
+      showToast(extractApiError(err, "Failed to save holiday"), "error");
+    } finally {
+      setHolidayBusy(false);
+    }
+  }
+
+  async function confirmDeleteHoliday() {
+    if (!deleteHoliday) return;
+    setHolidayBusy(true);
+    try {
+      await api.delete(`/api/admin/holidays/${deleteHoliday.date}`);
+      showToast("Holiday removed", "success");
+      setDeleteHoliday(null);
+      await loadHolidays();
+    } catch (err) {
+      showToast(extractApiError(err, "Failed to delete holiday"), "error");
+    } finally {
+      setHolidayBusy(false);
+    }
+  }
 
   function updateNumber(field: keyof SystemConfig, value: string) {
     const n = Number(value);
@@ -512,6 +570,72 @@ export function ConfigPage() {
                 </span>
               </div>
             </div>
+
+            <div className="config-section-head" style={{ marginTop: "1.25rem" }}>
+              <h2>Holidays</h2>
+              <p className="muted small">
+                Calendar dates that skip due dates (same collection the seed script uses)
+              </p>
+            </div>
+            <form className="toolbar" onSubmit={addHoliday}>
+              <label>
+                Date
+                <input
+                  type="date"
+                  value={holidayDate}
+                  onChange={(e) => setHolidayDate(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Name
+                <input
+                  type="text"
+                  value={holidayName}
+                  onChange={(e) => setHolidayName(e.target.value)}
+                  placeholder="Pakistan Day"
+                />
+              </label>
+              <button type="submit" className="btn btn-primary" disabled={holidayBusy}>
+                {holidayBusy ? "Saving..." : "Add holiday"}
+              </button>
+            </form>
+            <div className="table-wrap sticky-head" style={{ marginTop: "0.75rem" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Name</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {holidays.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="empty-cell">
+                        No holidays configured.
+                      </td>
+                    </tr>
+                  ) : (
+                    holidays.map((h) => (
+                      <tr key={h.date}>
+                        <td className="mono">{h.date}</td>
+                        <td>{h.name}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-small btn-danger-soft"
+                            onClick={() => setDeleteHoliday(h)}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
         ) : null}
 
@@ -563,6 +687,21 @@ export function ConfigPage() {
           </button>
         </div>
       </form>
+
+      <ConfirmDialog
+        open={!!deleteHoliday}
+        title="Remove this holiday?"
+        message={
+          deleteHoliday
+            ? `${deleteHoliday.date} (${deleteHoliday.name}) will no longer skip due dates.`
+            : ""
+        }
+        confirmLabel="Remove"
+        variant="danger"
+        busy={holidayBusy}
+        onConfirm={() => void confirmDeleteHoliday()}
+        onCancel={() => setDeleteHoliday(null)}
+      />
     </div>
   );
 }

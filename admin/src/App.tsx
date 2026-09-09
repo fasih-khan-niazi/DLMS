@@ -7,6 +7,7 @@ import { CatalogPage } from "./pages/Catalog";
 import { ConfigPage } from "./pages/Config";
 import { DashboardPage } from "./pages/Dashboard";
 import { FinesPage } from "./pages/Fines";
+import { LoansPage } from "./pages/Loans";
 import { LoginPage } from "./pages/Login";
 import { ForgotPasswordPage } from "./pages/ForgotPassword";
 import { ReportsPage } from "./pages/Reports";
@@ -53,6 +54,7 @@ export default function App() {
               <Route index element={<DashboardPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="catalog" element={<CatalogPage />} />
+              <Route path="loans" element={<LoansPage />} />
               <Route path="config" element={<ConfigPage />} />
               <Route path="reservations" element={<ReservationsPage />} />
               <Route path="fines" element={<FinesPage />} />

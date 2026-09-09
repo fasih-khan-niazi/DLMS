@@ -1074,14 +1074,30 @@ select {
 .login-card input,
 .config-form input[type="text"],
 .config-form input[type="number"],
+.config-form input[type="date"],
+.config-form input[type="file"],
+.config-form select,
+.config-form textarea,
+.config-grid input[type="text"],
+.config-grid input[type="number"],
+.config-grid input[type="date"],
+.config-grid input[type="file"],
+.config-grid select,
+.config-grid textarea,
 .toolbar input,
 .toolbar label input,
 table select {
+  font: inherit;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 0.55rem 0.7rem;
   background: var(--surface);
   color: var(--text);
+}
+
+.config-grid textarea {
+  resize: vertical;
+  min-height: 4.5rem;
 }
 
 .toolbar label {
