@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../config/api";
+import { PageHeader } from "../components/ui";
 
 type DashboardStats = {
   users: number;
@@ -64,13 +65,11 @@ export function DashboardPage() {
 
   return (
     <div className="page">
-      <header className="page-header">
-        <div>
-          <h1>Dashboard</h1>
-          <p className="muted">Operations overview for the library</p>
-        </div>
-        {refreshing ? <span className="pill">Refreshing...</span> : null}
-      </header>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Operations overview for the library"
+        actions={refreshing ? <span className="pill">Refreshing...</span> : null}
+      />
 
       {loading ? (
         <div className="stat-grid">
