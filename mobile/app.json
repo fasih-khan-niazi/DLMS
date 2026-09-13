@@ -2,15 +2,10 @@
   "expo": {
     "name": "DLMS",
     "slug": "dlms",
-    "version": "3.0.0",
+    "version": "3.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#2E4A62"
-    },
     "plugins": [
       [
         "expo-camera",
@@ -28,11 +23,23 @@
       ],
       "expo-asset",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#2E4A62",
+          "imageWidth": 200
+        }
+      ],
+      "expo-status-bar",
+      "./plugins/withReleaseSigning.js"
     ],
     "android": {
       "package": "com.fyp.dlms",
-      "versionCode": 4,
+      "versionCode": 6,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "CAMERA",
