@@ -2,7 +2,7 @@
   "expo": {
     "name": "DLMS",
     "slug": "dlms",
-    "version": "3.1.0",
+    "version": "3.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -34,11 +34,12 @@
           "imageWidth": 200
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      "./plugins/withReleaseSigning.js"
     ],
     "android": {
       "package": "com.fyp.dlms",
-      "versionCode": 5,
+      "versionCode": 6,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "CAMERA",
