@@ -40,11 +40,19 @@ const env = {
     path.join(process.env.LOCALAPPDATA || "", "Android", "Sdk"),
   GRADLE_USER_HOME: process.env.GRADLE_USER_HOME || "C:\\g",
   NODE_ENV: "production",
+  // Client APKs always target production Render (override local LAN .env)
+  EXPO_PUBLIC_API_URL:
+    process.env.EXPO_PUBLIC_API_URL_RELEASE || "https://dlms-csij.onrender.com",
 };
 env.Path = `${env.JAVA_HOME}\\bin;${env.ANDROID_HOME}\\platform-tools;${env.Path || process.env.PATH}`;
 
+console.log("Building release APK with API:", env.EXPO_PUBLIC_API_URL);
+
 const gradlew = process.platform === "win32" ? "gradlew.bat" : "./gradlew";
-const result = spawnSync(gradlew, ["assembleRelease", "--no-daemon"], {
+const result = spawnSync(
+  gradlew,
+  [":app:clean", ":expo-constants:createExpoConfig", "assembleRelease", "--no-daemon"],
+  {
   cwd: android,
   env,
   stdio: "inherit",
