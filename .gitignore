@@ -14,6 +14,10 @@ google-services.json
 secrets/
 api/uploads/
 
+# Local IDE / scratch (not part of the product)
+.idea/
+DLMS Expo SDK 57/
+
 .DS_Store
 Thumbs.db
 npm-debug.log*
