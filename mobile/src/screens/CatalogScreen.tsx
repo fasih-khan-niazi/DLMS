@@ -9,7 +9,7 @@ import {
   Modal,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppSafeArea } from "../hooks/useAppSafeArea";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "../utils/haptics";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -60,7 +60,7 @@ export default function CatalogScreen({
   embedded = false,
   initialQuery = "",
 }: Props) {
-  const insets = useSafeAreaInsets();
+  const insets = useAppSafeArea();
   const { colors, fontFamily, radius, space, type } = useTheme();
   const { isStaff } = useProfile();
 

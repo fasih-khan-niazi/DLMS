@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from "react";
 import { View, Text, FlatList, RefreshControl } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppSafeArea } from "../hooks/useAppSafeArea";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
 import { SkeletonList } from "../components/Skeleton";
@@ -21,7 +21,7 @@ type Props = {
 
 // ye screen notifications inbox dikhati hai
 export default function NotificationsScreen({ navigation }: Props) {
-  const insets = useSafeAreaInsets();
+  const insets = useAppSafeArea();
   const { colors, fontFamily, radius, space, type, mode } = useTheme();
   const [items, setItems] = useState<InboxNotification[]>([]);
   const [loading, setLoading] = useState(true);

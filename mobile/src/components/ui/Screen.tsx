@@ -8,7 +8,7 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppSafeArea } from "../../hooks/useAppSafeArea";
 import { useTheme } from "../../theme";
 
 type Props = {
@@ -30,7 +30,7 @@ export function Screen({
   refreshing = false,
   onRefresh,
 }: Props) {
-  const insets = useSafeAreaInsets();
+  const insets = useAppSafeArea();
   const { colors } = useTheme();
 
   const padding = {
