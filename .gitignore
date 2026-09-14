@@ -27,3 +27,4 @@ pnpm-debug.log*
 
 
 scripts/inspect-fasih-users.ts
+scripts/purge-fasih-users.ts
