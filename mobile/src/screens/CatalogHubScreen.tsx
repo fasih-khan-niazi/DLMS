@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppSafeArea } from "../hooks/useAppSafeArea";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import {
@@ -25,7 +25,7 @@ const TAB_ORDER: CatalogTab[] = ["physicalCopies", "digitalCopies"];
 
 // ye screen physical / digital catalog tabs dikhati hai
 export default function CatalogHubScreen({ navigation, route }: Props) {
-  const insets = useSafeAreaInsets();
+  const insets = useAppSafeArea();
   const { colors, fontFamily, radius, space, type } = useTheme();
   const [tab, setTab] = useState<CatalogTab>(route.params?.initialTab || DEFAULT_CATALOG_TAB);
 

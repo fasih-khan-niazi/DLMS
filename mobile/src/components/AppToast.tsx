@@ -9,8 +9,8 @@ import React, {
   type ReactNode,
 } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useAppSafeArea } from "../hooks/useAppSafeArea";
 import { useTheme } from "../theme";
 
 type ToastPayload = {
@@ -28,7 +28,7 @@ const ToastContext = createContext<ToastContextValue>({
 });
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const insets = useSafeAreaInsets();
+  const insets = useAppSafeArea();
   const { fontFamily, type, radius, mode } = useTheme();
   const [toast, setToast] = useState<ToastPayload | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -91,7 +91,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       {toast ? (
-        <View pointerEvents="box-none" style={[styles.host, { paddingTop: insets.top + 10 }]}>
+        <View
+          pointerEvents="box-none"
+          style={[styles.host, { top: insets.top + 10 }]}
+        >
           <View
             style={[
               styles.toast,
@@ -149,10 +152,13 @@ export function useToast() {
 
 const styles = StyleSheet.create({
   host: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    left: 0,
+    right: 0,
     zIndex: 9999,
     elevation: 9999,
     alignItems: "center",
+    justifyContent: "flex-start",
     pointerEvents: "box-none",
   },
   toast: {

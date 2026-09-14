@@ -14,7 +14,7 @@ import * as Haptics from "../utils/haptics";
 import * as ScreenOrientation from "expo-screen-orientation";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppSafeArea } from "../hooks/useAppSafeArea";
 import api, { API_BASE_URL } from "../config/api";
 import { firebaseAuth } from "../config/firebase";
 import { ReadingProgressTracker } from "../utils/readingProgress";
@@ -62,7 +62,7 @@ export default function PdfReaderScreen({ navigation, route }: Props) {
     onBookshelf = false,
   } = route.params;
   const { colors, fontFamily, space, type, radius } = useTheme();
-  const insets = useSafeAreaInsets();
+  const insets = useAppSafeArea();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isLandscape = windowWidth > windowHeight;
   const webRef = useRef<WebView>(null);
