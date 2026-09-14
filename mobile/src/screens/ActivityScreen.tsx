@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppSafeArea } from "../hooks/useAppSafeArea";
 import MyLoansScreen from "./MyLoansScreen";
 import ReservationsScreen from "./ReservationsScreen";
 import LoanHistoryScreen from "./LoanHistoryScreen";
@@ -17,7 +17,7 @@ type Props = {
 
 // ye screen loans / reservations tabs dikhati hai
 export default function ActivityScreen({ navigation, route }: Props) {
-  const insets = useSafeAreaInsets();
+  const insets = useAppSafeArea();
   const { colors, fontFamily, radius, space, type } = useTheme();
   const [tab, setTab] = useState<ActivityTab>(route?.params?.initialTab || "loans");
 
@@ -39,7 +39,7 @@ export default function ActivityScreen({ navigation, route }: Props) {
     <View
       style={[
         styles.container,
-        { paddingTop: Math.max(insets.top, 8), backgroundColor: colors.cream },
+        { paddingTop: insets.top + 8, backgroundColor: colors.cream },
       ]}
     >
       <Text

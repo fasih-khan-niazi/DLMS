@@ -7,7 +7,7 @@ import {
   StyleSheet,
   type ViewStyle,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppSafeArea } from "../hooks/useAppSafeArea";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "../utils/haptics";
 import { Button } from "./ui/Button";
@@ -57,7 +57,7 @@ export function AppModal({
   onConfirm,
   onCancel,
 }: Props) {
-  const insets = useSafeAreaInsets();
+  const insets = useAppSafeArea();
   const { colors, fontFamily, space, type, radius } = useTheme();
   const icon = ICONS[variant];
   const iconColor = colors[icon.colorKey];

@@ -3,7 +3,7 @@ import { View, StyleSheet, Pressable } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppSafeArea } from "../hooks/useAppSafeArea";
 import { Ionicons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
@@ -179,7 +179,7 @@ function MainTabs() {
 }
 
 function MainTabNavigator() {
-  const insets = useSafeAreaInsets();
+  const insets = useAppSafeArea();
   const bottomPad = Math.max(insets.bottom, 8);
   const { colors, mode } = useTheme();
   const { profile, refresh } = useProfile();

@@ -10,7 +10,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "../utils/haptics";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppSafeArea } from "../hooks/useAppSafeArea";
 import { useIsFocused } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import api from "../config/api";
@@ -89,7 +89,7 @@ async function resolveCopyLabel(copyId: string, isbn: string): Promise<string> {
 
 // yahan QR scan hota hai - borrow / return
 export default function ScanScreen({ navigation }: Props) {
-  const insets = useSafeAreaInsets();
+  const insets = useAppSafeArea();
   const isFocused = useIsFocused();
   const { colors, fontFamily, space, type, radius } = useTheme();
   const { isStaff, profile, refresh } = useProfile();
@@ -275,7 +275,8 @@ export default function ScanScreen({ navigation }: Props) {
       <StatusBar style="light" />
       {isFocused ? (
         <CameraView
-          style={StyleSheet.absoluteFillObject}
+          key={isFocused ? "scan-camera-on" : "scan-camera-off"}
+          style={StyleSheet.absoluteFill}
           facing="back"
           mute
           enableTorch={torchOn}
@@ -283,13 +284,10 @@ export default function ScanScreen({ navigation }: Props) {
           onBarcodeScanned={scanned || !!fineModal || !!result ? undefined : handleBarcode}
         />
       ) : (
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: ON_CAMERA_BACKDROP }]} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: ON_CAMERA_BACKDROP }]} />
       )}
 
-      <View
-        style={[styles.frameOverlay, { marginTop: insets.top + 48, marginBottom: 12 }]}
-        pointerEvents="none"
-      >
+      <View style={styles.frameOverlay} pointerEvents="none">
         <View style={styles.dimTop} />
         <View style={styles.frameRow}>
           <View style={styles.dimSide} />
@@ -366,7 +364,7 @@ export default function ScanScreen({ navigation }: Props) {
         </View>
       ) : null}
 
-      <View style={[styles.bottomPanel, { paddingBottom: insets.bottom + 16 }]}>
+      <View style={[styles.bottomPanel, { paddingBottom: Math.max(insets.bottom, 8) + 16 }]}>
         {returnOnly ? (
           <View
             style={[
@@ -535,10 +533,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   bottomPanel: {
+    position: "absolute",
     left: 0,
     right: 0,
+    bottom: 0,
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 12,
     zIndex: 2,
     backgroundColor: "rgba(20, 31, 40, 0.72)",
   },
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   frameOverlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFill,
     justifyContent: "center",
     zIndex: 1,
   },

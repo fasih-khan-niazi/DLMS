@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppSafeArea } from "../../hooks/useAppSafeArea";
 import { useTheme } from "../../theme";
 import { Card } from "./Card";
 import { PressableScale } from "./PressableScale";
@@ -29,7 +29,7 @@ export function AuthLayout({
   children,
   footer,
 }: Props) {
-  const insets = useSafeAreaInsets();
+  const insets = useAppSafeArea();
   const { colors, fontFamily, type, space, radius, mode } = useTheme();
   const isDark = mode === "dark";
   const heroBg = isDark ? colors.creamDark : "#2E4A62";
